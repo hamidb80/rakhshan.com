@@ -1,4 +1,4 @@
-import sequtils, strformat, strutils
+import sequtils, tables, strformat, strutils
 import telebot, asyncdispatch, logging, options
 
 
@@ -7,7 +7,7 @@ type
     chatId: int
     path: string
     state: int
-
+    route: seq[string]
     member: Option[MemberCtx]
 
   MemberCtx = ref object
@@ -18,63 +18,61 @@ type
     text: string
     code: string
 
-
-tgController(bot: Telebot, ctx: TgCtx): 
-  # main templates convert to dirty one
-
-  template goback= ctx.path.pop
-  template forward(newp: varargs[string])= ctx.path.push newp
-
-  template sendText= discard # has to be async
-  
-  template genKeyboard(seq[seq[KeyboardAlias]])= discard
-  template removeKeyboard= discard
-
-  proc resovler {.internal.}=
-    discard
-
-  route "/"=
-    fn
-
-  route "/reshte"=
-    genKeyboard  ...
-
-  route ("quiz", @qid[int], "part", @pid[int])=
-    discard
+  RouterMap = Table[
+    string, 
+    proc(bot: Telebot, uctx: TgCtx){.async, nimcall.}
+  ]
 
 
+template goback{.dirty.}= uctx.path.pop
+template forward(newp: varargs[string]){.dirty.}= uctx.path.push newp
 
-const API_KEY = "2004052302:AAHm_oICftfs5xLmY0QwGVTE3o-gYgD6ahw"
+template sendText{.dirty.}= discard # has to be async
+
+proc genKeyboard(aliases: seq[seq[KeyboardAlias]])= discard
+proc removeKeyboard= discard
+
+proc dispatcher(bot: TeleBot, u: Update): Future[bool] {.async.}=
+  if u.message.issome:
+    let msg = u.message.get
+
+    if msg.text.isSome:
+      let keys = toseq(1..4).mapit InlineKeyboardButton(text: $it, callbackData: some $it)
+
+      discard await bot.sendMessage(msg.chat.id, msg.text.get,
+        replyToMessageId = msg.messageId,
+        parseMode = "markdown",
+        replyMarkup = newInlineKeyboardMarkup(keys))
 
 
-proc updateHandler(bot: Telebot, u: Update): Future[bool] {.async.} =
-  if u.message.isNone:
-    if  u.callbackQuery.issome:
-      echo "====================="
+  elif u.callbackQuery.issome:
       let cq = u.callbackQuery.get
       discard await bot.answerCallbackQuery($cq.id, fmt"~~{cq.data.get}~~", true)
-      echo "====================="
 
-    else:
-      discard
 
-  elif u.message.get.text.isSome:
-    var response = u.message.get
+proc trigger(route: seq[string] or varargs[string])=
+  #TODO check get keys at compile time
+  discard
 
-    let keys = toseq(1..4).mapit InlineKeyboardButton(text: $it, callbackData: some $it)
 
-    discard await bot.sendMessage(response.chat.id, response.text.get,
-      replyToMessageId = response.messageId,
-      parseMode = "markdown",
-      replyMarkup = newInlineKeyboardMarkup(keys))
+const router: RouterMap = tgRouter(bot: Telebot, uctx: TgCtx): 
+  route("/") as "home":
+    discard
+
+  route("/reshte") as "select-reshte":
+    discard
+
+  route("quiz", @qid[int], "part", @pid[int]) as "quiz":
+    discard
+
 
 
 when isMainModule:
   addHandler newConsoleLogger(fmtStr= "$levelname, [$time]")
 
+  const API_KEY = "2004052302:AAHm_oICftfs5xLmY0QwGVTE3o-gYgD6ahw"
   let bot = newTeleBot API_KEY
-  bot.onUpdate updateHandler
-
+  bot.onUpdate dispatcher
 
   while true:
     echo "running ..."
