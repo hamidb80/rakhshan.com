@@ -9,7 +9,7 @@ type
     chatId*: int
     path*: string
     state*: int
-    route*: seq[string]
+    stage*: int
     member*: Option[MemberCtx]
 
   MemberCtx* = ref object
@@ -19,11 +19,14 @@ type
   RouterProc = proc(bot: Telebot, uctx: TgCtx, args: JsonNode) {.async.}
   RouterMap* = Table[string, RouterProc]
 
+
+# helper
 proc add(father: NimNode; children: openArray[NimNode]): NimNode =
   for node in children:
     father.add node
 
   return father
+
 
 proc typeToJsonProc(`type`: string): NimNode =
   return case `type`:
@@ -45,9 +48,11 @@ proc extractArgsFromJson(args: openArray[NimNode]): NimNode =
     ))
 
 
-macro tgRouter*(varName: typed, args: varargs[untyped]): untyped =
+macro initRouter(varName: typed, args: varargs[untyped]): untyped =
   result = newStmtList()
-  let body = args[^1]
+  let body = 
+    if args[^1].kind != nnkStmtList: args[^1]
+    else: args[^1][0]
 
   for entity in body:
     doAssert:
@@ -72,17 +77,31 @@ macro tgRouter*(varName: typed, args: varargs[untyped]): untyped =
 
 
   # echo treeRepr result
-  echo repr result
+  # echo repr result
   return result
 
-var myname: RouterMap
+template newRouter*(body: untyped): var RouterMap=
+  var result: RouterMap
+  initRouter(result, bot: TeleBot, ctx: TgCtx): body
+  result
 
-tgRouter(myname, bot: TeleBot, ctx: TgCtx):
+# var result: RouterMap
+
+# initRouter(result, bot: TeleBot, ctx: TgCtx):
+#   route(id: int) as "home":
+#     discard
+
+#   route() as "hey":
+#     echo "DKALJDLKSJ"
+
+## usage
+var tgRouter = newRouter:
   route(id: int) as "home":
     discard
 
   route() as "hey":
     echo "DKALJDLKSJ"
+
 
 # proc dispatcher*(bot: TeleBot, u: Update): Future[bool] {.async.} =
 #   if u.message.issome:

@@ -9,28 +9,25 @@ type
 
 
 
-template goback{.dirty.}= uctx.path.pop
-template forward(newp: varargs[string]){.dirty.}= uctx.path.push newp
+template sendText{.dirty.} = discard # has to be async
 
-template sendText{.dirty.}= discard # has to be async
+proc genKeyboard(aliases: seq[seq[KeyboardAlias]]) = discard
+proc removeKeyboard = discard
 
-proc genKeyboard(aliases: seq[seq[KeyboardAlias]])= discard
-proc removeKeyboard= discard
-
-const router: RouterMap = tgRouter(bot: Telebot, uctx: TgCtx): 
+const router: RouterMap = tgRouter(bot: Telebot, uctx: TgCtx):
   route("/") as "home":
     discard
 
   route("/reshte") as "select-reshte":
     discard
 
-  route("quiz", @qid[int], "part", @pid[int]) as "quiz":
+  route(qid: int, pid: int) as "quiz":
     discard
 
 
 
 when isMainModule:
-  addHandler newConsoleLogger(fmtStr= "$levelname, [$time]")
+  addHandler newConsoleLogger(fmtStr = "$levelname, [$time]")
 
   const API_KEY = "2004052302:AAHm_oICftfs5xLmY0QwGVTE3o-gYgD6ahw"
   let bot = newTeleBot API_KEY
