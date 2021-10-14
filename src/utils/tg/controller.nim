@@ -1,4 +1,4 @@
-import tables, sequtils, options
+import tables, sequtils, options, json
 import macros except params
 import
   asyncdispatch, telebot,
@@ -16,8 +16,7 @@ type
     fname*: string
     lname*: string
 
-  RouterProc = proc(bot: Telebot, uctx: TgCtx) {.async.}
-  # RouterProc = proc() {.async.}
+  RouterProc = proc(bot: Telebot, uctx: TgCtx, args: JsonNode) {.async.}
   RouterMap* = Table[string, RouterProc]
 
 proc add(father: NimNode; children: openArray[NimNode]): NimNode =
@@ -26,7 +25,27 @@ proc add(father: NimNode; children: openArray[NimNode]): NimNode =
 
   return father
 
-macro tgRouter*(varName: untyped, args: varargs[untyped]): untyped =
+proc typeToJsonProc(`type`: string): NimNode =
+  return case `type`:
+    of "string": bindsym "getStr"
+    of "int": bindsym "getInt"
+    else:
+      raise newException(ValueError, "type not found")
+
+proc extractArgsFromJson(args: openArray[NimNode]): NimNode =
+  doassert args.allIt it.kind == nnkExprColonExpr
+  result = newStmtList()
+
+  for (index, arg) in args.pairs:
+    discard result.add newLetStmt(
+      arg[0],
+      newcall(
+        typeToJsonProc arg[1].strval,
+        newNimNode(nnkBracketExpr).add(ident "args", newIntLitNode index)
+    ))
+
+
+macro tgRouter*(varName: typed, args: varargs[untyped]): untyped =
   result = newStmtList()
   let body = args[^1]
 
@@ -37,21 +56,23 @@ macro tgRouter*(varName: untyped, args: varargs[untyped]): untyped =
 
     let
       aliasName = entity[InfixRightSide].strVal
-      fnBody = entity[^1]
-      parameters = args[0..^2]
+      procBody = entity[^1]
+      customArgs = entity[1][1..^1]
+      commonArgs = args[0..^2] & @[newColonExpr(ident "args",
+          bindsym "JsonNode")]
+      extractArgs = extractArgsFromJson(customArgs)
 
     result.add quote do:
       `varname`[`aliasName`] = proc() {.async.} =
-        `fnBody`
+        `extractArgs`
+        `procBody`
 
-    let paramList = result[^1][3][3]
-    echo paramList.repr
-    discard paramList.add parameters.mapIt newIdentDefs(it[0], it[1])
+    let paramList = result[^1][3][RoutineFormalParams]
+    discard paramList.add commonArgs.mapIt newIdentDefs(it[0], it[1])
 
-    echo paramList.treeRepr
-    
+
   # echo treeRepr result
-  # echo repr result
+  echo repr result
   return result
 
 var myname: RouterMap
@@ -60,8 +81,8 @@ tgRouter(myname, bot: TeleBot, ctx: TgCtx):
   route(id: int) as "home":
     discard
 
-  # route() as "hey":
-  #   echo "DKALJDLKSJ"
+  route() as "hey":
+    echo "DKALJDLKSJ"
 
 # proc dispatcher*(bot: TeleBot, u: Update): Future[bool] {.async.} =
 #   if u.message.issome:
