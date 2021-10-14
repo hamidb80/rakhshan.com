@@ -2,26 +2,11 @@ import sequtils, tables, strformat, strutils
 import telebot, asyncdispatch, logging, options
 
 
-type 
-  TgCtx = ref object 
-    chatId: int
-    path: string
-    state: int
-    route: seq[string]
-    member: Option[MemberCtx]
-
-  MemberCtx = ref object
-    fname: string
-    lname: string
-
+type
   KeyboardAlias = tuple
     text: string
     code: string
 
-  RouterMap = Table[
-    string, 
-    proc(bot: Telebot, uctx: TgCtx){.async, nimcall.}
-  ]
 
 
 template goback{.dirty.}= uctx.path.pop
@@ -31,29 +16,6 @@ template sendText{.dirty.}= discard # has to be async
 
 proc genKeyboard(aliases: seq[seq[KeyboardAlias]])= discard
 proc removeKeyboard= discard
-
-proc dispatcher(bot: TeleBot, u: Update): Future[bool] {.async.}=
-  if u.message.issome:
-    let msg = u.message.get
-
-    if msg.text.isSome:
-      let keys = toseq(1..4).mapit InlineKeyboardButton(text: $it, callbackData: some $it)
-
-      discard await bot.sendMessage(msg.chat.id, msg.text.get,
-        replyToMessageId = msg.messageId,
-        parseMode = "markdown",
-        replyMarkup = newInlineKeyboardMarkup(keys))
-
-
-  elif u.callbackQuery.issome:
-      let cq = u.callbackQuery.get
-      discard await bot.answerCallbackQuery($cq.id, fmt"~~{cq.data.get}~~", true)
-
-
-proc trigger(route: seq[string] or varargs[string])=
-  #TODO check get keys at compile time
-  discard
-
 
 const router: RouterMap = tgRouter(bot: Telebot, uctx: TgCtx): 
   route("/") as "home":

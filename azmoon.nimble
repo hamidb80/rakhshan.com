@@ -12,3 +12,4 @@ bin           = @["azmoon"]
 
 requires "nim >= 1.5.1"
 requires "telebot >= 1.0.10"
+requires "macroplus >= 0.1.1"
