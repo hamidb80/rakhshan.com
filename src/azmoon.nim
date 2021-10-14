@@ -1,3 +1,7 @@
+import sequtils, strformat, strutils
+import telebot, asyncdispatch, logging, options
+
+
 type 
   TgCtx = ref object 
     chatId: int
@@ -10,37 +14,37 @@ type
     fname: string
     lname: string
 
+  KeyboardAlias = tuple
+    text: string
+    code: string
 
-tgController(bot: Telebot, ctx: TgCtx): # has to be async
+
+tgController(bot: Telebot, ctx: TgCtx): 
+  # main templates convert to dirty one
+
   template goback= ctx.path.pop
-  template go(newp: varargs[string])= ctx.path.push newp
+  template forward(newp: varargs[string])= ctx.path.push newp
 
-  template sendText= discard
+  template sendText= discard # has to be async
+  
+  template genKeyboard(seq[seq[KeyboardAlias]])= discard
+  template removeKeyboard= discard
 
-  proc resovler=
+  proc resovler {.internal.}=
     discard
 
-  route "/":
-    do: 
-      discard
+  route "/"=
+    fn
 
-    keyboard(ctx, ): [
-      if 
-    ]
+  route "/reshte"=
+    genKeyboard  ...
 
-
-  route "/exist":
-    goBack
+  route ("quiz", @qid[int], "part", @pid[int])=
+    discard
 
 
-import sequtils, strformat, strutils
-import telebot, asyncdispatch, logging, options
 
 const API_KEY = "2004052302:AAHm_oICftfs5xLmY0QwGVTE3o-gYgD6ahw"
-
-
-var L = newConsoleLogger(fmtStr = "$levelname, [$time] ")
-addHandler(L)
 
 
 proc updateHandler(bot: Telebot, u: Update): Future[bool] {.async.} =
@@ -66,11 +70,14 @@ proc updateHandler(bot: Telebot, u: Update): Future[bool] {.async.} =
 
 
 when isMainModule:
+  addHandler newConsoleLogger(fmtStr= "$levelname, [$time]")
+
   let bot = newTeleBot API_KEY
   bot.onUpdate updateHandler
 
+
   while true:
-    echo "hello"
+    echo "running ..."
 
     try: bot.poll(timeout = 100)
     except: discard
