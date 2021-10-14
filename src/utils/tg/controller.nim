@@ -1,11 +1,11 @@
-import tables, sequtils, options, json
+import tables, sequtils, json, options
 import macros except params
 import
   asyncdispatch, telebot,
   macroplus
 
 type
-  TgCtx* = ref object
+  UserCtx* = ref object
     chatId*: int
     path*: string
     state*: int
@@ -16,7 +16,7 @@ type
     fname*: string
     lname*: string
 
-  RouterProc = proc(bot: Telebot, uctx: TgCtx, args: JsonNode) {.async.}
+  RouterProc = proc(bot: Telebot, uctx: UserCtx, args: JsonNode) {.async.}
   RouterMap* = ref Table[string, RouterProc]
 
 
@@ -80,7 +80,7 @@ macro initRouter(varName: typed, args: varargs[untyped]): untyped =
 
 template newRouter*(body): RouterMap =
   let result = new(RouterMap)
-  initRouter(result, bot: TeleBot, ctx: TgCtx, body)
+  initRouter(result, bot: TeleBot, ctx: UserCtx, body)
   result
 
 ## usage
@@ -90,6 +90,18 @@ let tgRouter = newRouter:
 
   route() as "hey":
     echo "DKALJDLKSJ"
+
+proc trigger*(
+  router: RouterMap, alias: string,
+  bot: TeleBot, uctx: UserCtx, args: JsonNode = newJArray()
+) =
+  doassert args.kind == JArray
+
+  if alias in router:
+    router[alias](bot, uctx, args)
+
+  else:
+    raise newException(ValueError, "route alias is not defined")
 
 
 # proc dispatcher*(bot: TeleBot, u: Update): Future[bool] {.async.} =
@@ -108,10 +120,3 @@ let tgRouter = newRouter:
 #   elif u.callbackQuery.issome:
 #     let cq = u.callbackQuery.get
 #     discard await bot.answerCallbackQuery($cq.id, fmt"~~{cq.data.get}~~", true)
-
-# proc trigger*(routermap: RouterMap, routeAlias: string, params: seq[string]) =
-#   if routeAlias in routermap:
-#     routermap[routeAlias](params)
-
-#   raise newException(ValueError, fmt"route alias '{routeAlias}' is not defined")
-#   raise newException(ValueError, "route alias '{routeAlias}' is not defined")
