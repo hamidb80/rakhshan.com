@@ -7,10 +7,9 @@ import
 type
   UserCtx* = ref object
     chatId*: int
-    path*: string
-    state*: int
-    stage*: int
     member*: Option[MemberCtx]
+    stage*: int
+    state*: int
 
   MemberCtx* = ref object
     fname*: string
@@ -75,7 +74,7 @@ macro initRouter(varName: typed, args: varargs[untyped]): untyped =
 
 
   # echo treeRepr result
-  # echo repr result
+  echo repr result
   return result
 
 template newRouter*(body): RouterMap =
@@ -94,29 +93,11 @@ let tgRouter = newRouter:
 proc trigger*(
   router: RouterMap, alias: string,
   bot: TeleBot, uctx: UserCtx, args: JsonNode = newJArray()
-) =
+) {.async.}=
   doassert args.kind == JArray
 
   if alias in router:
-    router[alias](bot, uctx, args)
+    await router[alias](bot, uctx, args)
 
   else:
     raise newException(ValueError, "route alias is not defined")
-
-
-# proc dispatcher*(bot: TeleBot, u: Update): Future[bool] {.async.} =
-#   if u.message.issome:
-#     let msg = u.message.get
-
-#     if msg.text.isSome:
-#       let keys = toseq(1..4).mapit InlineKeyboardButton(text: $it,
-#           callbackData: some $it)
-
-#       discard await bot.sendMessage(msg.chat.id, msg.text.get,
-#         replyToMessageId = msg.messageId,
-#         parseMode = "markdown",
-#         replyMarkup = newInlineKeyboardMarkup(keys))
-
-#   elif u.callbackQuery.issome:
-#     let cq = u.callbackQuery.get
-#     discard await bot.answerCallbackQuery($cq.id, fmt"~~{cq.data.get}~~", true)
