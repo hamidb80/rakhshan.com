@@ -17,7 +17,7 @@ type
     lname*: string
 
   RouterProc = proc(bot: Telebot, uctx: TgCtx, args: JsonNode) {.async.}
-  RouterMap* = Table[string, RouterProc]
+  RouterMap* = ref Table[string, RouterProc]
 
 
 # helper
@@ -50,9 +50,7 @@ proc extractArgsFromJson(args: openArray[NimNode]): NimNode =
 
 macro initRouter(varName: typed, args: varargs[untyped]): untyped =
   result = newStmtList()
-  let body = 
-    if args[^1].kind != nnkStmtList: args[^1]
-    else: args[^1][0]
+  let body = args[^1]
 
   for entity in body:
     doAssert:
@@ -80,22 +78,13 @@ macro initRouter(varName: typed, args: varargs[untyped]): untyped =
   # echo repr result
   return result
 
-template newRouter*(body: untyped): var RouterMap=
-  var result: RouterMap
-  initRouter(result, bot: TeleBot, ctx: TgCtx): body
+template newRouter*(body): RouterMap =
+  let result = new(RouterMap)
+  initRouter(result, bot: TeleBot, ctx: TgCtx, body)
   result
 
-# var result: RouterMap
-
-# initRouter(result, bot: TeleBot, ctx: TgCtx):
-#   route(id: int) as "home":
-#     discard
-
-#   route() as "hey":
-#     echo "DKALJDLKSJ"
-
 ## usage
-var tgRouter = newRouter:
+let tgRouter = newRouter:
   route(id: int) as "home":
     discard
 
@@ -116,14 +105,13 @@ var tgRouter = newRouter:
 #         parseMode = "markdown",
 #         replyMarkup = newInlineKeyboardMarkup(keys))
 
-
 #   elif u.callbackQuery.issome:
 #     let cq = u.callbackQuery.get
 #     discard await bot.answerCallbackQuery($cq.id, fmt"~~{cq.data.get}~~", true)
 
 # proc trigger*(routermap: RouterMap, routeAlias: string, params: seq[string]) =
-  # if routeAlias in routermap:
-    # routermap[routeAlias](params)
+#   if routeAlias in routermap:
+#     routermap[routeAlias](params)
 
-  # raise newException(ValueError, fmt"route alias '{routeAlias}' is not defined")
-  # raise newException(ValueError, "route alias '{routeAlias}' is not defined")
+#   raise newException(ValueError, fmt"route alias '{routeAlias}' is not defined")
+#   raise newException(ValueError, "route alias '{routeAlias}' is not defined")
