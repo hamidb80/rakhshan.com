@@ -1,8 +1,8 @@
-import tables, sequtils, strformat, options
+import tables, sequtils, options
 import macros except params
 import
   asyncdispatch, telebot,
-  macroplus, macroutils
+  macroplus
 
 type
   TgCtx* = ref object
@@ -16,12 +16,15 @@ type
     fname*: string
     lname*: string
 
-  # RouterProc = proc(bot: Telebot, uctx: TgCtx) {.async.}
-  RouterProc = proc() {.async.}
+  RouterProc = proc(bot: Telebot, uctx: TgCtx) {.async.}
+  # RouterProc = proc() {.async.}
   RouterMap* = Table[string, RouterProc]
 
-template setRoute(vr, ro, fn): untyped =
-  newTree(nnkAsgn, [newTree(nnkBracketExpr, [vr, ro]), fn])
+proc add(father: NimNode; children: openArray[NimNode]): NimNode =
+  for node in children:
+    father.add node
+
+  return father
 
 macro tgRouter*(varName: untyped, args: varargs[untyped]): untyped =
   result = newStmtList()
@@ -35,25 +38,30 @@ macro tgRouter*(varName: untyped, args: varargs[untyped]): untyped =
     let
       aliasName = entity[InfixRightSide].strVal
       fnBody = entity[^1]
+      parameters = args[0..^2]
 
     result.add quote do:
       `varname`[`aliasName`] = proc() {.async.} =
         `fnBody`
 
-    # result[^1].params= []
+    let paramList = result[^1][3][3]
+    echo paramList.repr
+    discard paramList.add parameters.mapIt newIdentDefs(it[0], it[1])
 
-  echo treeRepr result
-  echo repr result
+    echo paramList.treeRepr
+    
+  # echo treeRepr result
+  # echo repr result
   return result
 
 var myname: RouterMap
 
-tgRouter(myname, bot: TeleBot, ctx: string):
-  route("/") as "home":
+tgRouter(myname, bot: TeleBot, ctx: TgCtx):
+  route(id: int) as "home":
     discard
 
-  route() as "hey":
-    echo "DKALJDLKSJ"
+  # route() as "hey":
+  #   echo "DKALJDLKSJ"
 
 # proc dispatcher*(bot: TeleBot, u: Update): Future[bool] {.async.} =
 #   if u.message.issome:
