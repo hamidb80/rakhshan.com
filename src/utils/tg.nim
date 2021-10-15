@@ -77,10 +77,8 @@ macro initRouter(varName: typed, args: varargs[untyped]): untyped =
   echo repr result
   return result
 
-template newRouter*(body): RouterMap =
-  let result = new(RouterMap)
-  initRouter(result, bot: TeleBot, uctx: UserCtx, u: Update, body)
-  result
+template newRouter*(varname, body)=
+  initRouter(varname, bot: TeleBot, uctx: UserCtx, u: Update, body)
 
 
 proc trigger*(

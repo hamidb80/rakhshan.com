@@ -9,7 +9,10 @@ type
 
 # UTILS ------------------------------------
 
-template sendText{.dirty.} = discard # has to be async
+template sendText{.dirty.} = discard
+template redirect(alias, params){.dirty.} = 
+  trigger(router, alias, bot, uctx, u)
+  
 
 proc genKeyboard(aliases: seq[seq[KeyboardAlias]]) = discard
 proc removeKeyboard = discard
@@ -27,7 +30,8 @@ proc getUser(chatId: int64): UserCtx =
 
 # ROUTER -----------------------------------
 
-let router = newRouter:
+var router: RouterMap
+newRouter(router):
   route() as "home":
     let keys = toseq(1..4).mapit:
       InlineKeyboardButton(text: $it, callbackData: some $it)
@@ -39,6 +43,7 @@ let router = newRouter:
 
   route(qid: int, pid: int) as "quiz":
     discard
+  
 
 proc findChatId(updateFeed: Update): int64 =
   template findId(msgWrapper): untyped =
