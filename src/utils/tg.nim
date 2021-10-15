@@ -27,13 +27,6 @@ proc add(father: NimNode; children: openArray[NimNode]): NimNode =
   return father
 
 
-proc typeToJsonProc(`type`: string): NimNode =
-  return case `type`:
-    of "string": bindsym "getStr"
-    of "int": bindsym "getInt"
-    else:
-      raise newException(ValueError, "type not found")
-
 proc extractArgsFromJson(args: openArray[NimNode]): NimNode =
   doassert args.allIt it.kind == nnkExprColonExpr
   result = newStmtList()
@@ -42,8 +35,9 @@ proc extractArgsFromJson(args: openArray[NimNode]): NimNode =
     discard result.add newLetStmt(
       arg[0],
       newcall(
-        typeToJsonProc arg[1].strval,
-        newNimNode(nnkBracketExpr).add(ident "args", newIntLitNode index)
+        bindsym "to",
+        newNimNode(nnkBracketExpr).add(ident "args", newIntLitNode index),
+        arg[1],
     ))
 
 
