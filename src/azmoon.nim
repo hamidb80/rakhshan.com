@@ -18,7 +18,6 @@ let router = newRouter:
       InlineKeyboardButton(text: $it, callbackData: some $it)
 
     discard await bot.sendMessage(uctx.chatId, "hello",
-      # replyToMessageId = msg.messageId,
       parseMode = "markdown",
       replyMarkup = newInlineKeyboardMarkup(keys))
 
