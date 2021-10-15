@@ -40,18 +40,30 @@ let router = newRouter:
   route(qid: int, pid: int) as "quiz":
     discard
 
+proc findChatId(updateFeed: Update): int64 =
+  template findId(msgWrapper): untyped =
+    msgWrapper.message.get.chat.id
+
+  return
+    if issome updateFeed.message: updateFeed.findId
+    elif issome updateFeed.callbackQuery: updateFeed.callbackQuery.get.findId
+    else: raise newException(ValueError, "couldn't find chat_id")
+
+
 proc dispatcher*(bot: TeleBot, u: Update): Future[bool] {.async.} =
+  template uctx: untyped =
+    getUser findChatId u
+
   if u.message.issome:
     let msg = u.message.get
 
     if msg.text.isSome:
       {.cast(gcsafe).}:
-        await trigger(router, "home", bot, getUser msg.chat.id, u, %*[msg.text.get])
+        await trigger(router, "home", bot, uctx, u, %*[msg.text.get])
 
   elif u.callbackQuery.issome:
     let cq = u.callbackQuery.get
     discard await bot.answerCallbackQuery($cq.id, fmt"~~{cq.data.get}~~")
-
 # ---------------------------------------
 
 when isMainModule:
