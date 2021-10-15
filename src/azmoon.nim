@@ -7,10 +7,25 @@ type
     text: string
     code: string
 
+# UTILS ------------------------------------
+
 template sendText{.dirty.} = discard # has to be async
 
 proc genKeyboard(aliases: seq[seq[KeyboardAlias]]) = discard
 proc removeKeyboard = discard
+
+# APP STATES -----------------------------------
+
+var users: Table[int64, UserCtx]
+
+proc getUser(chatId: int64): UserCtx =
+  if chatId notin users:
+    users[chatId] = new UserCtx
+    users[chatId].chatId = chatId
+
+  return users[chatId]
+
+# ROUTER -----------------------------------
 
 let router = newRouter:
   route() as "home":
@@ -25,15 +40,6 @@ let router = newRouter:
   route(qid: int, pid: int) as "quiz":
     discard
 
-var users: Table[int64, UserCtx]
-
-proc getUser(chatId: int64): UserCtx =
-  if chatId notin users:
-    users[chatId] = new UserCtx
-    users[chatId].chatId = chatId
-
-  return users[chatId]
-
 proc dispatcher*(bot: TeleBot, u: Update): Future[bool] {.async.} =
   if u.message.issome:
     let msg = u.message.get
@@ -46,6 +52,7 @@ proc dispatcher*(bot: TeleBot, u: Update): Future[bool] {.async.} =
     let cq = u.callbackQuery.get
     discard await bot.answerCallbackQuery($cq.id, fmt"~~{cq.data.get}~~")
 
+# ---------------------------------------
 
 when isMainModule:
   addHandler newConsoleLogger(fmtStr = "$levelname, [$time]")
