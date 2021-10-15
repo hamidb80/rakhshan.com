@@ -6,7 +6,7 @@ import
 
 type
   UserCtx* = ref object
-    chatId*: int
+    chatId*: int64
     member*: Option[MemberCtx]
     stage*: int
     state*: int
@@ -15,7 +15,7 @@ type
     fname*: string
     lname*: string
 
-  RouterProc = proc(bot: Telebot, uctx: UserCtx, args: JsonNode) {.async.}
+  RouterProc = proc(bot: Telebot, uctx: UserCtx, u: Update, args: JsonNode) {.async.}
   RouterMap* = ref Table[string, RouterProc]
 
 
@@ -79,25 +79,18 @@ macro initRouter(varName: typed, args: varargs[untyped]): untyped =
 
 template newRouter*(body): RouterMap =
   let result = new(RouterMap)
-  initRouter(result, bot: TeleBot, ctx: UserCtx, body)
+  initRouter(result, bot: TeleBot, uctx: UserCtx, u: Update, body)
   result
 
-## usage
-let tgRouter = newRouter:
-  route(id: int) as "home":
-    discard
-
-  route() as "hey":
-    echo "DKALJDLKSJ"
 
 proc trigger*(
   router: RouterMap, alias: string,
-  bot: TeleBot, uctx: UserCtx, args: JsonNode = newJArray()
+  bot: TeleBot, uctx: UserCtx, u: Update, args: JsonNode = newJArray()
 ) {.async.}=
   doassert args.kind == JArray
 
   if alias in router:
-    await router[alias](bot, uctx, args)
+    await router[alias](bot, uctx, u, args)
 
   else:
     raise newException(ValueError, "route alias is not defined")

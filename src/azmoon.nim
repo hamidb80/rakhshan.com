@@ -14,27 +14,38 @@ proc removeKeyboard = discard
 
 let router = newRouter:
   route() as "home":
-    discard
+    let keys = toseq(1..4).mapit:
+      InlineKeyboardButton(text: $it, callbackData: some $it)
+
+    discard await bot.sendMessage(uctx.chatId, "hello",
+      # replyToMessageId = msg.messageId,
+      parseMode = "markdown",
+      replyMarkup = newInlineKeyboardMarkup(keys))
+
 
   route(qid: int, pid: int) as "quiz":
     discard
+
+var users: Table[int64, UserCtx]
+
+proc getUser(chatId: int64): UserCtx =
+  if chatId notin users:
+    users[chatId] = new UserCtx
+    users[chatId].chatId = chatId
+
+  return users[chatId]
 
 proc dispatcher*(bot: TeleBot, u: Update): Future[bool] {.async.} =
   if u.message.issome:
     let msg = u.message.get
 
     if msg.text.isSome:
-      let keys = toseq(1..4).mapit InlineKeyboardButton(text: $it,
-          callbackData: some $it)
-
-      discard await bot.sendMessage(msg.chat.id, msg.text.get,
-        replyToMessageId = msg.messageId,
-        parseMode = "markdown",
-        replyMarkup = newInlineKeyboardMarkup(keys))
+      {.cast(gcsafe).}:
+        await trigger(router, "home", bot, getUser msg.chat.id, u, %*[msg.text.get])
 
   elif u.callbackQuery.issome:
     let cq = u.callbackQuery.get
-    discard await bot.answerCallbackQuery($cq.id, fmt"~~{cq.data.get}~~", true)
+    discard await bot.answerCallbackQuery($cq.id, fmt"~~{cq.data.get}~~")
 
 
 when isMainModule:
