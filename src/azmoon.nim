@@ -8,11 +8,14 @@ type
     code: string
 
 # UTILS ------------------------------------
+template fakeSafety(body): untyped =
+  {.cast(gcsafe).}:
+    body
 
 template sendText{.dirty.} = discard
-template redirect(alias, params){.dirty.} = 
+template redirect(alias, params){.dirty.} =
   trigger(router, alias, bot, uctx, u)
-  
+
 
 proc genKeyboard(aliases: seq[seq[KeyboardAlias]]) = discard
 proc removeKeyboard = discard
@@ -41,8 +44,8 @@ newRouter(router):
       replyMarkup = newInlineKeyboardMarkup(keys))
 
 
-  callbackQuery(qid: int, pid: int) as "quiz":
-    discard
+  callbackQuery(qid: int, buttonText: string) as "select-quiz":
+    echo qid
 
 
 proc findChatId(updateFeed: Update): int64 =
@@ -63,12 +66,18 @@ proc dispatcher*(bot: TeleBot, u: Update): Future[bool] {.async.} =
     let msg = u.message.get
 
     if msg.text.isSome:
-      {.cast(gcsafe).}:
+      fakeSafety:
         discard await trigger(router, "home", bot, uctx, u, %*[msg.text.get])
 
   elif u.callbackQuery.issome:
-    let cq = u.callbackQuery.get
-    discard await bot.answerCallbackQuery($cq.id, fmt"~~{cq.data.get}~~")
+    let
+      cq = u.callbackQuery.get
+
+    fakeSafety:
+      let res = await trigger(router, "select-quiz", bot, uctx, u, %*[cq.id, cq.data.get])
+
+    discard await bot.answerCallbackQuery($cq.id, res)
+
 # ---------------------------------------
 
 when isMainModule:
