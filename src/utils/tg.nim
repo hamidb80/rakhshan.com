@@ -1,4 +1,4 @@
-import tables, sequtils, json, options
+import tables, sequtils, strutils, json, options
 import macros except params
 import
   asyncdispatch, telebot,
@@ -15,7 +15,7 @@ type
     fname*: string
     lname*: string
 
-  RouterProc = proc(bot: Telebot, uctx: UserCtx, u: Update, args: JsonNode) {.async.}
+  RouterProc = proc(bot: Telebot, uctx: UserCtx, u: Update, args: JsonNode): Future[string] {.async.}
   RouterMap* = ref Table[string, RouterProc]
 
 
@@ -59,11 +59,19 @@ macro initRouter(varName: typed, args: varargs[untyped]): untyped =
       extractArgs = extractArgsFromJson(customArgs)
 
     result.add quote do:
-      `varname`[`aliasName`] = proc() {.async.} =
+      `varname`[`aliasName`] = proc(): Future[string] {.async.} =
         `extractArgs`
         `procBody`
 
-    let paramList = result[^1][3][RoutineFormalParams]
+    let
+      definedProc = result[^1][3]
+      paramList = definedProc[RoutineFormalParams]
+
+    case entity[InfixLeftSide][0].strval.normalize:
+    of "route": discard
+    of "callbackquery": discard
+    else: error "undefined entity"
+
     discard paramList.add commonArgs.mapIt newIdentDefs(it[0], it[1])
 
 
@@ -78,11 +86,10 @@ template newRouter*(varname, body)=
 proc trigger*(
   router: RouterMap, alias: string,
   bot: TeleBot, uctx: UserCtx, u: Update, args: JsonNode = newJArray()
-) {.async.}=
+): Future[string] {.async.}=
   doassert args.kind == JArray
 
   if alias in router:
-    await router[alias](bot, uctx, u, args)
+    return await router[alias](bot, uctx, u, args)
 
-  else:
-    raise newException(ValueError, "route alias is not defined")
+  raise newException(ValueError, "route alias is not defined")

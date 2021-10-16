@@ -30,7 +30,7 @@ proc getUser(chatId: int64): UserCtx =
 
 # ROUTER -----------------------------------
 
-var router: RouterMap
+var router = new RouterMap
 newRouter(router):
   route() as "home":
     let keys = toseq(1..4).mapit:
@@ -41,9 +41,9 @@ newRouter(router):
       replyMarkup = newInlineKeyboardMarkup(keys))
 
 
-  route(qid: int, pid: int) as "quiz":
+  callbackQuery(qid: int, pid: int) as "quiz":
     discard
-  
+
 
 proc findChatId(updateFeed: Update): int64 =
   template findId(msgWrapper): untyped =
@@ -64,7 +64,7 @@ proc dispatcher*(bot: TeleBot, u: Update): Future[bool] {.async.} =
 
     if msg.text.isSome:
       {.cast(gcsafe).}:
-        await trigger(router, "home", bot, uctx, u, %*[msg.text.get])
+        discard await trigger(router, "home", bot, uctx, u, %*[msg.text.get])
 
   elif u.callbackQuery.issome:
     let cq = u.callbackQuery.get
