@@ -33,71 +33,79 @@ proc `$`(t: DBTable): string =
 func nimType2SqliteType(ntype: string): string =
     discard
 
-proc process(args, body: NimNode) =
-    var dbtables: Table[string, DBTable]
+proc tableGen(rawTable: NimNode): DBTable =
+    doAssert rawTable[CommandIdent].strVal == "Table", "Entity is not Valid"
 
+    let tableName = rawTable[1].strVal
+    result = DBTable(name: tableName)
+
+    for rawColumn in rawTable[CommandBody]:
+        let columnName = rawColumn[CommandIdent].strVal
+        var params = rawColumn[CommandBody]
+
+        if params[0].kind == nnkCommand: # for columns with featues
+            params = params[0]
+
+        var
+            `type` = params[0]
+            column = Column(name: columnName)
+
+        # FIXME not working with Option[char[200]]
+        if `type`.kind == nnkBracketExpr:
+            if `type`[BracketExprIdent].strVal == "Option": # Option[string]
+                column.features.incl SCFNullable
+                `type` = `type`[1]
+
+            else: # string[value] | int[ref anotherTable.field]
+                let
+                    args = `type`[BracketExprParams]
+                    firstArg = args[0]
+                `type` = `type`[BracketExprIdent]
+
+                if firstArg.kind == nnkRefTy:
+                    doassert firstArg[0].kind == nnkDotExpr
+
+                    let
+                        refTable = firstArg[0][0].strval
+                        refField = firstArg[0][1].strval
+
+                elif firstarg.allIt it.kind in [nnkIntLit, nnkStrLit]:
+                    column.typeLimit = args[0].intVal.int
+
+                else:
+                    error "invalid type options"
+
+        column.`type` = parseEnum[SqliteColumnTypes](`type`.strVal)
+
+        if params.len == 2:
+            for feature in params[1]:
+                doAssert feature.strVal in ["primary"]
+
+                column.features.incl:
+                    case feature.strval:
+                    of "primary": SCFprimary
+                    else: raise newException(ValueError, "column feature is not defined")
+
+        result.columns.add column
+
+type Schema = Table[string, DBTable]
+
+proc schemaGen(args, body: NimNode): Schema =
     for rawTable in body:
-        doAssert rawTable[CommandIdent].strVal == "Table", "Entity is not Valid"
+        let table = tableGen(rawTable)
+        result[table.name] = table
 
-        let tableName = rawTable[1].strVal
-        var table = DBTable(name: tableName)
 
-        for rawColumn in rawTable[CommandBody]:
-            let columnName = rawColumn[CommandIdent].strVal
-            var params = rawColumn[CommandBody]
+macro Blueprint(features, body) =
+    echo treeRepr body
+    
+    let schema = schemaGen(features, body)
 
-            if params[0].kind == nnkCommand: # for columns with featues
-                params = params[0]
-
-            var
-                `type` = params[0]
-                column = Column(name: columnName)
-
-            # FIXME not working with Option[string[200]]
-            if `type`.kind == nnkBracketExpr:
-                if `type`[BracketExprIdent].strVal == "Option": # Option[string]
-                    column.features.incl SCFNullable
-                    `type` = `type`[1]
-
-                else: # string[value] | int[ref anotherTable.field]
-                    let 
-                        args = `type`[BracketExprParams]
-                        firstArg = args[0]
-                    `type` = `type`[BracketExprIdent]
-
-                    if firstArg.kind == nnkRefTy:
-                        doassert firstArg[0].kind == nnkDotExpr
-
-                        let
-                            refTable = firstArg[0][0].strval
-                            refField = firstArg[0][1].strval
-
-                    elif firstarg.allIt it.kind in [nnkIntLit, nnkStrLit]:
-                        column.typeLimit = args[0].intVal.int
-
-                    else:
-                        error "invalid type options"
-
-            column.`type` = parseEnum[SqliteColumnTypes](`type`.strVal)
-
-            if params.len == 2:
-                for feature in params[1]:
-                    doAssert feature.strVal in ["primary"]
-
-                    column.features.incl:
-                        case feature.strval:
-                        of "primary": SCFprimary
-                        else: raise newException(ValueError, "column feature is not defined")
-
-            table.columns.add column
-        dbtables[tablename] = table
+    for (name, table) in schema.pairs:
         echo table
 
-macro Schema(features, body) =
-    echo treeRepr body
-    process(features, body)
 
-Schema [autoId]:
+Blueprint [autoId]:
     Table test1:
         id: int[ref another.id]
         num: int {primary}
