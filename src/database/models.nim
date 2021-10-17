@@ -1,138 +1,34 @@
-import macros, macroplus
-import options, strutils, strformat, sequtils, tables
+import easydb
 
-type
-    SqliteColumnTypes {.pure.} = enum
-        SCTint = "int"
-        SCTtext = "string"
-        SCTvarchar = "char"
+var query: string
 
-    SqliteColumnFeatures {.pure.} = enum
-        SCFNullable, SCFprimary
+import macros
 
-    SqliteTableFeatures = enum
-        STFaddId, STFcreateDate, STFupdateDate
+expandMacros:
+    Blueprint [queryHolder: query, postfix: "Model"]:
+        Table members:
+            id: int {.primary.}
+            name: char[255]
 
-    DBTable = object
-        name: string
-        columns: seq[Column]
-        features: set[SqliteTableFeatures]
+        Table part:
+            id: int {.primary.}
+            name: string
 
-    Column = object
-        name: string
-        `type`: SqliteColumnTypes
-        typeLimit: int
-        refrence: Option[tuple[tableName, fieldName: string]]
-        features: set[SqliteColumnFeatures]
+        Table question:
+            id: int {.primary.}
+            quiz_id: int[ref quiz.id]
+            answer: int
 
-proc `$`(t: DBTable): string =
-    fmt"table '{t.name}':" & "\n" & (
-        t.columns.mapIt indent(fmt"{it.name}: {$ it.`type`}", 4)
-    ).join("\n")
+        Table quiz:
+            id: int {.primary.}
+            name: char[255]
+            member_id: int[ref members.id]
+            part_id: int[ref part.id]
 
-func nimType2SqliteType(ntype: string): string =
-    discard
-
-proc columnGen(rawColumn: NimNode): Column=
-    let columnName = rawColumn[CommandIdent].strVal
-    var params = rawColumn[CommandBody]
-
-    if params[0].kind == nnkCommand: # for columns with featues
-        params = params[0]
-
-    var `type` = params[0]
-    result = Column(name: columnName)
-
-    # FIXME not working with Option[char[200]]
-    if `type`.kind == nnkBracketExpr:
-        if `type`[BracketExprIdent].strVal == "Option": # Option[string]
-            result.features.incl SCFNullable
-            `type` = `type`[1]
-
-        else: # string[value] | int[ref anotherTable.field]
-            let
-                args = `type`[BracketExprParams]
-                firstArg = args[0]
-            `type` = `type`[BracketExprIdent]
-
-            if firstArg.kind == nnkRefTy:
-                doassert firstArg[0].kind == nnkDotExpr
-
-                let
-                    refTable = firstArg[0][0].strval
-                    refField = firstArg[0][1].strval
-
-            elif firstarg.allIt it.kind in [nnkIntLit, nnkStrLit]:
-                result.typeLimit = args[0].intVal.int
-
-            else:
-                error "invalid type options"
-
-    result.`type` = parseEnum[SqliteColumnTypes](`type`.strVal)
-
-    if params.len == 2:
-        for feature in params[1]:
-            doAssert feature.strVal in ["primary"]
-
-            result.features.incl:
-                case feature.strval:
-                of "primary": SCFprimary
-                else: raise newException(ValueError, "column feature is not defined")
+        Table record:
+            id: int {.primary.}
+            member_id: int[ref members.id]
 
 
-proc tableGen(rawTable: NimNode): DBTable =
-    doAssert rawTable[CommandIdent].strVal == "Table", "Entity is not Valid"
-    let tableName = rawTable[1].strVal
-
-    result = DBTable(name: tableName)
-    result.columns = rawTable[CommandBody].mapIt it.columnGen
-
-type Schema = Table[string, DBTable]
-
-proc schemaGen(args, body: NimNode): Schema =
-    for rawTable in body:
-        let table = tableGen(rawTable)
-        result[table.name] = table
-
-
-macro Blueprint(features, body) =
-    echo treeRepr body
-    
-    let schema = schemaGen(features, body)
-
-    for (name, table) in schema.pairs:
-        echo table
-
-
-Blueprint [autoId]:
-    Table test1:
-        id: int[ref another.id]
-        num: int {primary}
-        name: char[255]
-
-    # Table members:
-    #     id: int {primary}
-    #     name: string[255]
-
-    # Table part:
-    #     id: int {primary}
-    #     name: string
-
-    # Table quiz:
-    #     id: int {primary}
-    #     member_id: int[ref members.id]
-    #     name: string[255]
-    #     part_id: int[ref part.id]
-
-    # Table question:
-    #     id: int {primary}
-    #     quiz_id: int[ref quiz.id]
-    #     answer: int
-
-    # Table record:
-    #     id: int {primary}
-    #     member_id: int[ref members.id] {update: restrict, delete: restric}
-    #     date: DateTime {auto}
-
-    # Table test:
-    #     field: Option[string]
+when isMainModule:
+    writefile "src/database/init.sql", query

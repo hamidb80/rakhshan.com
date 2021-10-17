@@ -12,7 +12,8 @@ bin           = @["azmoon"]
 
 requires "nim >= 1.5.1"
 requires "telebot >= 1.0.10"
-requires "macroplus >= 0.1.1"
+requires "macroplus >= 0.1.4"
+requires "https://github.com/hamidb80/easydb"
 
 task go, "run app":
   exec "nim r -d:ssl src/azmoon.nim"

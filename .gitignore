@@ -1,1 +1,6 @@
+src/database/init.sql
+
 play.*
+*.exe
+
+db.sqlite
