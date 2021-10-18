@@ -1,24 +1,6 @@
 import sequtils, tables, strformat, strutils, json
 import telebot, asyncdispatch, logging, options
-import utils/tg
-
-type
-  KeyboardAlias = tuple
-    text: string
-    code: string
-
-# UTILS ------------------------------------
-template fakeSafety(body): untyped =
-  {.cast(gcsafe).}:
-    body
-
-template sendText{.dirty.} = discard
-template redirect(alias, params){.dirty.} =
-  trigger(router, alias, bot, uctx, u)
-
-
-proc genKeyboard(aliases: seq[seq[KeyboardAlias]]) = discard
-proc removeKeyboard = discard
+import telegram/[controller], utils
 
 # APP STATES -----------------------------------
 
@@ -44,6 +26,7 @@ newRouter(router):
       replyMarkup = newInlineKeyboardMarkup(keys))
 
     #------------------------------
+    await sleepAsync 1
 
     let keysp = toseq(1..4).mapit KeyboardButton(text: $it)
 
