@@ -39,9 +39,17 @@ newRouter(router):
     let keys = toseq(1..4).mapit:
       InlineKeyboardButton(text: $it, callbackData: some $it)
 
-    discard await bot.sendMessage(uctx.chatId, "hello",
+    discard bot.sendMessage(uctx.chatId, "hello",
       parseMode = "markdown",
       replyMarkup = newInlineKeyboardMarkup(keys))
+
+    #------------------------------
+
+    let keysp = toseq(1..4).mapit KeyboardButton(text: $it)
+
+    discard bot.sendMessage(uctx.chatId, "hello",
+      parseMode = "markdown",
+      replyMarkup = newReplyKeyboardMarkup(keysp))
 
 
   callbackQuery(qid: int, buttonText: string) as "select-quiz":
@@ -81,7 +89,7 @@ proc dispatcher*(bot: TeleBot, u: Update): Future[bool] {.async.} =
 # ---------------------------------------
 
 when isMainModule:
-  addHandler newConsoleLogger(fmtStr = "$levelname, [$time]")
+  # addHandler newConsoleLogger(fmtStr = "$levelname, [$time]")
 
   const API_KEY = "2004052302:AAHm_oICftfs5xLmY0QwGVTE3o-gYgD6ahw"
   let bot = newTeleBot API_KEY
