@@ -1,22 +1,47 @@
-import sequtils, tables, strformat, strutils, json
+import sequtils, tables, strformat, strutils, json, os
 import telebot, asyncdispatch, logging, options
 import telegram/[controller], states, utils
 
 # ROUTER -----------------------------------
 
+proc fileNameGen(path: string): string=
+  "file://" & getCurrentDir() / path
+
 var router = new RouterMap
 newRouter(router):
   route() as "home":
-    let keys = toseq(1..4).mapit:
-      InlineKeyboardButton(text: $it, callbackData: some $it)
+    let
+      keys = toseq(1..4).mapit:
+        InlineKeyboardButton(text: $it, callbackData: some $it)
 
-    discard bot.sendMessage(uctx.chatId, "hello",
-      parseMode = "markdown",
+      newkeys = toseq(2..5).mapit:
+        InlineKeyboardButton(text: $it, callbackData: some $it)
+
+    # let msg = await bot.sendMessage(uctx.chatId, "hello",
+    #   parseMode = "markdown",
+    #   replyMarkup = newInlineKeyboardMarkup(keys))
+
+    let msg = await bot.sendPhoto(
+      uctx.chatId, fileNameGen "temp/emoji.png",
+      "caption",
       replyMarkup = newInlineKeyboardMarkup(keys))
 
     #------------------------------
-    await sleepAsync 1
 
+    await sleepAsync 500
+
+    discard await bot.editMessageMedia(
+    InputMediaPhoto(kind: "photo", media: fileNameGen "temp/share.png"), 
+    $msg.chat.id, msg.messageId,
+      replyMarkup = newInlineKeyboardMarkup(newkeys)
+    )
+
+    discard await bot.editMessageCaption(
+      "sda", $msg.chat.id, msg.messageId,
+      replyMarkup = newInlineKeyboardMarkup(newkeys)
+    )
+
+  route() as "keyboard":
     let keysp = toseq(1..4).mapit KeyboardButton(text: $it)
 
     discard bot.sendMessage(uctx.chatId, "hello",
@@ -24,8 +49,10 @@ newRouter(router):
       replyMarkup = newReplyKeyboardMarkup(keysp))
 
 
-  callbackQuery(qid: int, buttonText: string) as "select-quiz":
-    echo qid
+  callbackQuery(qid: string, buttonText: string) as "select-quiz":
+    echo "++++++++++++++++++="
+    echo qid, buttonText
+    echo "++++++++++++++++++="
 
 
 proc findChatId(updateFeed: Update): int64 =
@@ -67,7 +94,7 @@ proc dispatcher*(bot: TeleBot, u: Update): Future[bool] {.async.} =
 # ---------------------------------------
 
 when isMainModule:
-  # addHandler newConsoleLogger(fmtStr = "$levelname, [$time]")
+  addHandler newConsoleLogger(fmtStr = "$levelname, [$time]")
 
   const API_KEY = "2004052302:AAHm_oICftfs5xLmY0QwGVTE3o-gYgD6ahw"
   let bot = newTeleBot API_KEY
@@ -77,4 +104,4 @@ when isMainModule:
     echo "running ..."
 
     try: bot.poll(timeout = 100)
-    except: discard
+    except: echo "--------------\n\n" & getCurrentExceptionMsg() & "\n\n--------------------------"
