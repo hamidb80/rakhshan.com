@@ -1,17 +1,6 @@
 import sequtils, tables, strformat, strutils, json
 import telebot, asyncdispatch, logging, options
-import telegram/[controller], utils
-
-# APP STATES -----------------------------------
-
-var users: Table[int64, UserCtx]
-
-proc getUser(chatId: int64): UserCtx =
-  if chatId notin users:
-    users[chatId] = new UserCtx
-    users[chatId].chatId = chatId
-
-  return users[chatId]
+import telegram/[controller], states, utils
 
 # ROUTER -----------------------------------
 
@@ -51,7 +40,7 @@ proc findChatId(updateFeed: Update): int64 =
 
 proc dispatcher*(bot: TeleBot, u: Update): Future[bool] {.async.} =
   template uctx: untyped =
-    getUser findChatId u
+    getOrCreateUser findChatId u
 
   if u.message.issome:
     let msg = u.message.get
