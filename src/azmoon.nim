@@ -39,22 +39,28 @@ proc findChatId(updateFeed: Update): int64 =
 
 
 proc dispatcher*(bot: TeleBot, u: Update): Future[bool] {.async.} =
-  template uctx: untyped =
-    getOrCreateUser findChatId u
+  var args = newJArray()
+  template getuctx: untyped =
+    fakeSafety: getOrCreateUser findChatId u
 
   if u.message.issome:
     let msg = u.message.get
+    var uctx = getuctx()
 
     if msg.text.isSome:
+      let route = case uctx.stage:
+        of sMain: "home"
+        of sEnterNumber: "..."
+        else: raise newException(ValueError, "what?")
+
       fakeSafety:
-        discard await trigger(router, "home", bot, uctx, u, %*[msg.text.get])
+        discard await trigger(router, route, bot, uctx, u, args)
 
   elif u.callbackQuery.issome:
-    let
-      cq = u.callbackQuery.get
+    let cq = u.callbackQuery.get
 
     fakeSafety:
-      let res = await trigger(router, "select-quiz", bot, uctx, u, %*[cq.id, cq.data.get])
+      let res = await trigger(router, "select-quiz", bot, getuctx, u, %*[cq.id, cq.data.get])
 
     discard await bot.answerCallbackQuery($cq.id, res)
 

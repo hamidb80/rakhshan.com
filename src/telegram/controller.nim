@@ -5,11 +5,16 @@ import
   macroplus
 
 type
+  Stages* = enum
+    sMain, sEnterNumber, # primary
+    sSelectQuiz, sSelectAnswer, sSelectRecord # member
+    sAddQuiz,  # admin
+
   UserCtx* = ref object
     chatId*: int64
     member*: Option[MemberCtx]
-    stage*: int
-    state*: int
+    stage*: Stages
+    counters*: seq[int]
 
   MemberCtx* = ref object
     fname*: string
@@ -51,7 +56,7 @@ macro initRouter(varName: typed, args: varargs[untyped]): untyped =
       entity[InfixIdent].strVal == "as"
 
     let
-      aliasName = entity[InfixRightSide].strVal
+      alias = entity[InfixRightSide]
       procBody = entity[^1]
       customArgs = entity[1][1..^1]
       commonArgs = args[0..^2] & @[newColonExpr(ident "args",
@@ -59,7 +64,7 @@ macro initRouter(varName: typed, args: varargs[untyped]): untyped =
       extractArgs = extractArgsFromJson(customArgs)
 
     result.add quote do:
-      `varname`[`aliasName`] = proc(): Future[string] {.async.} =
+      `varname`[`alias`] = proc(): Future[string] {.async.} =
         `extractArgs`
         `procBody`
 
