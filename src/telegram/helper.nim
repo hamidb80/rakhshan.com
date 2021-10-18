@@ -1,9 +1,14 @@
+import os
+
 type
   KeyboardAlias = tuple
     text: string
     code: string
 
-template sendText{.dirty.} = discard
+
+proc fileNameGen*(path: string): string =
+  "file://" & getCurrentDir() / path
+
 
 template redirect*(alias, params){.dirty.} =
   trigger(router, alias, bot, uctx, u)

@@ -1,15 +1,26 @@
-import sequtils, tables, strformat, strutils, json, os
-import telebot, asyncdispatch, logging, options
-import telegram/[controller], states, utils
+import sequtils, tables, strformat, strutils, json
+import telebot, asyncdispatch, options
+import telegram/[controller, helper], states, utils
 
 # ROUTER -----------------------------------
 
-proc fileNameGen(path: string): string=
-  "file://" & getCurrentDir() / path
+let nexPrevBtns = @[
+  InlineKeyboardButton(text: "prev", callbackData: some "prev"),
+  InlineKeyboardButton(text: "next", callbackData: some "next"),
+]
 
 var router = new RouterMap
 newRouter(router):
   route() as "home":
+    let msg = u.message.get
+
+    if issome msg.photo:
+      # NOTE: when you send an image, telegram will send it to the bot with different sizes
+      # - you can pick smallest one or biggest one, or save them all
+      let fid = msg.photo.get[^1].fileId
+      discard await bot.sendPhoto(msg.chat.id, fid)
+
+
     let
       keys = toseq(1..4).mapit:
         InlineKeyboardButton(text: $it, callbackData: some $it)
@@ -17,28 +28,19 @@ newRouter(router):
       newkeys = toseq(2..5).mapit:
         InlineKeyboardButton(text: $it, callbackData: some $it)
 
-    # let msg = await bot.sendMessage(uctx.chatId, "hello",
-    #   parseMode = "markdown",
-    #   replyMarkup = newInlineKeyboardMarkup(keys))
-
-    let msg = await bot.sendPhoto(
+    let mymsg = await bot.sendPhoto(
       uctx.chatId, fileNameGen "temp/emoji.png",
       "caption",
-      replyMarkup = newInlineKeyboardMarkup(keys))
+      replyMarkup = newInlineKeyboardMarkup(keys, nexPrevBtns))
 
     #------------------------------
 
     await sleepAsync 500
 
     discard await bot.editMessageMedia(
-    InputMediaPhoto(kind: "photo", media: fileNameGen "temp/share.png"), 
-    $msg.chat.id, msg.messageId,
-      replyMarkup = newInlineKeyboardMarkup(newkeys)
-    )
-
-    discard await bot.editMessageCaption(
-      "sda", $msg.chat.id, msg.messageId,
-      replyMarkup = newInlineKeyboardMarkup(newkeys)
+    InputMediaPhoto(kind: "photo", media: fileNameGen "temp/share.png"),
+    $mymsg.chat.id, mymsg.messageId,
+      replyMarkup = newInlineKeyboardMarkup(newkeys, nexPrevBtns)
     )
 
   route() as "keyboard":
@@ -50,10 +52,9 @@ newRouter(router):
 
 
   callbackQuery(qid: string, buttonText: string) as "select-quiz":
-    echo "++++++++++++++++++="
-    echo qid, buttonText
-    echo "++++++++++++++++++="
+    return buttonText
 
+# ------------------------------------------
 
 proc findChatId(updateFeed: Update): int64 =
   template findId(msgWrapper): untyped =
@@ -64,7 +65,6 @@ proc findChatId(updateFeed: Update): int64 =
     elif issome updateFeed.callbackQuery: updateFeed.callbackQuery.get.findId
     else: raise newException(ValueError, "couldn't find chat_id")
 
-
 proc dispatcher*(bot: TeleBot, u: Update): Future[bool] {.async.} =
   var args = newJArray()
   template getuctx: untyped =
@@ -74,14 +74,14 @@ proc dispatcher*(bot: TeleBot, u: Update): Future[bool] {.async.} =
     let msg = u.message.get
     var uctx = getuctx()
 
-    if msg.text.isSome:
-      let route = case uctx.stage:
-        of sMain: "home"
-        of sEnterNumber: "..."
-        else: raise newException(ValueError, "what?")
+    let route = case uctx.stage:
+      of sMain: "home"
+      of sEnterNumber: "..."
+      else: raise newException(ValueError, "what?")
 
-      fakeSafety:
-        discard await trigger(router, route, bot, uctx, u, args)
+    fakeSafety:
+      discard await trigger(router, route, bot, uctx, u, args)
+
 
   elif u.callbackQuery.issome:
     let cq = u.callbackQuery.get
@@ -94,7 +94,7 @@ proc dispatcher*(bot: TeleBot, u: Update): Future[bool] {.async.} =
 # ---------------------------------------
 
 when isMainModule:
-  addHandler newConsoleLogger(fmtStr = "$levelname, [$time]")
+  # addHandler newConsoleLogger(fmtStr = "$levelname, [$time]")
 
   const API_KEY = "2004052302:AAHm_oICftfs5xLmY0QwGVTE3o-gYgD6ahw"
   let bot = newTeleBot API_KEY
