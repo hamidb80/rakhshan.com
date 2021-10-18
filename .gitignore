@@ -1,6 +1,7 @@
-src/database/init.sql
+temp/
+*.sql
 
 play.*
 *.exe
 
-db.sqlite
+azmoon

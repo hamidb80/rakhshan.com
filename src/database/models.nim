@@ -1,8 +1,8 @@
 import easydb
 
-var query: string
+var initQuery: string
 
-Blueprint [queryHolder: query, postfix: "Model"]:
+Blueprint [queryHolder: initQuery, postfix: "Model"]:
     Table member:
         id: int {.primary.}
         name: char[255]
@@ -10,25 +10,34 @@ Blueprint [queryHolder: query, postfix: "Model"]:
 
     Table part:
         id: int {.primary.}
-        name: string
+        name: char[120]
+        lesson: char[60]
+        grade: int # 10 | 11 | 12
+        chapter: int
+        slice: int # -1 means all
 
     Table quiz:
         id: int {.primary.}
         name: char[255]
         part_id: int[ref part.id]
-        
+
     Table question:
         id: int {.primary.}
         quiz_id: int[ref quiz.id]
-        answer: int
+        photo_path: Option[string]
+        description: string
+        answer: int # 1 | 2 | 3 | 4
 
     Table record:
         id: int {.primary.}
-        member_id: int[ref members.id]
         quiz_id: int[ref quiz.id]
-        answer_list: char[255]
+        member_id: int[ref members.id]
         questions_order: string
+        answer_list: char[255]
 
 
 when isMainModule:
-    writefile "src/database/init.sql", query
+    writefile "src/database/init.sql", initQuery
+
+when defined(test):
+    export initQuery

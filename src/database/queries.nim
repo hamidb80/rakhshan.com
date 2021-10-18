@@ -7,14 +7,18 @@ template dbworks*(path: string, body): untyped =
         body
         db.close()
 
-proc getMembers*(db: DbConn): seq[MembersModel] =
-    db.getAllRows(
-        sql"SELECT id, name FROM members"
-    )
-    .mapIt MembersModel(id: parseint it[0], name: it[1])
+# member ----------------------------------------
 
-proc insertMember*(db: DbConn, name: string): int64 =
+proc getMembers*(db: DbConn): seq[MemberModel] =
+    db.getAllRows(
+        sql"SELECT id, name FROM member"
+    )
+    .mapIt MemberModel(id: parseint it[0], name: it[1])
+
+proc addMember*(db: DbConn, name: string): int64 =
     db.insertID(
-        sql"INSERT INTO members (name) VALUES (?)",
+        sql"INSERT INTO member (name) VALUES (?)",
         name
     )
+
+# member ----------------------------------------
