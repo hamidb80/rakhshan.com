@@ -8,29 +8,56 @@ const
 
 # texts: texts that are recieved from the client
 const
-    loginText* = "ورود"
-    adminLoginText* = "ادمین"
+    cancelT* = "انصراف"
+    returningT* = "بازگشت ..."
+    menuT* = "منو"
+    loginT* = "ورود"
+    adminT* = "ادمین"
+
+    sendAdminPassT* = "رمز را وارد کنید"
+    passwordIsWrongT* = "رمز اشتباه است"
+    loggedInAsAdminT* = "به عنوان ادمین وارد شدید"
+
+    addQuizT* = "اضافه کردن آزمون"
+    removeQuizT* = "حذف آزمون"
+    selectQuizT* = "انتخاب آزمون"
 
     askPasswordAdmin* = "رمز ادمین را وارد کنید"
 
 
 let
-    notLoggedInkeyboard* = newReplyKeyboardMarkup @[
-        @[adminLoginText],
-        @[loginText],
+    notLoggedInReply* = newReplyKeyboardMarkup @[
+        @[adminT],
+        @[loginT],
     ]
 
-let
-  answerBtns* = [
-    ("1", "1"),
-    ("2", "2"),
-    ("3", "3"),
-    ("4", "4"),
-    ("empty", "0"),
-  ].toInlineButtons
+    cancelReply* = newReplyKeyboardMarkup @[
+      @[cancelT]
+    ]
 
-  moveBtns* = @[
-    ("prev", "prev"),
-    ("next", "next"),
-  ].toInlineButtons
+    memberReplyRaw = @[
+      @[selectQuizT]
+    ]
+
+    adminReplyRaw = @[ @[addQuizT, removeQuizT]]
+
+    memberReply* = newReplyKeyboardMarkup memberReplyRaw
+    adminReply* = newReplyKeyboardMarkup adminReplyRaw & memberReplyRaw
+
+    noReply* = newReplyKeyboardRemove(true)
+
+
+let
+    answerBtns* = [
+      ("1", "1"),
+      ("2", "2"),
+      ("3", "3"),
+      ("4", "4"),
+      ("empty", "0"),
+    ].toInlineButtons
+
+    moveBtns* = @[
+      ("prev", "prev"),
+      ("next", "next"),
+    ].toInlineButtons
 

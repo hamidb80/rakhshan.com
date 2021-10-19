@@ -12,25 +12,38 @@ import
 const PASS = "1234"
 
 
+template `->`(newStage: Stages): untyped {.dirty.}=
+  uctx.stage = newStage
+  
+
 var router = new RouterMap
 newRouter(router):
   route(chatid: int, msgtext: string) as "home":
     case msgtext:
-    of logintext:
-      discard sendmsg(chatid, "good luck!", newReplyKeyboardRemove(true))
+    of loginT:
+      discard sendmsg(chatid, "good luck!", noReply)
 
-    of adminLoginText:
-      uctx.stage = sEnterAdminPass
-      discard sendmsg(chatid, "send pass then", newReplyKeyboardRemove(true))
+    of adminT:
+      -> sEnterAdminPass
+      discard sendmsg(chatid, sendAdminPassT, noReply)
 
     else:
-      discard await sendmsg(chatid, mainPageMsg, notLoggedInkeyboard)
+      discard await sendmsg(chatid, mainPageMsg, notLoggedInReply)
 
   route(chatid: int, pass: string) as "admin-login":
-    if pass == PASS:
-      discard sendmsg(chatid, "yay")
+    
+    case pass:
+    of PASS:
+      -> sMemberPage
+      discard sendmsg(chatid, loggedInAsAdminT)
+
+    of cancelT:
+      -> sMain
+      discard await sendmsg(chatid, returningT)
+      discard sendmsg(chatid, menuT, adminReply)
+
     else:
-      discard sendmsg(chatid, "NOOOOOOOOOOOOOOOOOOOOOOOOOOOO")
+      discard sendmsg(chatid, passwordIsWrongT)
 
   route() as "test":
     let msg = u.message.get
@@ -57,14 +70,10 @@ newRouter(router):
       replyMarkup = newInlineKeyboardMarkup(answerBtns, moveBtns)
     )
 
-  route() as "keyboard":
-    let keysp = toseq(1..4).mapit KeyboardButton(text: $it)
+  route() as "add-quiz":
+    discard
 
-    discard bot.sendMessage(uctx.chatId, "hello",
-      parseMode = "markdown",
-      replyMarkup = newReplyKeyboardMarkup(keysp))
-
-  callbackQuery(chatid: int, buttonText: string) as "select-quiz":
+  callbackQuery(chatid: int, buttonText: string) as "quiz-question-controll":
     return buttonText
 
 # ------------------------------------------

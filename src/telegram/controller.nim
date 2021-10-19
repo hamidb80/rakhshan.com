@@ -7,8 +7,10 @@ import
 type
   Stages* = enum
     sMain, sEnterNumber, sEnterAdminPass # primary
-    sSelectQuiz, sSelectAnswer, sSelectRecord # member
-    sAddQuiz,  # admin
+    sMemberPage, sSelectQuiz, 
+    sSelectRecord,
+    sAddQuiz, sAQEnterName, sAQTime, sAQQuestion  # admin
+    sDoingQuiz,
 
   UserCtx* = ref object
     chatId*: int64

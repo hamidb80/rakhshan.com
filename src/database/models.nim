@@ -6,6 +6,8 @@ Blueprint [queryHolder: initQuery, postfix: "Model"]:
     Table member:
         id: int {.primary.}
         name: char[255]
+        grade: int
+        is_admin: bool
         phone_number: char[15]
         tg_chat_id: int
 
@@ -21,6 +23,7 @@ Blueprint [queryHolder: initQuery, postfix: "Model"]:
         id: int {.primary.}
         name: char[255]
         part_id: int[ref part.id]
+        time: int
 
     Table question:
         id: int {.primary.}
