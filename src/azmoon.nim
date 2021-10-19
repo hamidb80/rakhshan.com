@@ -94,14 +94,15 @@ newRouter(router):
     let msg = u.message.get
     template allQuestions: untyped = uctx.quizCreation.get.questions
 
+    # FIXME delete quiz from user's object after creating in databse
     case uctx.stage:
     
     of sAQQuestion:
-      # TODO add question to questions list
-      if uctx.counter == 0:
+      if issome uctx.quizCreation:
+        # TODO say you can stop adding questions + end key
         discard
 
-      else: # TODO say you can stop adding questions + end key
+      else: 
         discard 
     
     of sAQQPic:
@@ -140,15 +141,6 @@ newRouter(router):
 
 
 # ------------------------------------------
-
-proc findChatId(updateFeed: Update): int64 =
-  template findId(msgWrapper): untyped =
-    msgWrapper.message.get.chat.id
-
-  return
-    if issome updateFeed.message: updateFeed.findId
-    elif issome updateFeed.callbackQuery: updateFeed.callbackQuery.get.findId
-    else: raise newException(ValueError, "couldn't find chat_id")
 
 proc dispatcher*(bot: TeleBot, u: Update): Future[bool] {.async.} =
   var args = newJArray()
@@ -190,7 +182,6 @@ proc dispatcher*(bot: TeleBot, u: Update): Future[bool] {.async.} =
 
     discard await bot.answerCallbackQuery($cq.id, res)
 
-# ---------------------------------------
 
 when isMainModule:
   # addHandler newConsoleLogger(fmtStr = "$levelname, [$time]")

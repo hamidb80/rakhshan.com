@@ -7,24 +7,35 @@ import
 type
   Stages* = enum
     sMain, sEnterNumber, sEnterAdminPass # primary
-    sMenu, sSelectQuiz, 
-    sSelectRecord,
-    sAddQuiz, sAQEnterName, sAQTime, sAQGrade, sAQLesson, sAQchapter, sAQQuestion  # admin
-    sAQQPic, sAQQInfo, sAQQAns,
-    sDoingQuiz,
+    sMenu, sSelectQuiz
+    sSelectRecord
+    sAddQuiz, sAQEnterName, sAQTime, sAQGrade, sAQLesson, sAQchapter # admin
+    sAQQuestion, sAQQPic, sAQQInfo, sAQQAns
+    sFindQuiz, sFQname, sFQgrade, sFQlesson
+    sTakingQuiz
 
-  
+
   UserCtx* = ref object
     chatId*: int64
     stage*: Stages
-    counter*: int
-    member*: Option[MemberCtx]
-    quizId*: int
-    quizCreation*: Option[QuizCreate]
 
-  MemberCtx* = ref object
-    fname*: string
-    lname*: string
+    name*: string
+    isAdmin*: bool
+
+    quizCreation*: Option[QuizCreate]
+    quizTaking*: Option[QuizTaking]
+    quizQuery*: Option[QuizQuery]
+
+  QuizQuery* = object
+    name*: Option[string]
+    grade*: Option[int]
+    lesson*: Option[string]
+
+  QuizTaking* = object
+    questionPicMsgId*: int
+    questionsOrder*: seq[int]
+    answerSheet*: seq[int]
+    currentQuestionIndex: int
 
   QuizCreate* = object
     name*: string
@@ -33,7 +44,7 @@ type
     grade*: int
     lesson*: string
     chapter*: int
-    # ---    
+    # ---
     questions*: seq[QuestionCreate]
 
   QuestionCreate* = object
@@ -42,7 +53,8 @@ type
     answer*: int
 
 
-  RouterProc = proc(bot: Telebot, uctx: UserCtx, u: Update, args: JsonNode): Future[string] {.async.}
+  RouterProc = proc(bot: Telebot, uctx: UserCtx, u: Update,
+      args: JsonNode): Future[string] {.async.}
   RouterMap* = ref Table[string, RouterProc]
 
 
@@ -106,14 +118,14 @@ macro initRouter(varName: typed, args: varargs[untyped]): untyped =
   # echo repr result
   return result
 
-template newRouter*(varname, body)=
+template newRouter*(varname, body) =
   initRouter(varname, bot: TeleBot, uctx: UserCtx, u: Update, body)
 
 
 proc trigger*(
   router: RouterMap, alias: string,
   bot: TeleBot, uctx: UserCtx, u: Update, args: JsonNode = newJArray()
-): Future[string] {.async.}=
+): Future[string] {.async.} =
   doassert args.kind == JArray
 
   if alias in router:

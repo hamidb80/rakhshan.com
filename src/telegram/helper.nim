@@ -43,3 +43,13 @@ func getBiggestPhotoFileId*(msg: Message): string=
     # NOTE: when you send an image, telegram will send it to the bot with different sizes
     # - you can pick smallest one or biggest one, or save them all
     msg.photo.get[^1].fileId
+
+
+proc findChatId*(updateFeed: Update): int64 =
+  template findId(msgWrapper): untyped =
+    msgWrapper.message.get.chat.id
+
+  return
+    if issome updateFeed.message: updateFeed.findId
+    elif issome updateFeed.callbackQuery: updateFeed.callbackQuery.get.findId
+    else: raise newException(ValueError, "couldn't find chat_id")
