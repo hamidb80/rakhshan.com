@@ -7,7 +7,7 @@ import
 type
   Stages* = enum
     sMain, sEnterNumber, sEnterAdminPass # primary
-    sMemberPage, sSelectQuiz, 
+    sMenu, sSelectQuiz, 
     sSelectRecord,
     sAddQuiz, sAQEnterName, sAQTime, sAQQuestion  # admin
     sDoingQuiz,

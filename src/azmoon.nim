@@ -34,7 +34,7 @@ newRouter(router):
     
     case pass:
     of PASS:
-      -> sMemberPage
+      -> sMenu
       discard sendmsg(chatid, loggedInAsAdminT)
 
     of cancelT:
@@ -44,6 +44,14 @@ newRouter(router):
 
     else:
       discard sendmsg(chatid, passwordIsWrongT)
+
+  route(chatid: int, input: string) as "menu":
+    case input:
+    of addQuizT: discard
+    of removeQuizT: discard
+    of selectQuizT: discard
+    else:
+      discard sendmsg(chatid, wrongCommandT)
 
   route() as "test":
     let msg = u.message.get

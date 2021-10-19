@@ -9,6 +9,7 @@ const
 # texts: texts that are recieved from the client
 const
     cancelT* = "انصراف"
+    wrongCommandT* = "دستور اشتباه"
     returningT* = "بازگشت ..."
     menuT* = "منو"
     loginT* = "ورود"
@@ -20,6 +21,7 @@ const
 
     addQuizT* = "اضافه کردن آزمون"
     removeQuizT* = "حذف آزمون"
+    
     selectQuizT* = "انتخاب آزمون"
 
     askPasswordAdmin* = "رمز ادمین را وارد کنید"
