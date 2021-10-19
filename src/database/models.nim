@@ -6,7 +6,6 @@ Blueprint [queryHolder: initQuery, postfix: "Model"]:
     Table member:
         id: int {.primary.}
         name: char[255]
-        grade: int
         phone_number: char[15]
         is_admin: bool
         tg_chat_id: int
@@ -27,7 +26,7 @@ Blueprint [queryHolder: initQuery, postfix: "Model"]:
     Table question:
         id: int {.primary.}
         quiz_id: int[ref quiz.id]
-        photo_path: Option[string]
+        photo_path: string
         description: string
         answer: char[1] # 1 | 2 | 3 | 4
 

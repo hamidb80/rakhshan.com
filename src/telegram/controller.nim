@@ -10,17 +10,30 @@ type
     sMenu, sSelectQuiz, 
     sSelectRecord,
     sAddQuiz, sAQEnterName, sAQTime, sAQGrade, sAQLesson, sAQchapter, sAQQuestion  # admin
+    sAQQPic, sAQQInfo, sAQQAns,
     sDoingQuiz,
+
+  
+  UserCtx* = ref object
+    chatId*: int64
+    stage*: Stages
+    counter*: int
+    member*: Option[MemberCtx]
+    quizId*: int
+    quizCreation*: Option[QuizCreate]
+
+  MemberCtx* = ref object
+    fname*: string
+    lname*: string
 
   QuizCreate* = object
     name*: string
     time*: int
-    
     # part info
     grade*: int
     lesson*: string
     chapter*: int
-    
+    # ---    
     questions*: seq[QuestionCreate]
 
   QuestionCreate* = object
@@ -28,17 +41,6 @@ type
     photo_path*: string
     answer*: int
 
-  UserCtx* = ref object
-    chatId*: int64
-    stage*: Stages
-    counters*: seq[int]
-    member*: Option[MemberCtx]
-
-    quizCreation*: Option[QuizCreate]
-
-  MemberCtx* = ref object
-    fname*: string
-    lname*: string
 
   RouterProc = proc(bot: Telebot, uctx: UserCtx, u: Update, args: JsonNode): Future[string] {.async.}
   RouterMap* = ref Table[string, RouterProc]

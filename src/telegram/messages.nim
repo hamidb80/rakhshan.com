@@ -11,6 +11,7 @@ const
     menuT* = "منو"
     loginT* = "ورود"
     adminT* = "ادمین"
+    withoutPhotoT* = "بدون عکس"
 
     selectOptionsT* = "‌یکی از گزینه ها رو انتخاب کنید‌"
     sendAdminPassT* = "رمز را وارد کنید"
@@ -26,6 +27,8 @@ const
     enterQuizChapterT* = "شماره فصل درس آزمون را وارد کنید"
     
     selectQuizT* = "انتخاب آزمون"
+    enterQuestionInfoT* = "توضیحات سوال را وارد کنید"
+    enterQuestionAnswerT* = "جواب سوال را وارد کنید"
 
     askPasswordAdmin* = "رمز ادمین را وارد کنید"
 

@@ -14,3 +14,8 @@ template `<<`*(msgid: int64, text: string): untyped{.dirty.} =
 template `/->`*(newStage: Stages): untyped {.dirty.}=
   uctx.stage = newStage
   
+template trySendInvalid*(body) =
+  try:
+    body
+  except:
+    discard await chatid << invalidInputT

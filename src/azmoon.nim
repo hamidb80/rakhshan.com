@@ -1,5 +1,5 @@
 import
-  sequtils, tables, strformat, strutils,
+  sequtils, tables, strutils,
   asyncdispatch, options, json
 import telebot
 import
@@ -10,7 +10,6 @@ import
 # ROUTER -----------------------------------
 
 const PASS = "1234"
-
 
 var router = new RouterMap
 newRouter(router):
@@ -53,11 +52,6 @@ newRouter(router):
 
   route(chatid: int, input: string) as "add-quiz":
     template myquiz: untyped = uctx.quizCreation.get
-    template trycode(body) =
-      try:
-        body
-      except:
-        discard await chatid << invalidInputT
 
     case uctx.stage:
     of sAddQuiz:
@@ -71,13 +65,13 @@ newRouter(router):
       discard chatid << enterQuizTimeT
 
     of sAQTime: # TODO parse time rather than giving a number in seconds
-      trycode:
+      trySendInvalid:
         myquiz.time = input.parseInt
         /-> sAQgrade
         discard chatid << enterQuizGradeT
 
     of sAQgrade:
-      trycode:
+      trySendInvalid:
         myquiz.grade = input.parseInt
         /-> sAQLesson
         discard chatid << enterQuizLessonT
@@ -88,7 +82,7 @@ newRouter(router):
       discard chatid << enterQuizChapterT
 
     of sAQchapter:
-      trycode:
+      trySendInvalid:
         myquiz.chapter = input.parseInt
         /-> sAQQuestion
         discard redirect("add-quiestion", %[%chatid, %""])
@@ -97,34 +91,53 @@ newRouter(router):
       discard chatid << wrongCommandT
 
   route(chatid: int, input: string) as "add-question":
+    let msg = u.message.get
+    template allQuestions: untyped = uctx.quizCreation.get.questions
+
+    case uctx.stage:
+    
+    of sAQQuestion:
+      # TODO add question to questions list
+      if uctx.counter == 0:
+        discard
+
+      else: # TODO say you can stop adding questions + end key
+        discard 
+    
+    of sAQQPic:
+      if issome msg.photo:
+        let fid = getBiggestPhotoFileId(msg) # TODO
+
+      /-> sAQQInfo
+      discard chatId << enterQuestionInfoT
+
+    of sAQQInfo:
+      allquestions[^1].description = input
+      /-> sAQQAns
+      discard chatId << enterQuestionAnswerT
+
+    of sAQQAns:
+      trySendInvalid:
+        allquestions[^1].answer = parseint $input[0]
+        /-> sAQQuestion
+        discard redirect("add-question", %[%chatid, %""])
+
+    else:
+      discard
+
+  route(chatid: int) as "search-quiz":
+    # see all quizzes in pages with filter
     discard
 
-  route() as "give-image":
-    let msg = u.message.get
+  route(chatid: int) as "take-quiz":
+    discard
 
-    if issome msg.photo:
-      # NOTE: when you send an image, telegram will send it to the bot with different sizes
-      # - you can pick smallest one or biggest one, or save them all
-      let fid = msg.photo.get[^1].fileId
-      discard await bot.sendPhoto(msg.chat.id, fid)
-
-    let mymsg = await bot.sendPhoto(
-      uctx.chatId, fileNameGen "temp/emoji.png",
-      "caption",
-      replyMarkup = newInlineKeyboardMarkup(answerBtns, moveBtns))
-
-    #------------------------------
-
-    await sleepAsync 500
-
-    discard await bot.editMessageMedia(
-      InputMediaPhoto(kind: "photo", media: fileNameGen "temp/share.png"),
-      $mymsg.chat.id, mymsg.messageId,
-      replyMarkup = newInlineKeyboardMarkup(answerBtns, moveBtns)
-    )
-
-  callbackQuery(chatid: int, buttonText: string) as "quiz-question-controll":
+  callbackQuery(chatid: int, buttonText: string) as "select-answer":
     return buttonText
+
+  callbackQuery(chatid: int, buttonText: string) as "select-question":
+    return buttonText
+
 
 # ------------------------------------------
 
@@ -158,6 +171,7 @@ proc dispatcher*(bot: TeleBot, u: Update): Future[bool] {.async.} =
       of sEnterAdminPass: "admin-login"
       of sEnterNumber: "..."
       of sAddQuiz: "add-quiz"
+      of sAQQuestion: "add-question"
       else: raise newException(ValueError, "what?")
 
     fakeSafety:

@@ -37,3 +37,9 @@ func newReplyKeyboardMarkup*(
 ): ReplyKeyboardMarkup =
   newReplyKeyboardMarkup:
     keyboards.mapit it.mapIt initKeyBoardButton(it)
+
+
+func getBiggestPhotoFileId*(msg: Message): string=
+    # NOTE: when you send an image, telegram will send it to the bot with different sizes
+    # - you can pick smallest one or biggest one, or save them all
+    msg.photo.get[^1].fileId
