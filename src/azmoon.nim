@@ -1,17 +1,36 @@
 import sequtils, tables, strformat, strutils, json
 import telebot, asyncdispatch, options
-import telegram/[controller, helper], states, utils
+import
+  telegram/[controller, helper, messages, comfortable],
+  # concurrency,
+  states, utils
 
 # ROUTER -----------------------------------
 
-let nexPrevBtns = @[
-  InlineKeyboardButton(text: "prev", callbackData: some "prev"),
-  InlineKeyboardButton(text: "next", callbackData: some "next"),
-]
+const PASS = "1234"
+
 
 var router = new RouterMap
 newRouter(router):
-  route() as "home":
+  route(chatid: int, msgtext: string) as "home":
+    case msgtext:
+    of logintext:
+      discard sendmsg(chatid, "good luck!", newReplyKeyboardRemove(true))
+
+    of adminLoginText:
+      uctx.stage = sEnterAdminPass
+      discard sendmsg(chatid, "send pass then", newReplyKeyboardRemove(true))
+
+    else:
+      discard await bot.sendMessage(chatid, mainPageMsg, replyMarkup = notLoggedInkeyboard)
+
+  route(chatid: int, pass: string) as "admin-login":
+    if pass == PASS:
+      discard sendmsg(chatid, "yay")
+    else:
+      discard sendmsg(chatid, "NOOOOOOOOOOOOOOOOOOOOOOOOOOOO")
+
+  route() as "test":
     let msg = u.message.get
 
     if issome msg.photo:
@@ -21,26 +40,19 @@ newRouter(router):
       discard await bot.sendPhoto(msg.chat.id, fid)
 
 
-    let
-      keys = toseq(1..4).mapit:
-        InlineKeyboardButton(text: $it, callbackData: some $it)
-
-      newkeys = toseq(2..5).mapit:
-        InlineKeyboardButton(text: $it, callbackData: some $it)
-
     let mymsg = await bot.sendPhoto(
       uctx.chatId, fileNameGen "temp/emoji.png",
       "caption",
-      replyMarkup = newInlineKeyboardMarkup(keys, nexPrevBtns))
+      replyMarkup = newInlineKeyboardMarkup(answerBtns, moveBtns))
 
     #------------------------------
 
     await sleepAsync 500
 
     discard await bot.editMessageMedia(
-    InputMediaPhoto(kind: "photo", media: fileNameGen "temp/share.png"),
-    $mymsg.chat.id, mymsg.messageId,
-      replyMarkup = newInlineKeyboardMarkup(newkeys, nexPrevBtns)
+      InputMediaPhoto(kind: "photo", media: fileNameGen "temp/share.png"),
+      $mymsg.chat.id, mymsg.messageId,
+      replyMarkup = newInlineKeyboardMarkup(answerBtns, moveBtns)
     )
 
   route() as "keyboard":
@@ -49,7 +61,6 @@ newRouter(router):
     discard bot.sendMessage(uctx.chatId, "hello",
       parseMode = "markdown",
       replyMarkup = newReplyKeyboardMarkup(keysp))
-
 
   callbackQuery(qid: string, buttonText: string) as "select-quiz":
     return buttonText
@@ -71,11 +82,19 @@ proc dispatcher*(bot: TeleBot, u: Update): Future[bool] {.async.} =
     fakeSafety: getOrCreateUser findChatId u
 
   if u.message.issome:
-    let msg = u.message.get
-    var uctx = getuctx()
+    let 
+      uctx = getuctx()
+      msg = u.message.get
+
+    args.add %msg.chat.id
+    args.add %(
+      if issome msg.text: msg.text.get
+      else: ""
+    )
 
     let route = case uctx.stage:
       of sMain: "home"
+      of sEnterAdminPass: "admin-login"
       of sEnterNumber: "..."
       else: raise newException(ValueError, "what?")
 
@@ -104,4 +123,4 @@ when isMainModule:
     echo "running ..."
 
     try: bot.poll(timeout = 100)
-    except: echo "--------------\n\n" & getCurrentExceptionMsg() & "\n\n--------------------------"
+    except: echo ">>>> " & getCurrentExceptionMsg()

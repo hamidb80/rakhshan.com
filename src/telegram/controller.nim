@@ -6,7 +6,7 @@ import
 
 type
   Stages* = enum
-    sMain, sEnterNumber, # primary
+    sMain, sEnterNumber, sEnterAdminPass # primary
     sSelectQuiz, sSelectAnswer, sSelectRecord # member
     sAddQuiz,  # admin
 
@@ -81,7 +81,7 @@ macro initRouter(varName: typed, args: varargs[untyped]): untyped =
 
 
   # echo treeRepr result
-  echo repr result
+  # echo repr result
   return result
 
 template newRouter*(varname, body)=
