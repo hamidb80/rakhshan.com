@@ -7,17 +7,16 @@ Blueprint [queryHolder: initQuery, postfix: "Model"]:
         id: int {.primary.}
         name: char[255]
         grade: int
-        is_admin: bool
         phone_number: char[15]
+        is_admin: bool
         tg_chat_id: int
 
     Table part:
         id: int {.primary.}
         name: char[120]
-        lesson: char[60]
         grade: int # 10 | 11 | 12
+        lesson: char[60]
         chapter: int
-        slice: int # -1 means all
 
     Table quiz:
         id: int {.primary.}

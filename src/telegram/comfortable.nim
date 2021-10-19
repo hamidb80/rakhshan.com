@@ -2,11 +2,11 @@ import asyncdispatch
 import telebot
 import ./controller
 
-template redirect*(alias, params){.dirty.} =
-  trigger(router, alias, bot, uctx, u)
+template redirect*(alias, params): untyped {.dirty.} =
+  trigger(router, alias, bot, uctx, u, params)
 
-template sendmsg*(msgid: int64, text: string, rmarkup: KeyboardMarkup = nil): untyped{.dirty.} =
-  bot.sendMessage(msgid, text, replyMarkup = rmarkup)
+template `<<`*(msgid: int64, box: tuple[t: string, k: KeyboardMarkup]): untyped {.dirty.} =
+  bot.sendMessage(msgid, box[0], replyMarkup = box[1])
 
 template `<<`*(msgid: int64, text: string): untyped{.dirty.} =
   bot.sendMessage(msgid, text)

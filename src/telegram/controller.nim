@@ -9,14 +9,32 @@ type
     sMain, sEnterNumber, sEnterAdminPass # primary
     sMenu, sSelectQuiz, 
     sSelectRecord,
-    sAddQuiz, sAQEnterName, sAQTime, sAQQuestion  # admin
+    sAddQuiz, sAQEnterName, sAQTime, sAQGrade, sAQLesson, sAQchapter, sAQQuestion  # admin
     sDoingQuiz,
+
+  QuizCreate* = object
+    name*: string
+    time*: int
+    
+    # part info
+    grade*: int
+    lesson*: string
+    chapter*: int
+    
+    questions*: seq[QuestionCreate]
+
+  QuestionCreate* = object
+    description*: string
+    photo_path*: string
+    answer*: int
 
   UserCtx* = ref object
     chatId*: int64
-    member*: Option[MemberCtx]
     stage*: Stages
     counters*: seq[int]
+    member*: Option[MemberCtx]
+
+    quizCreation*: Option[QuizCreate]
 
   MemberCtx* = ref object
     fname*: string

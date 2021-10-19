@@ -2,25 +2,28 @@ import strutils
 import telebot
 import ./helper
 
-# messages : text that are sent to the client
-const
-    mainPageMsg* = "‌یکی از گزینه ها رو انتخاب کنید‌"
-
 # texts: texts that are recieved from the client
 const
     cancelT* = "انصراف"
+    invalidInputT* = "ورودی اشتباه"
     wrongCommandT* = "دستور اشتباه"
     returningT* = "بازگشت ..."
     menuT* = "منو"
     loginT* = "ورود"
     adminT* = "ادمین"
 
+    selectOptionsT* = "‌یکی از گزینه ها رو انتخاب کنید‌"
     sendAdminPassT* = "رمز را وارد کنید"
     passwordIsWrongT* = "رمز اشتباه است"
     loggedInAsAdminT* = "به عنوان ادمین وارد شدید"
 
-    addQuizT* = "اضافه کردن آزمون"
     removeQuizT* = "حذف آزمون"
+    addQuizT* = "اضافه کردن آزمون"
+    enterQuizNameT* = "نام آزمون را وارد کنید"
+    enterQuizTimeT* = "زمان آزمون را وارد کنید"
+    enterQuizGradeT* = "پایه تحصیلی آزمون را وارد کنید"
+    enterQuizLessonT* = "نام درس آزمون را انتخاب کنید"
+    enterQuizChapterT* = "شماره فصل درس آزمون را وارد کنید"
     
     selectQuizT* = "انتخاب آزمون"
 
