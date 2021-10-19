@@ -19,14 +19,21 @@ const
     loggedInAsAdminT* = "به عنوان ادمین وارد شدید"
 
     removeQuizT* = "حذف آزمون"
+
     addQuizT* = "اضافه کردن آزمون"
     enterQuizNameT* = "نام آزمون را وارد کنید"
     enterQuizTimeT* = "زمان آزمون را وارد کنید"
     enterQuizGradeT* = "پایه تحصیلی آزمون را وارد کنید"
     enterQuizLessonT* = "نام درس آزمون را انتخاب کنید"
     enterQuizChapterT* = "شماره فصل درس آزمون را وارد کنید"
+
+    findQuizDialogT* = "میتوانید به طور اختیاری فیلتر هایی اعمال کنید و سپس روی دکمه جستجوی آزمون بزنید"
+    findQuizT* = "جستجوی آزمون"
+    findQuizChangeNameT* = "نام آزمون"
+    findQuizChangeGradeT* = "پایه"
+    findQuizChangeLessonT* = "نام درس"
+    findQuizClearFiltersT* = "حذف فیلتر ها"
     
-    selectQuizT* = "انتخاب آزمون"
     enterQuestionInfoT* = "توضیحات سوال را وارد کنید"
     enterQuestionAnswerT* = "جواب سوال را وارد کنید"
 
@@ -44,7 +51,7 @@ let
     ]
 
     memberReplyRaw = @[
-      @[selectQuizT]
+      @[findQuizT]
     ]
 
     adminReplyRaw = @[ @[addQuizT, removeQuizT]]

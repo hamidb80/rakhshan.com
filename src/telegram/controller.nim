@@ -6,13 +6,12 @@ import
 
 type
   Stages* = enum
-    sMain, sEnterNumber, sEnterAdminPass # primary
-    sMenu, sSelectQuiz
-    sSelectRecord
+    sMain, sEnterNumber, sEnterAdminPass, sMenu # primary
     sAddQuiz, sAQEnterName, sAQTime, sAQGrade, sAQLesson, sAQchapter # admin
     sAQQuestion, sAQQPic, sAQQInfo, sAQQAns
-    sFindQuiz, sFQname, sFQgrade, sFQlesson
+    sFindQuizMain, sFQname, sFQgrade, sFQlesson
     sTakingQuiz
+    sFindMyRecords
 
 
   UserCtx* = ref object
@@ -32,10 +31,15 @@ type
     lesson*: Option[string]
 
   QuizTaking* = object
-    questionPicMsgId*: int
+    quizId: int
+    currentQuestionIndex: int
     questionsOrder*: seq[int]
     answerSheet*: seq[int]
-    currentQuestionIndex: int
+
+    quizTimeMsgId*: int
+    questionPicMsgId*: int
+    questionInfoMsgId*: int
+    answerSheetMsgId*: int
 
   QuizCreate* = object
     name*: string

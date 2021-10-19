@@ -40,13 +40,17 @@ newRouter(router):
     else:
       discard chatid << passwordIsWrongT
 
+  route(chatid: int) as "verify-user":
+    discard
+
   route(chatid: int, input: string) as "menu":
     case input:
     of addQuizT:
       /-> sAddQuiz
       discard redirect("add-quiz", %[%chatid, %""])
-    of removeQuizT: discard
-    of selectQuizT: discard
+    of findQuizT: 
+      /-> sFindQuizMain
+      discard redirect("find-quiz", %[%chatid, %""])
     else:
       discard chatid << wrongCommandT
 
@@ -87,7 +91,7 @@ newRouter(router):
         /-> sAQQuestion
         discard redirect("add-quiestion", %[%chatid, %""])
 
-    else: 
+    else:
       discard chatid << wrongCommandT
 
   route(chatid: int, input: string) as "add-question":
@@ -96,18 +100,18 @@ newRouter(router):
 
     # FIXME delete quiz from user's object after creating in databse
     case uctx.stage:
-    
+
     of sAQQuestion:
       if issome uctx.quizCreation:
         # TODO say you can stop adding questions + end key
         discard
 
-      else: 
-        discard 
-    
+      else:
+        discard
+
     of sAQQPic:
       if issome msg.photo:
-        let fid = getBiggestPhotoFileId(msg) # TODO
+        let fid = getBiggestPhotoFileId(msg)             # TODO
 
       /-> sAQQInfo
       discard chatId << enterQuestionInfoT
@@ -126,11 +130,46 @@ newRouter(router):
     else:
       discard
 
-  route(chatid: int) as "search-quiz":
-    # see all quizzes in pages with filter
-    discard
+  route(chatid: int, input: string) as "find-quiz":
+    template myquery: untyped = uctx.quizQuery.get
+    template goBack: untyped = /-> sFindQuizMain
 
-  route(chatid: int) as "take-quiz":
+    case input:
+    of findQuizT:
+      discard # TODO actually send the result + show filters top of result
+    of findQuizChangeNameT: /-> sFQname
+    of findQuizChangeGradeT: /-> sFQgrade
+    of findQuizChangeLessonT: /-> sFQlesson
+    of findQuizClearFiltersT: /-> sFindQuizMain
+
+    else:
+      case uctx.stage:
+
+      of sfindQuizMain:
+        uctx.quizQuery = some QuizQuery()
+        discard chatid << findQuizDialogT
+
+      of sFQname:
+        myquery.name = some input
+        goBack()
+
+      of sFQgrade:
+        trySendInvalid:
+          myquery.grade = some parseint input
+          goBack()
+
+      of sFQlesson:
+        myquery.lesson = some input
+        goBack()
+
+
+      else: discard
+
+  route(chatid: int, input: string) as "take-quiz":
+    # qet quiz and it's questions from database
+    # save them into memory
+    # set uctx.quiztaking
+
     discard
 
   callbackQuery(chatid: int, buttonText: string) as "select-answer":
@@ -138,6 +177,17 @@ newRouter(router):
 
   callbackQuery(chatid: int, buttonText: string) as "select-question":
     return buttonText
+
+  route(chatId: int) as "update-timer":
+    discard
+
+  route(chatId: int) as "end-quiz":
+    # NOTE: can be called with end of the tiem of cancel by user
+    # calulate score
+    # save record
+    # calulate grade
+    # show complete result
+    discard
 
 
 # ------------------------------------------
