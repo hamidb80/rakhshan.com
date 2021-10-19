@@ -1,5 +1,7 @@
-import sequtils, tables, strformat, strutils, json
-import telebot, asyncdispatch, options
+import 
+  sequtils, tables, strformat, strutils, 
+  asyncdispatch, options, json
+import telebot
 import
   telegram/[controller, helper, messages, comfortable],
   # concurrency,
@@ -22,7 +24,7 @@ newRouter(router):
       discard sendmsg(chatid, "send pass then", newReplyKeyboardRemove(true))
 
     else:
-      discard await bot.sendMessage(chatid, mainPageMsg, replyMarkup = notLoggedInkeyboard)
+      discard await sendmsg(chatid, mainPageMsg, notLoggedInkeyboard)
 
   route(chatid: int, pass: string) as "admin-login":
     if pass == PASS:
@@ -62,7 +64,7 @@ newRouter(router):
       parseMode = "markdown",
       replyMarkup = newReplyKeyboardMarkup(keysp))
 
-  callbackQuery(qid: string, buttonText: string) as "select-quiz":
+  callbackQuery(chatid: int, buttonText: string) as "select-quiz":
     return buttonText
 
 # ------------------------------------------
@@ -106,7 +108,11 @@ proc dispatcher*(bot: TeleBot, u: Update): Future[bool] {.async.} =
     let cq = u.callbackQuery.get
 
     fakeSafety:
-      let res = await trigger(router, "select-quiz", bot, getuctx, u, %*[cq.id, cq.data.get])
+      let res = await trigger(
+        router, "select-quiz", 
+        bot, getuctx, u, 
+        %*[cq.message.get.chat.id, cq.data.get]
+      )
 
     discard await bot.answerCallbackQuery($cq.id, res)
 
