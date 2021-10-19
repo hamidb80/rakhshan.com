@@ -12,10 +12,6 @@ import
 const PASS = "1234"
 
 
-template `->`(newStage: Stages): untyped {.dirty.}=
-  uctx.stage = newStage
-  
-
 var router = new RouterMap
 newRouter(router):
   route(chatid: int, msgtext: string) as "home":
@@ -24,7 +20,7 @@ newRouter(router):
       discard sendmsg(chatid, "good luck!", noReply)
 
     of adminT:
-      -> sEnterAdminPass
+      /-> sEnterAdminPass
       discard sendmsg(chatid, sendAdminPassT, noReply)
 
     else:
@@ -34,16 +30,16 @@ newRouter(router):
     
     case pass:
     of PASS:
-      -> sMenu
-      discard sendmsg(chatid, loggedInAsAdminT)
+      /-> sMenu
+      discard chatid << loggedInAsAdminT
 
     of cancelT:
-      -> sMain
-      discard await sendmsg(chatid, returningT)
+      /-> sMain
+      discard await chatid << returningT
       discard sendmsg(chatid, menuT, adminReply)
 
     else:
-      discard sendmsg(chatid, passwordIsWrongT)
+      discard chatid << passwordIsWrongT
 
   route(chatid: int, input: string) as "menu":
     case input:
@@ -51,7 +47,10 @@ newRouter(router):
     of removeQuizT: discard
     of selectQuizT: discard
     else:
-      discard sendmsg(chatid, wrongCommandT)
+      discard chatid << wrongCommandT
+  
+  route() as "add-quiz":
+    discard
 
   route() as "test":
     let msg = u.message.get
@@ -77,9 +76,6 @@ newRouter(router):
       $mymsg.chat.id, mymsg.messageId,
       replyMarkup = newInlineKeyboardMarkup(answerBtns, moveBtns)
     )
-
-  route() as "add-quiz":
-    discard
 
   callbackQuery(chatid: int, buttonText: string) as "quiz-question-controll":
     return buttonText
