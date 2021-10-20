@@ -16,4 +16,4 @@ requires "macroplus >= 0.1.4"
 requires "https://github.com/hamidb80/easydb"
 
 task go, "run app":
-  exec "nim r -d:ssl src/azmoon.nim"
+  exec "nim r -d:ssl --threads:on src/azmoon.nim"

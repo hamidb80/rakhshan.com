@@ -1,4 +1,4 @@
-import tables, sequtils, strutils, json, options
+import tables, sequtils, strutils, json, options, times
 import macros except params
 import
   asyncdispatch, telebot,
@@ -20,6 +20,7 @@ type
 
     name*: string
     isAdmin*: bool
+    lastActivity: DateTime
 
     quizCreation*: Option[QuizCreate]
     quizTaking*: Option[QuizTaking]
@@ -35,6 +36,8 @@ type
     currentQuestionIndex: int
     questionsOrder*: seq[int]
     answerSheet*: seq[int]
+
+    # startTime
 
     quizTimeMsgId*: int
     questionPicMsgId*: int
