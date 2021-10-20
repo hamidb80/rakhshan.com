@@ -35,14 +35,13 @@ type
   QuizTaking* = ref object
     # FIXME this can be improved for ram usage
     quiz*: QuizModel
-    questions*: Table[int64, QuestionModel]
-
+    questions*: seq[QuestionModel]
     currentQuestionIndex*: int
-    questionsOrder*: seq[int]
     answerSheet*: seq[int]
     
     startTime*: DateTime
     lastCheckedTime*: Datetime
+    # isWatingForResult: bool
 
     quizTimeMsgId*: int
     questionPicMsgId*: int

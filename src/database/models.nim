@@ -36,6 +36,7 @@ Blueprint [queryHolder: initQuery, postfix: "Model"]:
         member_id: int[ref members.id]
         questions_order: string
         answer_list: char[255]
+        percent: float
 
 
 when isMainModule:

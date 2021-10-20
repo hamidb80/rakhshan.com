@@ -1,6 +1,6 @@
 import
-  sequtils, tables, strutils,
-  asyncdispatch, options, json, times
+  sequtils, tables, strutils, options, json, times,
+  asyncdispatch, threadpool
 import telebot
 import
   telegram/[controller, helper, messages, comfortable],
@@ -136,6 +136,7 @@ newRouter(router):
     case input:
     of findQuizT:
       discard # TODO actually send the result + show filters top of result
+    
     of findQuizChangeNameT: /-> sFQname
     of findQuizChangeGradeT: /-> sFQgrade
     of findQuizChangeLessonT: /-> sFQlesson
@@ -178,36 +179,69 @@ newRouter(router):
     return buttonText
 
   route(chatId: int) as "update-timer":
-    let 
+    let
       record = uctx.record.get
       quiz = record.quiz
-      newtime = quiz.time - (now() - record.startTime).inseconds 
+      newtime = quiz.time - (now() - record.startTime).inseconds
     discard bot.editMessageText($newtime, $chatid, record.quizTimeMsgId)
 
   route(chatId: int) as "end-quiz":
     # NOTE: can be called with end of the tiem of cancel by user
+    
+    # delete quiz messages
+    let r = uctx.record.get
+    for msgId in [
+      r.quizTimeMsgId,
+      r.questionPicMsgId,
+      r.questionInfoMsgId,
+      r.answerSheetMsgId
+    ]:
+      asynccheck bot.deleteMessage($chatId, msgid)
+
+    
     # calulate score
+    var
+      corrects = 0
+      wrongs = 0
+      empties = 0 
+
+    for (i, userAns) in r.answerSheet.pairs:
+      let correctAns = r.questions[i].answer.parseInt
+      if userAns == 0: empties.inc
+      elif userAns == correctAns: corrects.inc
+      else: wrongs.inc
+
+    let percent = (corrects * 3 - wrongs) / (r.answerSheet.len * 3)
+    
     # save record
+    
     # calulate grade
+    
     # show complete result
-    discard
+
+    uctx.record = none QuizTaking
 
 
 # ------------------------------------------
 
-proc checkNofitications(pch: ptr Channel[Notification], bot: TeleBot, delay: int) {.async.} =
+proc checkNofitications(
+  pch: ptr Channel[Notification], delay: int,
+  bot: TeleBot
+) {.async.} =
   while true:
     let (ok, notif) = pch[].tryRecv
     if ok:
-      let 
+      let
         args = %[notif.user_chatid]
-        routeName = 
+        routeName =
           case notif.kind:
-          of nkEndQuizTime:  "end-quiz"
+          of nkEndQuizTime: "end-quiz"
           of nkUpdateQuizTime: "update-timer"
-          
-      asyncCheck router[routeName](bot, getOrCreateUser(notif.user_chatid), Update(), args)
-      
+
+      asyncCheck router[routeName](
+        bot, getOrCreateUser(notif.user_chatid),
+        Update(), args)
+
     await sleepAsync delay
 
 proc dispatcher*(bot: TeleBot, u: Update): Future[bool] {.async.} =
@@ -258,8 +292,11 @@ when isMainModule:
   let bot = newTeleBot API_KEY
   bot.onUpdate dispatcher
 
+  spawn startTimer(100)
+  asyncCheck checkNofitications(addr notifier, 100, bot)
+
   while true:
     echo "running ..."
 
     try: bot.poll(timeout = 100)
-    except: echo ">>>> " & getCurrentExceptionMsg()
+    except: echo ">>>  " & getCurrentExceptionMsg()

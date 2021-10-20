@@ -18,7 +18,7 @@ const
 
 var
   users: Table[int64, UserCtx]
-  notifier: Channel[Notification]
+  notifier*: Channel[Notification]
   usersLock: Lock
 
 
