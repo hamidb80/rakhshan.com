@@ -1,10 +1,9 @@
 import
   sequtils, tables, strutils,
-  asyncdispatch, options, json
+  asyncdispatch, options, json, times
 import telebot
 import
   telegram/[controller, helper, messages, comfortable],
-  # concurrency,
   states, utils
 
 # ROUTER -----------------------------------
@@ -48,7 +47,7 @@ newRouter(router):
     of addQuizT:
       /-> sAddQuiz
       discard redirect("add-quiz", %[%chatid, %""])
-    of findQuizT: 
+    of findQuizT:
       /-> sFindQuizMain
       discard redirect("find-quiz", %[%chatid, %""])
     else:
@@ -179,7 +178,11 @@ newRouter(router):
     return buttonText
 
   route(chatId: int) as "update-timer":
-    discard
+    let 
+      record = uctx.record.get
+      quiz = record.quiz
+      newtime = quiz.time - (now() - record.startTime).inseconds 
+    discard bot.editMessageText($newtime, $chatid, record.quizTimeMsgId)
 
   route(chatId: int) as "end-quiz":
     # NOTE: can be called with end of the tiem of cancel by user
@@ -191,6 +194,21 @@ newRouter(router):
 
 
 # ------------------------------------------
+
+proc checkNofitications(pch: ptr Channel[Notification], bot: TeleBot, delay: int) {.async.} =
+  while true:
+    let (ok, notif) = pch[].tryRecv
+    if ok:
+      let 
+        args = %[notif.user_chatid]
+        routeName = 
+          case notif.kind:
+          of nkEndQuizTime:  "end-quiz"
+          of nkUpdateQuizTime: "update-timer"
+          
+      asyncCheck router[routeName](bot, getOrCreateUser(notif.user_chatid), Update(), args)
+      
+    await sleepAsync delay
 
 proc dispatcher*(bot: TeleBot, u: Update): Future[bool] {.async.} =
   var args = newJArray()

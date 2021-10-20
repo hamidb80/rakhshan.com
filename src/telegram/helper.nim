@@ -1,8 +1,6 @@
 import os, sequtils, options
 import telebot
 
-let fakeUpdate* = Update()
-
 # ------------------------------------------
 
 func toInlineButtons*(buttons: openArray[tuple[text, code: string]]): seq[

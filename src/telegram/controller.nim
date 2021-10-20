@@ -3,6 +3,7 @@ import macros except params
 import
   asyncdispatch, telebot,
   macroplus
+import ../database/models
 
 type
   Stages* = enum
@@ -20,10 +21,10 @@ type
 
     name*: string
     isAdmin*: bool
-    lastActivity: DateTime
+    lastActivity*: DateTime
 
     quizCreation*: Option[QuizCreate]
-    quizTaking*: Option[QuizTaking]
+    record*: Option[QuizTaking]
     quizQuery*: Option[QuizQuery]
 
   QuizQuery* = object
@@ -31,13 +32,17 @@ type
     grade*: Option[int]
     lesson*: Option[string]
 
-  QuizTaking* = object
-    quizId: int
-    currentQuestionIndex: int
+  QuizTaking* = ref object
+    # FIXME this can be improved for ram usage
+    quiz*: QuizModel
+    questions*: Table[int64, QuestionModel]
+
+    currentQuestionIndex*: int
     questionsOrder*: seq[int]
     answerSheet*: seq[int]
-
-    # startTime
+    
+    startTime*: DateTime
+    lastCheckedTime*: Datetime
 
     quizTimeMsgId*: int
     questionPicMsgId*: int

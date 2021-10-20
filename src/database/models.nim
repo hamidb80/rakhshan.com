@@ -7,7 +7,7 @@ Blueprint [queryHolder: initQuery, postfix: "Model"]:
         id: int {.primary.}
         name: char[255]
         phone_number: char[15]
-        is_admin: bool
+        is_admin: int # fake bool
         tg_chat_id: int
 
     Table part:
