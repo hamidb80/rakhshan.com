@@ -4,7 +4,7 @@ import
 import telebot
 import
   telegram/[controller, helper, messages, comfortable],
-  states, utils
+  states, utils, ./math
 
 # ROUTER -----------------------------------
 
@@ -200,18 +200,10 @@ newRouter(router):
 
     
     # calulate score
-    var
-      corrects = 0
-      wrongs = 0
-      empties = 0 
-
-    for (i, userAns) in r.answerSheet.pairs:
-      let correctAns = r.questions[i].answer.parseInt
-      if userAns == 0: empties.inc
-      elif userAns == correctAns: corrects.inc
-      else: wrongs.inc
-
-    let percent = (corrects * 3 - wrongs) / (r.answerSheet.len * 3)
+    let percent = getPercent(
+      r.answerSheet,
+      r.questions.mapIt it.answer.parseInt,
+    )
     
     # save record
     
