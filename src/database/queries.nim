@@ -6,6 +6,7 @@ type
         name: string
         grade: int
         lesson: string
+        time: int
         questions_number: int
 
     QuizInfoModel* = tuple
@@ -32,14 +33,16 @@ template transaction(db, body): untyped =
 
 # member ----------------------------------------
 
-proc addMember*(db; name: string): int64 =
+proc addMember*(db; name, phone_number: string, isAdmin: bool,
+        chatId: int64): int64 =
     db.insertID(
-        sql"INSERT INTO member (name) VALUES (?)",
-        name)
+        sql"INSERT INTO member (name, phone_number, is_admin, tg_chat_id) VALUES (?, ?, ?, ?)",
+        name, phone_number, isAdmin.int, chatId)
 
 proc getNember*(db): MemberModel =
-    let row = db.getRow(sql"SELECT id, name FROM member")
-    MemberModel(id: parseint row[0], name: row[1])
+    let row = db.getRow(sql"SELECT id, name, phone_number, is_admin, tg_chat_id FROM member")
+    MemberModel(id: parseint row[0], name: row[1], phone_number: row[2],
+            isAdmin: row[3].parseInt, tgchatid: row[4].parseBiggestInt)
 
 # quiz -------------------------------------------
 
@@ -68,17 +71,17 @@ proc addQuiz*(db;
     quizid
 
 
-proc findQuiz*(db; qq: QuizQuery, pageIndex, pageSize: int): seq[
-        QuizSearchModel] =
+proc findQuiz*(db; qq: QuizQuery, pageIndex, pageSize: int
+): seq[QuizSearchModel] =
     discard
 
-proc getQuizInfo*(db): QuizInfoModel =
+proc getQuizInfo*(db; quizid: int64): QuizInfoModel =
     result
 
-proc getQuestions*(db): seq[QuestionModel] =
+proc getQuestions*(db; quizid: int64): seq[QuestionModel] =
     result
 
-proc deleteQuiz*(db) =
+proc deleteQuiz*(db; quizid: int64) =
     # remove quiz + questions + records + part
     transaction(db):
         discard
