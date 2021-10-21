@@ -39,6 +39,7 @@ type
     name*: Option[string]
     grade*: Option[int]
     lesson*: Option[string]
+    resultMsgId*: Option[int]
 
   QuizTaking* = ref object
     # FIXME this can be improved for ram usage
@@ -128,6 +129,7 @@ macro initRouter(varName: typed, args: varargs[untyped]): untyped =
     case entity[InfixLeftSide][0].strval.normalize:
     of "route": discard
     of "callbackquery": discard
+    of "event": discard
     else: error "undefined entity"
 
     discard paramList.add commonArgs.mapIt newIdentDefs(it[0], it[1])

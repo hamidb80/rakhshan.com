@@ -5,11 +5,20 @@ import ./controller
 template redirect*(alias, params): untyped {.dirty.} =
   trigger(router, alias, bot, uctx, u, params)
 
-template `<<`*(msgid: int64, box: tuple[t: string, k: KeyboardMarkup]): untyped {.dirty.} =
-  bot.sendMessage(msgid, box[0], replyMarkup = box[1])
+template `<<`*(chatid: int64, box: tuple[t: string, k: KeyboardMarkup]): untyped {.dirty.} =
+  bot.sendMessage(chatid, box[0], replyMarkup = box[1])
 
-template `<<`*(msgid: int64, text: string): untyped{.dirty.} =
-  bot.sendMessage(msgid, text)
+template `<<`*(chatid: int64, text: string): untyped{.dirty.} =
+  bot.sendMessage(chatid, text)
+
+template `<^`*(msginfo: tuple[chatid: int64, msgid: int], box: tuple[t: string, k: KeyboardMarkup]): untyped {.dirty.} =
+  bot.editMessageText(box[0], $msginfo[0], msginfo[1], replyMarkup = box[1])
+
+template `<^`*(msginfo: tuple[chatid: int64, msgid: int], text: string): untyped{.dirty.} =
+  bot.editMessageText(text, $msginfo[0], msginfo[1])
+
+template `<!`*(chatid: int64, msgid: int): untyped{.dirty.} =
+  bot.deleteMessage($chatId, msgid)
 
 template `/->`*(newStage: Stages): untyped {.dirty.}=
   uctx.stage = newStage
@@ -19,3 +28,6 @@ template trySendInvalid*(body) =
     body
   except:
     discard await chatid << invalidInputT
+
+template myrecord*: untyped = 
+  uctx.record.get

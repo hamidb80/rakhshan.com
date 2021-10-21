@@ -11,21 +11,20 @@ randomize()
 
 var router = new RouterMap
 newRouter(router):
-  route(chatid: int, msgtext: string) as "home":
+  route(chatid: int64, msgtext: string) as "home":
     case msgtext:
     of loginT:
       discard chatid << ("good luck!", noReply)
-
     else:
       discard await chatid << (selectOptionsT, notLoggedInReply)
 
-  route(chatid: int) as "verify-user":
+  route(chatid: int64) as "verify-user":
     # send phone number
     # verify code
     # get user info
     discard
 
-  route(chatid: int, input: string) as "menu":
+  route(chatid: int64, input: string) as "menu":
     case input:
     of addQuizT:
       /-> sAddQuiz
@@ -36,7 +35,7 @@ newRouter(router):
     else:
       discard chatid << wrongCommandT
 
-  route(chatid: int, input: string) as "add-quiz":
+  route(chatid: int64, input: string) as "add-quiz":
     template myquiz: untyped = uctx.quizCreation.get
 
     case uctx.stage:
@@ -76,7 +75,7 @@ newRouter(router):
     else:
       discard chatid << wrongCommandT
 
-  route(chatid: int, input: string) as "add-question":
+  route(chatid: int64, input: string) as "add-question":
     let msg = u.message.get
     template allQuestions: untyped = uctx.quizCreation.get.questions
 
@@ -117,7 +116,7 @@ newRouter(router):
 
     else: discard
 
-  route(chatid: int, input: string) as "find-quiz":
+  route(chatid: int64, input: string) as "find-quiz":
     template myquery: untyped = uctx.quizQuery.get
     template goBack: untyped = /-> sFindQuizMain
 
@@ -153,11 +152,10 @@ newRouter(router):
 
       else: discard
 
-  route(chatid: int, quizid: int) as "take-quiz":
+  route(chatid: int64, quizid: int64) as "take-quiz":
     asyncCheck chatid << (quizWillStartSoonT, cancelReply)
 
     uctx.record = some QuizTaking()
-    template myrecord: untyped = uctx.record.get
 
     # qet quiz and it's questions from database & save them into memory uctx.record
     # myrecord.quiz =
@@ -167,40 +165,43 @@ newRouter(router):
     myrecord.starttime = now()
     myrecord.lastCheckedTime = now()
 
-    myrecord.quizTimeMsgId = (await chatid << timeSerializer myrecord.quiz.time).messageId
+    myrecord.quizTimeMsgId = (await chatid <<
+        timeSerializer myrecord.quiz.time).messageId
 
     myrecord.questionPicMsgId = (await chatid << "message").messageId
     myrecord.questionInfoMsgId = (await chatid << "message").messageId
-    myrecord.answerSheetMsgId = (await chatid << answerSheetSerializer myrecord.answerSheet).messageId
+    myrecord.answerSheetMsgId = (await chatid <<
+        answerSheetSerializer myrecord.answerSheet).messageId
 
+  callbackQuery(chatid: int64, selectedAnswer: string) as "quiz-select-answer":
+    myrecord.answerSheet[myrecord.currentQuestionIndex] = parseInt selectedAnswer
+    
+    asyncCheck (chatid, myrecord.answerSheetMsgId) <^ answerSheetSerializer(
+          myrecord.answerSheet)
 
-  callbackQuery(chatid: int, buttonText: string) as "quiz-select-answer":
-    # change the question to target
-    discard
+  callbackQuery(chatid: int64, selectedQuestionNumber: string) as "quiz-select-question":
+    myrecord.currentQuestionIndex = parseint selectedQuestionNumber
+    # update question view
 
-  callbackQuery(chatid: int, buttonText: string) as "quiz-select-question":
-    # change the question to target
-    discard
-
-  route(chatId: int) as "update-timer":
+  event(chatId: int64) as "update-timer":
     let
-      record = uctx.record.get
+      record = myrecord
       quiz = record.quiz
       newtime = quiz.time - (now() - record.startTime).inseconds
-    discard bot.editMessageText($newtime, $chatid, record.quizTimeMsgId)
+    asyncCheck (chatid, myrecord.quizTimeMsgId) <^ timeSerializer(newtime)
 
-  route(chatId: int) as "end-quiz":
+  event(chatId: int64) as "end-quiz":
     # NOTE: can be called with end of the tiem of cancel by user
 
     # delete quiz messages
-    let r = uctx.record.get
+    let r = myrecord
     for msgId in [
       r.quizTimeMsgId,
       r.questionPicMsgId,
       r.questionInfoMsgId,
       r.answerSheetMsgId
     ]:
-      asynccheck bot.deleteMessage($chatId, msgid)
+      asynccheck chatId <! msgid
 
 
     # calulate score
