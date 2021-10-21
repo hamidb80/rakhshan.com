@@ -5,7 +5,7 @@ author        = "hamidb80"
 description   = "A new awesome nimble package"
 license       = "ALL RIGHTS LIMITED"
 srcDir        = "src"
-bin           = @["azmoon"]
+bin           = @["main"]
 
 
 # Dependencies
@@ -16,4 +16,4 @@ requires "macroplus >= 0.1.4"
 requires "https://github.com/hamidb80/easydb"
 
 task go, "run app":
-  exec "nim r -d:ssl --threads:on src/azmoon.nim"
+  exec "nim r -d:ssl --threads:on src/main.nim"

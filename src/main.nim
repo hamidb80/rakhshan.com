@@ -1,14 +1,13 @@
 import
-  sequtils, tables, strutils, options, json, times,
+  sequtils, tables, strutils, options, json, times, random,
   asyncdispatch, threadpool
 import telebot
 import
   telegram/[controller, helper, messages, comfortable],
   states, utils, ./math
 
+randomize()
 # ROUTER -----------------------------------
-
-const PASS = "1234"
 
 var router = new RouterMap
 newRouter(router):
@@ -17,29 +16,13 @@ newRouter(router):
     of loginT:
       discard chatid << ("good luck!", noReply)
 
-    of adminT:
-      /-> sEnterAdminPass
-      discard chatid << (sendAdminPassT, noReply)
-
     else:
       discard await chatid << (selectOptionsT, notLoggedInReply)
 
-  route(chatid: int, pass: string) as "admin-login":
-
-    case pass:
-    of PASS:
-      /-> sMenu
-      discard chatid << loggedInAsAdminT
-
-    of cancelT:
-      /-> sMain
-      discard await chatid << returningT
-      discard chatid << (menuT, adminReply)
-
-    else:
-      discard chatid << passwordIsWrongT
-
   route(chatid: int) as "verify-user":
+    # send phone number
+    # verify code
+    # get user info
     discard
 
   route(chatid: int, input: string) as "menu":
@@ -97,16 +80,22 @@ newRouter(router):
     let msg = u.message.get
     template allQuestions: untyped = uctx.quizCreation.get.questions
 
+    if input == cancelT:
+      discard
+
     # FIXME delete quiz from user's object after creating in databse
     case uctx.stage:
 
     of sAQQuestion:
-      if issome uctx.quizCreation:
-        # TODO say you can stop adding questions + end key
-        discard
-
+      if allquestions.len == 0:
+        asyncCheck chatid << addQuizQuestionFirstT
       else:
-        discard
+        asyncCheck chatid << (addQuizQuestionMoreT, cancelReply)
+
+      allquestions.add QuestionCreate()
+      /-> sAQQPic
+      asyncCheck chatid << uploadQuizQuestionPicT
+
 
     of sAQQPic:
       if issome msg.photo:
@@ -126,8 +115,7 @@ newRouter(router):
         /-> sAQQuestion
         discard redirect("add-question", %[%chatid, %""])
 
-    else:
-      discard
+    else: discard
 
   route(chatid: int, input: string) as "find-quiz":
     template myquery: untyped = uctx.quizQuery.get
@@ -136,7 +124,7 @@ newRouter(router):
     case input:
     of findQuizT:
       discard # TODO actually send the result + show filters top of result
-    
+
     of findQuizChangeNameT: /-> sFQname
     of findQuizChangeGradeT: /-> sFQgrade
     of findQuizChangeLessonT: /-> sFQlesson
@@ -165,18 +153,34 @@ newRouter(router):
 
       else: discard
 
-  route(chatid: int, input: string) as "take-quiz":
-    # qet quiz and it's questions from database
-    # save them into memory
-    # set uctx.quiztaking
+  route(chatid: int, quizid: int) as "take-quiz":
+    asyncCheck chatid << (quizWillStartSoonT, cancelReply)
 
+    uctx.record = some QuizTaking()
+    template myrecord: untyped = uctx.record.get
+
+    # qet quiz and it's questions from database & save them into memory uctx.record
+    # myrecord.quiz =
+    # myrecord.questions =
+    shuffle myrecord.questions
+    myrecord.answersheet = newSeqWith(myrecord.questions.len, 0)
+    myrecord.starttime = now()
+    myrecord.lastCheckedTime = now()
+
+    myrecord.quizTimeMsgId = (await chatid << timeSerializer myrecord.quiz.time).messageId
+
+    myrecord.questionPicMsgId = (await chatid << "message").messageId
+    myrecord.questionInfoMsgId = (await chatid << "message").messageId
+    myrecord.answerSheetMsgId = (await chatid << answerSheetSerializer myrecord.answerSheet).messageId
+
+
+  callbackQuery(chatid: int, buttonText: string) as "quiz-select-answer":
+    # change the question to target
     discard
 
-  callbackQuery(chatid: int, buttonText: string) as "select-answer":
-    return buttonText
-
-  callbackQuery(chatid: int, buttonText: string) as "select-question":
-    return buttonText
+  callbackQuery(chatid: int, buttonText: string) as "quiz-select-question":
+    # change the question to target
+    discard
 
   route(chatId: int) as "update-timer":
     let
@@ -187,7 +191,7 @@ newRouter(router):
 
   route(chatId: int) as "end-quiz":
     # NOTE: can be called with end of the tiem of cancel by user
-    
+
     # delete quiz messages
     let r = uctx.record.get
     for msgId in [
@@ -198,21 +202,20 @@ newRouter(router):
     ]:
       asynccheck bot.deleteMessage($chatId, msgid)
 
-    
+
     # calulate score
     let percent = getPercent(
       r.answerSheet,
       r.questions.mapIt it.answer.parseInt,
     )
-    
+
     # save record
-    
+
     # calulate grade
-    
+
     # show complete result
 
     uctx.record = none QuizTaking
-
 
 # ------------------------------------------
 
@@ -254,7 +257,6 @@ proc dispatcher*(bot: TeleBot, u: Update): Future[bool] {.async.} =
 
     let route = case uctx.stage:
       of sMain: "home"
-      of sEnterAdminPass: "admin-login"
       of sEnterNumber: "..."
       of sAddQuiz: "add-quiz"
       of sAQQuestion: "add-question"

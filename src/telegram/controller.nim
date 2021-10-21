@@ -7,14 +7,22 @@ import ../database/models
 
 type
   Stages* = enum
-    sMain, sEnterNumber, sEnterAdminPass, sMenu # primary
+    sMain, sEnterNumber         # primary
     sAddQuiz, sAQEnterName, sAQTime, sAQGrade, sAQLesson, sAQchapter # admin
     sAQQuestion, sAQQPic, sAQQInfo, sAQQAns
     sFindQuizMain, sFQname, sFQgrade, sFQlesson
     sTakingQuiz
     sFindMyRecords
 
+const
+  HomeStages* = {sMain, sEnterNumber}       # primary
+  AddQuizStages* = {sAddQuiz, sAQEnterName, sAQTime, sAQGrade, sAQLesson, sAQchapter} # admin
+  AddQuestionStages* = {sAQQuestion, sAQQPic, sAQQInfo, sAQQAns}
+  FindQuizStages* = {sFindQuizMain, sFQname, sFQgrade, sFQlesson}
+  TakingQuizStages* = {sTakingQuiz}
+  RecordStages* = {sFindMyRecords}
 
+type
   UserCtx* = ref object
     chatId*: int64
     stage*: Stages
@@ -38,7 +46,7 @@ type
     questions*: seq[QuestionModel]
     currentQuestionIndex*: int
     answerSheet*: seq[int]
-    
+
     startTime*: DateTime
     lastCheckedTime*: Datetime
     # isWatingForResult: bool

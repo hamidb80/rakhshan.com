@@ -33,9 +33,14 @@ const
     findQuizChangeGradeT* = "پایه"
     findQuizChangeLessonT* = "نام درس"
     findQuizClearFiltersT* = "حذف فیلتر ها"
-    
+
     enterQuestionInfoT* = "توضیحات سوال را وارد کنید"
     enterQuestionAnswerT* = "جواب سوال را وارد کنید"
+    addQuizQuestionFirstT* = "به ترتیب اطلاعات وارد شده برای هر سوال را وارد کنید"
+    addQuizQuestionMoreT* = "با وارد کردن 'انصراف' وارد کردن سوالات را تمام کنید در غیر این صورت اطلاعات سوال بعدی ر وارد کنید"
+    uploadQuizQuestionPicT* = "تصویر سوال را در صورت وجود ارسال کنید در غیر این صورت یک پیام حاوی متن ارسال کنید"
+
+    quizWillStartSoonT* = "آزمون انتخابی تا لحظاتی دیگر شروع میشود"
 
     askPasswordAdmin* = "رمز ادمین را وارد کنید"
 
@@ -76,3 +81,9 @@ let
       ("next", "next"),
     ].toInlineButtons
 
+
+func timeSerializer*(lastTime: int64): string =
+    ""
+
+func answerSheetSerializer*(sheet: seq[int]): string =
+    ""

@@ -11,6 +11,7 @@ type
     kind*: NotificationKinds
     quiz_id*: int64
     user_chat_id*: int64
+    msg: string
 
 const 
   maxActivityTimeout = 60 * 60
