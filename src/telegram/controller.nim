@@ -130,6 +130,7 @@ macro initRouter(varName: typed, args: varargs[untyped]): untyped =
     of "route": discard
     of "callbackquery": discard
     of "event": discard
+    of "command": discard
     else: error "undefined entity"
 
     discard paramList.add commonArgs.mapIt newIdentDefs(it[0], it[1])

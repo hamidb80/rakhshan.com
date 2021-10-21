@@ -152,6 +152,13 @@ newRouter(router):
 
       else: discard
 
+  command(chatid: int64, quizid: int) as "show-quiz":
+    # show record if has
+    discard
+
+  callbackQuery(chatid: int64) as "delete-quiz":
+    discard
+
   route(chatid: int64, quizid: int64) as "take-quiz":
     asyncCheck chatid << (quizWillStartSoonT, cancelReply)
 
