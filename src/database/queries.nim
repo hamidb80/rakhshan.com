@@ -36,13 +36,13 @@ template transaction(db, body): untyped =
 proc addMember*(db; name, phone_number: string, isAdmin: bool,
         chatId: int64): int64 =
     db.insertID(
-        sql"INSERT INTO member (name, phone_number, is_admin, tg_chat_id) VALUES (?, ?, ?, ?)",
-        name, phone_number, isAdmin.int, chatId)
+        sql"INSERT INTO member (chat_id, name, phone_number, is_admin) VALUES (?, ?, ?, ?)",
+        chatId, name, phone_number, isAdmin.int)
 
 proc getNember*(db): MemberModel =
-    let row = db.getRow(sql"SELECT id, name, phone_number, is_admin, tg_chat_id FROM member")
-    MemberModel(id: parseint row[0], name: row[1], phone_number: row[2],
-            isAdmin: row[3].parseInt, tgchatid: row[4].parseBiggestInt)
+    let row = db.getRow(sql"SELECT chat_id, name, phone_number, is_admin, chat_id FROM member")
+    MemberModel(chatid: row[0].parseBiggestInt, name: row[1],
+    phone_number: row[2], isAdmin: row[3].parseInt)
 
 # quiz -------------------------------------------
 
@@ -88,7 +88,7 @@ proc deleteQuiz*(db; quizid: int64) =
 
 # quiz -------------------------------------------
 
-proc addRecord*(db; quizId, memberId: int64,
+proc addRecord*(db; quizId, member_chatId: int64,
     precent: float, questionsOrder: seq[int], answers: seq[int]
 ) =
     discard

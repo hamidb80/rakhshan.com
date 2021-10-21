@@ -4,11 +4,10 @@ var initQuery: string
 
 Blueprint [queryHolder: initQuery, postfix: "Model"]:
     Table member:
-        id: int {.primary.}
+        chat_id: int {.primary.}
         name: char[255]
         phone_number: char[15]
         is_admin: int # fake bool
-        tg_chat_id: int
 
     Table part:
         id: int {.primary.}
@@ -34,7 +33,7 @@ Blueprint [queryHolder: initQuery, postfix: "Model"]:
     Table record:
         id: int {.primary.}
         quiz_id: int[ref quiz.id]
-        member_id: int[ref members.id]
+        member_chatid: int[ref members.chat_id]
         questions_order: string
         answer_list: char[255]
         percent: float
