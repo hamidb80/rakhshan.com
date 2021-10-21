@@ -22,6 +22,7 @@ const
 
     addQuizT* = "اضافه کردن آزمون"
     enterQuizNameT* = "نام آزمون را وارد کنید"
+    enterQuizInfoT* = "توضیحات آزمون را وارد کنید"
     enterQuizTimeT* = "زمان آزمون را وارد کنید"
     enterQuizGradeT* = "پایه تحصیلی آزمون را وارد کنید"
     enterQuizLessonT* = "نام درس آزمون را انتخاب کنید"

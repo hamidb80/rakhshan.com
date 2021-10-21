@@ -40,12 +40,17 @@ newRouter(router):
 
     case uctx.stage:
     of sAddQuiz:
-      /-> sAQEnterName
+      /-> sAQName
       uctx.quizCreation = some QuizCreate()
       discard chatid << enterQuizNameT
 
-    of sAQEnterName:
+    of sAQName:
       myquiz.name = input
+      /-> sAQDesc
+      discard chatid << enterQuizInfoT
+
+    of sAQDesc:
+      myquiz.description = input
       /-> sAQTime
       discard chatid << enterQuizTimeT
 
@@ -159,7 +164,7 @@ newRouter(router):
   callbackQuery(chatid: int64) as "delete-quiz":
     discard
 
-  route(chatid: int64, quizid: int64) as "take-quiz":
+  callbackQuery(chatid: int64, quizid: int64) as "take-quiz":
     asyncCheck chatid << (quizWillStartSoonT, cancelReply)
 
     uctx.record = some QuizTaking()
@@ -232,20 +237,22 @@ proc checkNofitications(
   bot: TeleBot
 ) {.async.} =
   while true:
-    let (ok, notif) = pch[].tryRecv
-    if ok:
-      let
-        args = %[notif.user_chatid]
-        routeName =
-          case notif.kind:
-          of nkEndQuizTime: "end-quiz"
-          of nkUpdateQuizTime: "update-timer"
-
-      asyncCheck router[routeName](
-        bot, getOrCreateUser(notif.user_chatid),
-        Update(), args)
-
     await sleepAsync delay
+
+    let (ok, notif) = pch[].tryRecv
+    if not ok: continue
+
+    let
+      args = %[notif.user_chatid]
+      routeName =
+        case notif.kind:
+        of nkEndQuizTime: "end-quiz"
+        of nkUpdateQuizTime: "update-timer"
+
+    asyncCheck router[routeName](
+      bot, getOrCreateUser(notif.user_chatid),
+      Update(), args)
+
 
 proc dispatcher*(bot: TeleBot, u: Update): Future[bool] {.async.} =
   var args = newJArray()

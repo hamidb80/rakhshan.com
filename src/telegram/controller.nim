@@ -8,7 +8,7 @@ import ../database/models
 type
   Stages* = enum
     sMain, sEnterNumber         # primary
-    sAddQuiz, sAQEnterName, sAQTime, sAQGrade, sAQLesson, sAQchapter # admin
+    sAddQuiz, sAQName, sAQDesc, sAQTime, sAQGrade, sAQLesson, sAQchapter # admin
     sAQQuestion, sAQQPic, sAQQInfo, sAQQAns
     sFindQuizMain, sFQname, sFQgrade, sFQlesson
     sTakingQuiz
@@ -16,7 +16,7 @@ type
 
 const
   HomeStages* = {sMain, sEnterNumber}       # primary
-  AddQuizStages* = {sAddQuiz, sAQEnterName, sAQTime, sAQGrade, sAQLesson, sAQchapter} # admin
+  AddQuizStages* = {sAddQuiz, sAQName, sAQTime, sAQGrade, sAQLesson, sAQchapter} # admin
   AddQuestionStages* = {sAQQuestion, sAQQPic, sAQQInfo, sAQQAns}
   FindQuizStages* = {sFindQuizMain, sFQname, sFQgrade, sFQlesson}
   TakingQuizStages* = {sTakingQuiz}
@@ -59,6 +59,7 @@ type
 
   QuizCreate* = object
     name*: string
+    description*: string
     time*: int
     # part info
     grade*: int

@@ -19,8 +19,9 @@ Blueprint [queryHolder: initQuery, postfix: "Model"]:
 
     Table quiz:
         id: int {.primary.}
-        name: char[255]
         part_id: int[ref part.id]
+        name: char[255]
+        description: string
         time: int
 
     Table question:
