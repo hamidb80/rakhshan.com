@@ -33,8 +33,9 @@ template transaction(db, body): untyped =
 
 # member ----------------------------------------
 
-proc addMember*(db; name, phone_number: string, isAdmin: bool,
-        chatId: int64): int64 =
+proc addMember*(db;
+    name, phone_number: string, isAdmin: bool, chatId: int64
+): int64 =
     db.insertID(
         sql"INSERT INTO member (chat_id, name, phone_number, is_admin) VALUES (?, ?, ?, ?)",
         chatId, name, phone_number, isAdmin.int)
@@ -71,7 +72,8 @@ proc addQuiz*(db;
     quizid
 
 
-proc findQuiz*(db; qq: QuizQuery, pageIndex, pageSize: int
+proc findQuiz*(db;
+    qq: QuizQuery, pageIndex, pageSize: int
 ): seq[QuizSearchModel] =
     discard
 
@@ -88,11 +90,13 @@ proc deleteQuiz*(db; quizid: int64) =
 
 # quiz -------------------------------------------
 
-proc addRecord*(db; quizId, member_chatId: int64,
+proc addRecord*(db;
+    quizId, member_chatId: int64,
     precent: float, questionsOrder: seq[int], answers: seq[int]
 ) =
     discard
 
-proc getRecords*(db; memberId: int64, pageIndex, pageSize: int
+proc getRecords*(db;
+    memberId: int64, pageIndex, pageSize: int
 ): seq[RecordInfoModel] =
     result

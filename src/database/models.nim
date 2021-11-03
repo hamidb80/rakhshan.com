@@ -1,6 +1,7 @@
+import strutils
 import easydb
 
-var initQuery: string
+var initQuery: seq[string]
 
 Blueprint [queryHolder: initQuery, postfix: "Model"]:
     Table member:
@@ -9,16 +10,16 @@ Blueprint [queryHolder: initQuery, postfix: "Model"]:
         phone_number: char[15]
         is_admin: int # fake bool
 
-    Table part:
+    Table tag:
         id: int {.primary.}
         name: char[120]
-        grade: int # 10 | 11 | 12
+        grade: int {.index.} # 10 | 11 | 12
         lesson: char[60]
         chapter: int
 
     Table quiz:
         id: int {.primary.}
-        part_id: int[ref part.id]
+        tag_id: int[ref tag.id]
         name: char[255]
         description: string
         time: int
@@ -33,14 +34,14 @@ Blueprint [queryHolder: initQuery, postfix: "Model"]:
     Table record:
         id: int {.primary.}
         quiz_id: int[ref quiz.id]
-        member_chatid: int[ref members.chat_id]
+        member_chatid: int[ref members.chat_id] {.index.}
         questions_order: string
         answer_list: char[255]
         percent: float
 
 
 when isMainModule:
-    writefile "src/database/init.sql", initQuery
+    writefile "src/database/init.sql", initQuery.join "\n"
 
 when defined(test):
     export initQuery
