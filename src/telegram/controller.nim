@@ -50,6 +50,7 @@ type
 
     startTime*: DateTime
     lastCheckedTime*: Datetime
+    isEnded*: bool
     # isWatingForResult: bool
 
     quizTimeMsgId*: int

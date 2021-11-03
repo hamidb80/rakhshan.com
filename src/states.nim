@@ -1,9 +1,9 @@
-import 
+import
   tables, times, options,
-  locks, os, asyncdispatch
+  locks, os
 import telegram/[controller], database/models, utils
 
-type 
+type
   NotificationKinds* = enum
     nkEndQuizTime, nkUpdateQuizTime,
 
@@ -13,9 +13,9 @@ type
     user_chat_id*: int64
     # msg: string
 
-const 
+const
   maxActivityTimeout = 60 * 60
-  minResreshTimeSeconds = 10 
+  minResreshTimeSeconds = 10
 
 var
   users: Table[int64, UserCtx]
@@ -31,7 +31,7 @@ proc getOrCreateUser*(chatId: int64): UserCtx =
 
     return users[chatId]
 
-proc startTimer*(delay: int) {.thread.}=
+proc startTimer*(delay: int) {.thread.} =
   fakeSafety:
     while true:
       var offlineUsers: seq[int64]
@@ -40,31 +40,35 @@ proc startTimer*(delay: int) {.thread.}=
       # delete offline users
       for (uid, user) in users.pairs:
         let dt = (currentTime - user.lastActivity).inSeconds
-        if dt > maxActivityTimeout: # TODO and the time is greater than quiztime
+        if dt > maxActivityTimeout and (
+          if issome user.record: user.record.get.quiz.time < dt
+          else: true
+        ):
           offlineUsers.add uid
 
       withLock usersLock:
-        for uid in offlineUsers: 
+        for uid in offlineUsers:
           del users, uid
 
-      # update quizzes times
-      var timeChanging: seq[int]
-      withLock usersLock:
-        for (uid, user) in users.pairs:
-          if isnone user.record: continue
-          let 
-            freshNow = now()
-            record = user.record.get
-            quiz = record.quiz
-            dtStart = (freshNow - record.startTime).inSeconds
-            dtLastCheck = (freshNow - record.lastCheckedTime).inSeconds
+      # check records
+      for (uid, user) in users.pairs:
+        if isnone user.record: continue
+        let
+          freshNow = now()
+          record = user.record.get
+          quiz = record.quiz
+          dtStart = (freshNow - record.startTime).inSeconds
+          dtLastCheck = (freshNow - record.lastCheckedTime).inSeconds
 
-          if dtStart >= quiz.time:
-            notifier.send Notification(kind:nkEndQuizTime, quizid: quiz.id, userchatid: uid)
+        if (not record.isEnded) and (dtStart >= quiz.time):
+          record.isEnded = true
+          notifier.send Notification(kind: nkEndQuizTime, quizid: quiz.id,
+              userchatid: uid)
 
-          elif dtLastCheck > minResreshTimeSeconds:
-            record.lastCheckedTime = freshNow
-            notifier.send Notification(kind:nkUpdateQuizTime, quizid: quiz.id, userchatid: uid)
+        elif dtLastCheck > minResreshTimeSeconds:
+          record.lastCheckedTime = freshNow
+          notifier.send Notification(kind: nkUpdateQuizTime, quizid: quiz.id,
+              userchatid: uid)
 
       sleep delay
 
