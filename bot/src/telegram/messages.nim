@@ -1,4 +1,4 @@
-import strutils
+import options
 import telebot
 import ./helper
 
@@ -19,6 +19,7 @@ const
     loggedInAsAdminT* = "به عنوان ادمین وارد شدید"
 
     removeQuizT* = "حذف آزمون"
+    sendContactIntoT* = "ارسال اطلاعات حساب تلگرام"
 
     addQuizT* = "اضافه کردن آزمون"
     enterQuizNameT* = "نام آزمون را وارد کنید"
@@ -64,6 +65,10 @@ let
 
     memberReply* = newReplyKeyboardMarkup memberReplyRaw
     adminReply* = newReplyKeyboardMarkup adminReplyRaw & memberReplyRaw
+
+    sendContactReply* = newReplyKeyboardMarkup @[@[
+      KeyboardButton(text: sendContactIntoT, requestContact: some true)
+    ]]
 
     noReply* = newReplyKeyboardRemove(true)
 

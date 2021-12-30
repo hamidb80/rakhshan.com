@@ -1,37 +1,39 @@
 import
   sequtils, tables, strutils, options, json, times, random,
+  logging,
   asyncdispatch, threadpool
 import telebot
 import
   telegram/[controller, helper, messages, comfortable],
+  host_api,
   states, utils, ./math
 
 randomize()
 # ROUTER -----------------------------------
 
 var router = new RouterMap
-newRouter(router):
+newRouter router:
   route(chatid: int64, msgtext: string) as "home":
     case msgtext:
     of loginT:
-      discard chatid << ("good luck!", noReply)
+      discard chatid << ("روی دکمه بزنید", sendContactReply)
+      /-> sSendContact
+
     else:
       discard await chatid << (selectOptionsT, notLoggedInReply)
 
-  route(chatid: int64) as "verify-user":
-    # send phone number
-    # verify code
-    # get user info
+  route(chatid: int64, input: string) as "verify-user":
+    echo ">> ", input
     discard
 
   route(chatid: int64, input: string) as "menu":
     case input:
     of addQuizT:
       /-> sAddQuiz
-      discard redirect("add-quiz", %[%chatid, %""])
+      discard redirect("add-quiz", %*[chatid, ""])
     of findQuizT:
       /-> sFindQuizMain
-      discard redirect("find-quiz", %[%chatid, %""])
+      discard redirect("find-quiz", %*[chatid, ""])
     else:
       discard chatid << wrongCommandT
 
@@ -103,7 +105,7 @@ newRouter(router):
 
     of sAQQPic:
       if issome msg.photo:
-        let fid = getBiggestPhotoFileId(msg)             # TODO
+        let fid = getBiggestPhotoFileId(msg)
 
       /-> sAQQInfo
       discard chatId << enterQuestionInfoT
@@ -272,7 +274,7 @@ proc dispatcher*(bot: TeleBot, u: Update): Future[bool] {.async.} =
 
     let route = case uctx.stage:
       of sMain: "home"
-      of sEnterNumber: "..."
+      of sSendContact: "verify-user"
       of sAddQuiz: "add-quiz"
       of sAQQuestion: "add-question"
       else: raise newException(ValueError, "what?")
@@ -301,7 +303,10 @@ when isMainModule:
   let bot = newTeleBot API_KEY
   bot.onUpdate dispatcher
 
-  spawn startTimer(100)
+  # var L = newConsoleLogger(fmtStr="$levelname, [$time] ")
+  # addHandler(L)
+
+  # spawn startTimer(100)
   asyncCheck checkNofitications(addr notifier, 100, bot)
 
   while true:

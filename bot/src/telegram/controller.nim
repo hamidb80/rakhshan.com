@@ -7,7 +7,7 @@ import ../database/models
 
 type
   Stages* = enum
-    sMain, sEnterNumber         # primary
+    sMain, sSendContact # primary
     sAddQuiz, sAQName, sAQDesc, sAQTime, sAQGrade, sAQLesson, sAQchapter # admin
     sAQQuestion, sAQQPic, sAQQInfo, sAQQAns
     sFindQuizMain, sFQname, sFQgrade, sFQlesson
@@ -15,7 +15,7 @@ type
     sFindMyRecords
 
 const
-  HomeStages* = {sMain, sEnterNumber}       # primary
+  HomeStages* = {sMain, sSendContact} # primary
   AddQuizStages* = {sAddQuiz, sAQName, sAQTime, sAQGrade, sAQLesson, sAQchapter} # admin
   AddQuestionStages* = {sAQQuestion, sAQQPic, sAQQInfo, sAQQAns}
   FindQuizStages* = {sFindQuizMain, sFQname, sFQgrade, sFQlesson}
@@ -115,8 +115,8 @@ macro initRouter(varName: typed, args: varargs[untyped]): untyped =
       alias = entity[InfixRightSide]
       procBody = entity[^1]
       customArgs = entity[1][1..^1]
-      commonArgs = args[0..^2] & @[newColonExpr(ident "args",
-          bindsym "JsonNode")]
+      commonArgs = args[0..^2] & @[
+          newColonExpr(ident "args", bindsym "JsonNode")]
       extractArgs = extractArgsFromJson(customArgs)
 
     result.add quote do:

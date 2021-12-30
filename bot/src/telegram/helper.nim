@@ -3,8 +3,9 @@ import telebot
 
 # ------------------------------------------
 
-func toInlineButtons*(buttons: openArray[tuple[text, code: string]]): seq[
-    InlineKeyboardButton] =
+func toInlineButtons*(
+  buttons: openArray[tuple[text, code: string]]
+): seq[InlineKeyboardButton] =
   buttons.mapIt:
     InlineKeyboardButton(text: it.text, callbackData: some it.code)
 
@@ -49,4 +50,3 @@ proc findChatId*(updateFeed: Update): int64 =
 
 proc fileNameGen*(path: string): string =
   "file://" & getCurrentDir() / path
-

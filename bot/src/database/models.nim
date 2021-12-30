@@ -35,13 +35,13 @@ Blueprint [queryHolder: initQuery, postfix: "Model"]:
         id: int {.primary.}
         quiz_id: int[ref quiz.id]
         member_chatid: int[ref members.chat_id] {.index.}
-        questions_order: string
-        answer_list: char[255]
+        questions_order: string # a json array containing ids of questions
+        answer_list: char[255] # answer corresponding to 'questions_order'
         percent: float
 
 
 when isMainModule:
     writefile "src/database/init.sql", initQuery.join "\n"
 
-when defined(test):
+when defined test:
     export initQuery

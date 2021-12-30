@@ -17,4 +17,4 @@ requires "https://github.com/hamidb80/easydb"
 requires "https://github.com/hamidb80/asyncanything"
 
 task go, "run app":
-  exec "nim r -d:ssl --threads:on src/main.nim"
+  exec "nim r -d:ssl src/main.nim"
