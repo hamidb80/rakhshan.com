@@ -1,0 +1,1 @@
+call tar -cf  plug.zip wp-api-ext\*

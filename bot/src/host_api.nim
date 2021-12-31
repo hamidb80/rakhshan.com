@@ -1,8 +1,18 @@
-import asyncdispatch, httpclient
+import asyncdispatch, httpclient, json
 
-proc sendPhoneNumber*(phoneNumber: string) {.async.} =
-  discard
+const
+  baseUrl {.strdefine.} = "http://localhost/wordpress/wp-json/"
+  apiToken {.strdefine.} = "xxx"
 
-proc verifyPhoneNumber*(phoneNumber: string): Future[bool] {.async.} =
-  let hc = newAsyncHttpClient()
-  
+let
+  accessHeader = newHttpHeaders [("api-token", apiToken)]
+
+# -------------------------------------------------------
+
+proc getName(ahc: AsyncHttpClient, phoneNumber: string): Future[
+    string] {.async.} =
+  return (await body await ahc.request(
+    baseUrl & "wp_api_ext/getName/" & phoneNumber,
+    HttpGet, "",
+    accessHeader
+  )).parsejson["display_name"].getStr
