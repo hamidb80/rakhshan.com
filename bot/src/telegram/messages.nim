@@ -1,4 +1,4 @@
-import options
+import options, strutils
 import telebot
 import ./helper
 
@@ -13,6 +13,10 @@ const
     adminT* = "ادمین"
     withoutPhotoT* = "بدون عکس"
     enterPhoneNumberT* = "شماره خود را وارد کنید"
+    wrongNumberT* = [
+      "شماره اشتباه میباشد",
+      "مطمئن شو که از همون شماره ای استفاده میکنی که توی سایت باهاش ثبت نام کردی"
+    ].join("\n")
 
     selectOptionsT* = "‌یکی از گزینه ها رو انتخاب کنید‌"
     sendAdminPassT* = "رمز را وارد کنید"
@@ -88,6 +92,13 @@ let
       ("next", "next"),
     ].toInlineButtons
 
+
+func greeting*(uname: string): string =
+    [
+      "کاربر",
+      uname,
+      "خوش آمدید",
+    ].join " "
 
 func timeSerializer*(lastTime: int64): string =
     ""

@@ -1,11 +1,11 @@
 import
   tables, times, options,
   locks, os
-import telegram/[controller], database/models, utils
+import telegram/[controller], database/[models, queries], utils
 
 type
   NotificationKinds* = enum
-    nkEndQuizTime, nkUpdateQuizTime,
+    nkEndQuizTime, nkUpdateQuizTime
 
   Notification* = object
     kind*: NotificationKinds
@@ -14,7 +14,7 @@ type
     # msg: string
 
 const
-  maxActivityTimeout = 60 * 60
+  # maxActivityTimeout = 60 * 60
   minResreshTimeSeconds = 10
 
 var
@@ -26,10 +26,10 @@ var
 proc getOrCreateUser*(chatId: int64): UserCtx =
   withLock usersLock:
     if chatId notin users:
-      users[chatId] = new UserCtx
-      users[chatId].chatId = chatId
+      users[chatId] = UserCtx(chatId: chatId)
+      users[chatId].firstTime = true
 
-    return users[chatId]
+    result = users[chatId]
 
 proc startTimer*(delay: int) {.thread.} =
   fakeSafety:
@@ -38,17 +38,17 @@ proc startTimer*(delay: int) {.thread.} =
       let currentTime = now()
 
       # delete offline users
-      for (uid, user) in users.pairs:
-        let dt = (currentTime - user.lastActivity).inSeconds
-        if dt > maxActivityTimeout and (
-          if issome user.record: user.record.get.quiz.time < dt
-          else: true
-        ):
-          offlineUsers.add uid
+      # for (uid, user) in users.pairs:
+      #   let dt = (currentTime - user.lastActivity).inSeconds
+      #   if dt > maxActivityTimeout and (
+      #     if issome user.record: user.record.get.quiz.time < dt
+      #     else: true
+      #   ):
+      #     offlineUsers.add uid
 
-      withLock usersLock:
-        for uid in offlineUsers:
-          del users, uid
+      # withLock usersLock:
+      #   for uid in offlineUsers:
+      #     del users, uid
 
       # check records
       for (uid, user) in users.pairs:

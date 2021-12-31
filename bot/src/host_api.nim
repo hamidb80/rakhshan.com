@@ -32,4 +32,4 @@ proc getUserInfo*(identifier: string): Future[UserApiModel] {.async.} =
   if resp.code.is2xx:
     return (await resp.body).parseJson.toUserApiModel
   else:
-    raise newException(HttpRequestError, "failed")
+    raise newException(ValueError, "failed")

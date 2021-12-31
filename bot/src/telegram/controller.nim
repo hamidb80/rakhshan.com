@@ -14,26 +14,18 @@ type
     sTakingQuiz
     sFindMyRecords
 
-const
-  HomeStages* = {sMain, sSendContact} # primary
-  AddQuizStages* = {sAddQuiz, sAQName, sAQTime, sAQGrade, sAQLesson, sAQchapter} # admin
-  AddQuestionStages* = {sAQQuestion, sAQQPic, sAQQInfo, sAQQAns}
-  FindQuizStages* = {sFindQuizMain, sFQname, sFQgrade, sFQlesson}
-  TakingQuizStages* = {sTakingQuiz}
-  RecordStages* = {sFindMyRecords}
-
 type
   UserCtx* = ref object
     chatId*: int64
     stage*: Stages
 
-    name*: string
-    isAdmin*: bool
     lastActivity*: DateTime
+    membership*: Option[MemberModel]
 
     quizCreation*: Option[QuizCreate]
     record*: Option[QuizTaking]
     quizQuery*: Option[QuizQuery]
+    firstTime*: bool
 
   QuizQuery* = object
     name*: Option[string]
@@ -75,9 +67,20 @@ type
     answer*: int
 
 
-  RouterProc = proc(bot: Telebot, uctx: UserCtx, u: Update,
-      args: JsonNode): Future[string] {.async.}
+  RouterProc = proc(
+        bot: Telebot, uctx: UserCtx,
+        u: Update, args: JsonNode): Future[string] {.async.}
+
   RouterMap* = ref Table[string, RouterProc]
+
+
+const
+  HomeStages* = {sMain, sSendContact} # primary
+  AddQuizStages* = {sAddQuiz, sAQName, sAQTime, sAQGrade, sAQLesson, sAQchapter} # admin
+  AddQuestionStages* = {sAQQuestion, sAQQPic, sAQQInfo, sAQQAns}
+  FindQuizStages* = {sFindQuizMain, sFQname, sFQgrade, sFQlesson}
+  TakingQuizStages* = {sTakingQuiz}
+  RecordStages* = {sFindMyRecords}
 
 
 # helper

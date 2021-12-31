@@ -1,4 +1,4 @@
-import db_sqlite, sequtils, strutils
+import db_sqlite, sequtils, strutils, options
 import models, ../telegram/controller
 
 type
@@ -33,17 +33,30 @@ template transaction(db, body): untyped =
 
 # member ----------------------------------------
 
+proc getMember*(db; chatId: int64): Option[MemberModel] =
+    let row = db.getRow(
+        sql"SELECT chat_id, name, phone_number, is_admin FROM member WHERE chat_id = ?",
+        chatId)
+
+    if row.len == 0:
+        none MemberModel
+
+    else:
+        some MemberModel(
+            chatid: row[0].parseBiggestInt,
+            name: row[1],
+            phone_number: row[2],
+            isAdmin: row[3].parseInt
+        )
+
 proc addMember*(db;
-    name, phone_number: string, isAdmin: bool, chatId: int64
-): int64 =
-    db.insertID(
+     chatId: int64, name, phone_number: string, isAdmin: bool,
+): MemberModel =
+    discard db.insertID(
         sql"INSERT INTO member (chat_id, name, phone_number, is_admin) VALUES (?, ?, ?, ?)",
         chatId, name, phone_number, isAdmin.int)
 
-proc getNember*(db): MemberModel =
-    let row = db.getRow(sql"SELECT chat_id, name, phone_number, is_admin, chat_id FROM member")
-    MemberModel(chatid: row[0].parseBiggestInt, name: row[1],
-    phone_number: row[2], isAdmin: row[3].parseInt)
+    get db.getMember chatId
 
 # quiz -------------------------------------------
 

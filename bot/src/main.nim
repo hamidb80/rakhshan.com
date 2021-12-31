@@ -1,34 +1,52 @@
 import
   sequtils, tables, strutils, options, json, times, random, logging,
-  asyncdispatch, threadpool
+  asyncdispatch, threadpool, db_sqlite, os
 import telebot
 import
   telegram/[controller, helper, messages, comfortable],
-  host_api, states, utils, ./mymath
+  host_api, states, utils, ./mymath, database/[queries]
+
+# prepare ----------------------------------
 
 randomize()
-# ROUTER -----------------------------------
+const dbPath = getenv("DB_PATH")
+
+# init -----------------------------------
+
+let db = open(dbPath, "", "", "")
+
+template adminRequired(body): untyped {.dirty.} =
+  if issome(uctx.membership) and uctx.membership.get.isAdmin == 1:
+    body
 
 var router = new RouterMap
 newRouter router:
   route(chatid: int64, msgtext: string) as "home":
     case msgtext:
-    of loginT:
-      discard chatid << (enterPhoneNumberT, sendContactReply)
-      /-> sSendContact
+      of loginT:
+        discard chatid << (enterPhoneNumberT, sendContactReply)
+        /-> sSendContact
 
-    else:
-      discard await chatid << (selectOptionsT, notLoggedInReply)
+      else:
+        discard await chatid << (selectOptionsT, notLoggedInReply)
 
   route(chatid: int64, input: string) as "verify-user":
-    let userName = (await input.getUserInfo).display_name
-    discard chatid << (userName, noReply)
+    try:
+      let userInfo = await input.getUserInfo
+      discard addMember(
+          db, chatid, userinfo.display_name, input, userInfo.is_admin)
+
+      discard chatid << (greeting(userinfo.displayName), noReply)
+
+    except ValueError:
+      discard chatid << (wrongNumberT, noReply)
 
   route(chatid: int64, input: string) as "menu":
     case input:
     of addQuizT:
-      /-> sAddQuiz
-      discard redirect("add-quiz", %*[chatid, ""])
+      adminRequired:
+        /-> sAddQuiz
+        discard redirect("add-quiz", %*[chatid, ""])
     of findQuizT:
       /-> sFindQuizMain
       discard redirect("find-quiz", %*[chatid, ""])
@@ -230,7 +248,7 @@ newRouter router:
 
     uctx.record = none QuizTaking
 
-# ------------------------------------------
+# ---
 
 proc checkNofitications(
   pch: ptr Channel[Notification], delay: int,
@@ -253,16 +271,19 @@ proc checkNofitications(
       bot, getOrCreateUser(notif.user_chatid),
       Update(), args)
 
-
 proc dispatcher*(bot: TeleBot, u: Update): Future[bool] {.async.} =
-  var args = newJArray()
-  template getuctx: untyped =
-    fakeSafety: getOrCreateUser findChatId u
+  var args = %*[]
+  let uctx = fakeSafety: getOrCreateUser findChatId u
+
+  if uctx.firstTime:
+    let m = getMember(db, u.getchatid)
+    if issome m:
+      uctx.membership = m
+
+    uctx.firsttime = false
 
   if u.message.issome:
-    let
-      uctx = getuctx()
-      msg = u.message.get
+    let msg = u.message.get
 
     args.add %msg.chat.id
     args.add %(
@@ -280,14 +301,13 @@ proc dispatcher*(bot: TeleBot, u: Update): Future[bool] {.async.} =
     fakeSafety:
       discard await trigger(router, route, bot, uctx, u, args)
 
-
   elif u.callbackQuery.issome:
     let cq = u.callbackQuery.get
 
     fakeSafety:
       let res = await trigger(
         router, "select-quiz",
-        bot, getuctx, u,
+        bot, uctx, u,
         %*[cq.message.get.chat.id, cq.data.get]
       )
 
@@ -303,7 +323,7 @@ when isMainModule:
 
   addHandler(newConsoleLogger(fmtStr = "$levelname, [$time] "))
 
-  # spawn startTimer(100)
+  spawn startTimer(100)
   asyncCheck checkNofitications(addr notifier, 100, bot)
 
   while true:

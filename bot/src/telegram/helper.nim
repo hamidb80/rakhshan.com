@@ -34,10 +34,25 @@ func newReplyKeyboardMarkup*(
 
 # ------------------------------------------
 
-func getBiggestPhotoFileId*(msg: Message): string=
-    # NOTE: when you send an image, telegram will send it to the bot with different sizes
-    # - you can pick smallest one or biggest one, or save them all
-    msg.photo.get[^1].fileId
+func getChatId(msg: Message): int64 =
+  msg.chat.id
+
+func getChatId*(u: Update): int64 =
+  if issome u.message:
+    getChatId u.message.get
+  elif isSome u.editedMessage:
+    getChatId u.message.get
+  elif issome u.callbackQuery:
+    u.callbackQuery.get.fromUser.id
+  else:
+    raise newException(ValueError, "not supported")
+
+# ------------------------------------------
+
+func getBiggestPhotoFileId*(msg: Message): string =
+  # NOTE: when you send an image, telegram will send it to the bot with different sizes
+  # - you can pick smallest one or biggest one, or save them all
+  msg.photo.get[^1].fileId
 
 proc findChatId*(updateFeed: Update): int64 =
   template findId(msgWrapper): untyped =
