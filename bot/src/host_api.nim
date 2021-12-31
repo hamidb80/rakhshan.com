@@ -5,12 +5,11 @@ const
   apiToken {.strdefine.} = "xxx"
 
 let
-  accessHeader = newHttpHeaders [("api-token", apiToken)]
+  accessHeader = newHttpHeaders {"api-token": apiToken}
 
 # -------------------------------------------------------
 
-proc getName(ahc: AsyncHttpClient, phoneNumber: string): Future[
-    string] {.async.} =
+proc getName*(ahc: AsyncHttpClient, phoneNumber: string): Future[string] {.async.} =
   return (await body await ahc.request(
     baseUrl & "wp_api_ext/getName/" & phoneNumber,
     HttpGet, "",
