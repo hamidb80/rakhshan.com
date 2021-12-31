@@ -11,7 +11,7 @@ type
 
     QuizInfoModel* = tuple
         quiz: QuizModel
-        part: PartModel
+        tag: TagModel
         questions_number: int
 
     RecordInfoModel* = tuple

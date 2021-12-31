@@ -2,7 +2,7 @@
 
 version       = "0.0.1"
 author        = "hamidb80"
-description   = ""
+description   = "a"
 license       = "ALL RIGHTS LIMITED"
 srcDir        = "src"
 bin           = @["main"]

@@ -1,12 +1,10 @@
 import
-  sequtils, tables, strutils, options, json, times, random,
-  logging,
+  sequtils, tables, strutils, options, json, times, random, logging,
   asyncdispatch, threadpool
 import telebot
 import
   telegram/[controller, helper, messages, comfortable],
-  host_api,
-  states, utils, ./math
+  host_api, states, utils, ./mymath
 
 randomize()
 # ROUTER -----------------------------------
@@ -16,15 +14,15 @@ newRouter router:
   route(chatid: int64, msgtext: string) as "home":
     case msgtext:
     of loginT:
-      discard chatid << ("روی دکمه بزنید", sendContactReply)
+      discard chatid << (enterPhoneNumberT, sendContactReply)
       /-> sSendContact
 
     else:
       discard await chatid << (selectOptionsT, notLoggedInReply)
 
   route(chatid: int64, input: string) as "verify-user":
-    echo ">> ", input
-    discard
+    let userName = (await input.getUserInfo).display_name
+    discard chatid << (userName, noReply)
 
   route(chatid: int64, input: string) as "menu":
     case input:
@@ -189,7 +187,7 @@ newRouter router:
 
   callbackQuery(chatid: int64, selectedAnswer: string) as "quiz-select-answer":
     myrecord.answerSheet[myrecord.currentQuestionIndex] = parseInt selectedAnswer
-    
+
     asyncCheck (chatid, myrecord.answerSheetMsgId) <^ answerSheetSerializer(
           myrecord.answerSheet)
 
@@ -303,8 +301,7 @@ when isMainModule:
   let bot = newTeleBot API_KEY
   bot.onUpdate dispatcher
 
-  # var L = newConsoleLogger(fmtStr="$levelname, [$time] ")
-  # addHandler(L)
+  addHandler(newConsoleLogger(fmtStr = "$levelname, [$time] "))
 
   # spawn startTimer(100)
   asyncCheck checkNofitications(addr notifier, 100, bot)

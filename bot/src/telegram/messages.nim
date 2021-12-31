@@ -12,6 +12,7 @@ const
     loginT* = "ورود"
     adminT* = "ادمین"
     withoutPhotoT* = "بدون عکس"
+    enterPhoneNumberT* = "شماره خود را وارد کنید"
 
     selectOptionsT* = "‌یکی از گزینه ها رو انتخاب کنید‌"
     sendAdminPassT* = "رمز را وارد کنید"

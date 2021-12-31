@@ -1,7 +1,6 @@
-import strutils
 import easydb
 
-var initQuery: seq[string]
+var initQuery*: seq[string]
 
 Blueprint [queryHolder: initQuery, postfix: "Model"]:
     Table member:
@@ -14,7 +13,7 @@ Blueprint [queryHolder: initQuery, postfix: "Model"]:
         id: int {.primary.}
         name: char[120]
         grade: int {.index.} # 10 | 11 | 12
-        lesson: char[60]
+        lesson: char[120]
         chapter: int
 
     Table quiz:
@@ -41,6 +40,7 @@ Blueprint [queryHolder: initQuery, postfix: "Model"]:
 
 
 when isMainModule:
+    import strutils
     writefile "src/database/init.sql", initQuery.join "\n"
 
 when defined test:
