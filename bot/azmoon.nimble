@@ -19,4 +19,5 @@ requires "https://github.com/hamidb80/easydb"
 requires "https://github.com/hamidb80/asyncanything"
 
 task go, "run app":
+  putenv "DB_PATH", "./temp/play.db"
   exec "nim r -d:ssl src/main.nim"

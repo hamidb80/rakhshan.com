@@ -22,7 +22,7 @@ using db: DbConn
 
 template dbworks*(path: string, body): untyped =
     block:
-        let db{.inject.} = open(path, "", "", "")
+        let db {.inject.} = open(path, "", "", "")
         body
         db.close()
 
@@ -33,10 +33,16 @@ template transaction(db, body): untyped =
 
 # member ----------------------------------------
 
+proc getAllTables*(db; ): seq[string] =
+    (db.getAllRows "SELECT name FROM sqlite_master WHERE type='table';".sql).mapIt:
+        it[0]
+
 proc getMember*(db; chatId: int64): Option[MemberModel] =
     let row = db.getRow(
         sql"SELECT chat_id, name, phone_number, is_admin FROM member WHERE chat_id = ?",
         chatId)
+
+    # echo "(*)(*(*&(*&(*&(*   ", row
 
     if row.len == 0:
         none MemberModel
@@ -60,22 +66,22 @@ proc addMember*(db;
 
 # quiz -------------------------------------------
 
-proc addPart*(db;
+proc addTag*(db;
     name: string, grade: int, lesson: string, chapter: int
 ): int64 =
     db.insertID(
-        sql"INSERT INTO part (name, grade, lesson, chapter) VALUES (?, ?, ?, ?)",
+        sql"INSERT INTO tag (name, grade, lesson, chapter) VALUES (?, ?, ?, ?)",
         name, grade, lesson, chapter)
 
 proc addQuiz*(db;
-    name, description: string, time: int, part_id: int,
+    name, description: string, time: int, tag_id: int,
     questions: seq[QuestionModel]
 ): int64 =
 
-    transaction(db):
+    transaction db:
         let quizId = db.insertID(
             sql"INSERT INTO quiz (name, description, time, part_id) VALUES (?, ?, ?, ?)",
-            name, description, time, partid)
+            name, description, time, tagid)
 
         for q in questions:
             db.exec(
@@ -83,7 +89,6 @@ proc addQuiz*(db;
                 quizId, q.photo_path, q.description, q.answer)
 
     quizid
-
 
 proc findQuiz*(db;
     qq: QuizQuery, pageIndex, pageSize: int
@@ -98,7 +103,7 @@ proc getQuestions*(db; quizid: int64): seq[QuestionModel] =
 
 proc deleteQuiz*(db; quizid: int64) =
     # remove quiz + questions + records + part
-    transaction(db):
+    transaction db:
         discard
 
 # quiz -------------------------------------------

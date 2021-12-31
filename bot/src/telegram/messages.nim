@@ -41,6 +41,8 @@ const
     findQuizChangeLessonT* = "نام درس"
     findQuizClearFiltersT* = "حذف فیلتر ها"
 
+    chooseOneT* = "یکی را انتخاب کنید"
+
     enterQuestionInfoT* = "توضیحات سوال را وارد کنید"
     enterQuestionAnswerT* = "جواب سوال را وارد کنید"
     addQuizQuestionFirstT* = "به ترتیب اطلاعات وارد شده برای هر سوال را وارد کنید"
@@ -68,8 +70,8 @@ let
 
     adminReplyRaw = @[ @[addQuizT, removeQuizT]]
 
-    memberReply* = newReplyKeyboardMarkup memberReplyRaw
-    adminReply* = newReplyKeyboardMarkup adminReplyRaw & memberReplyRaw
+    memberMenuReply* = newReplyKeyboardMarkup memberReplyRaw
+    adminMenuReply* = newReplyKeyboardMarkup adminReplyRaw & memberReplyRaw
 
     sendContactReply* = newReplyKeyboardMarkup @[@[
       KeyboardButton(text: sendContactIntoT, requestContact: some true)

@@ -9,12 +9,13 @@ import
 # prepare ----------------------------------
 
 randomize()
-const dbPath = getenv("DB_PATH")
+let dbPath = getenv("DB_PATH")
+
+# TODO PREPARE some random data
 
 # init -----------------------------------
 
 let db = open(dbPath, "", "", "")
-
 template adminRequired(body): untyped {.dirty.} =
   if issome(uctx.membership) and uctx.membership.get.isAdmin == 1:
     body
@@ -24,7 +25,7 @@ newRouter router:
   route(chatid: int64, msgtext: string) as "home":
     case msgtext:
       of loginT:
-        discard chatid << (enterPhoneNumberT, sendContactReply)
+        asyncCheck chatid << (enterPhoneNumberT, sendContactReply)
         /-> sSendContact
 
       else:
@@ -33,13 +34,25 @@ newRouter router:
   route(chatid: int64, input: string) as "verify-user":
     try:
       let userInfo = await input.getUserInfo
-      discard addMember(
+      uctx.membership = some addMember(
           db, chatid, userinfo.display_name, input, userInfo.is_admin)
 
-      discard chatid << (greeting(userinfo.displayName), noReply)
+      asyncCheck chatid << (greeting(userinfo.displayName), noReply)
+      /-> sEnterMainMenu
+      discard redirect("enter-menu", %*[chatid, ""])
 
     except ValueError:
-      discard chatid << (wrongNumberT, noReply)
+      asyncCheck chatid << (wrongNumberT, noReply)
+
+  route(chatid: int64) as "enter-menu":
+    let keyboardReply =
+      if uctx.membership.get.isAdmin == 1:
+        adminMenuReply
+      else:
+        memberMenuReply
+
+    asyncCheck chatid << (chooseOneT, keyboardReply)
+    /-> sMainMenu
 
   route(chatid: int64, input: string) as "menu":
     case input:
@@ -47,11 +60,17 @@ newRouter router:
       adminRequired:
         /-> sAddQuiz
         discard redirect("add-quiz", %*[chatid, ""])
+
+    of removeQuizT:
+      adminRequired:
+        discard
+
     of findQuizT:
       /-> sFindQuizMain
       discard redirect("find-quiz", %*[chatid, ""])
+
     else:
-      discard chatid << wrongCommandT
+      asyncCheck chatid << wrongCommandT
 
   route(chatid: int64, input: string) as "add-quiz":
     template myquiz: untyped = uctx.quizCreation.get
@@ -60,34 +79,34 @@ newRouter router:
     of sAddQuiz:
       /-> sAQName
       uctx.quizCreation = some QuizCreate()
-      discard chatid << enterQuizNameT
+      asyncCheck chatid << enterQuizNameT
 
     of sAQName:
       myquiz.name = input
       /-> sAQDesc
-      discard chatid << enterQuizInfoT
+      asyncCheck chatid << enterQuizInfoT
 
     of sAQDesc:
       myquiz.description = input
       /-> sAQTime
-      discard chatid << enterQuizTimeT
+      asyncCheck chatid << enterQuizTimeT
 
     of sAQTime: # TODO parse time rather than giving a number in seconds
       trySendInvalid:
         myquiz.time = input.parseInt
         /-> sAQgrade
-        discard chatid << enterQuizGradeT
+        asyncCheck chatid << enterQuizGradeT
 
     of sAQgrade:
       trySendInvalid:
         myquiz.grade = input.parseInt
         /-> sAQLesson
-        discard chatid << enterQuizLessonT
+        asyncCheck chatid << enterQuizLessonT
 
     of sAQLesson:
       myquiz.lesson = input
       /-> sAQchapter
-      discard chatid << enterQuizChapterT
+      asyncCheck chatid << enterQuizChapterT
 
     of sAQchapter:
       trySendInvalid:
@@ -96,7 +115,7 @@ newRouter router:
         discard redirect("add-quiestion", %[%chatid, %""])
 
     else:
-      discard chatid << wrongCommandT
+      asyncCheck chatid << wrongCommandT
 
   route(chatid: int64, input: string) as "add-question":
     let msg = u.message.get
@@ -124,12 +143,12 @@ newRouter router:
         let fid = getBiggestPhotoFileId(msg)
 
       /-> sAQQInfo
-      discard chatId << enterQuestionInfoT
+      asyncCheck chatId << enterQuestionInfoT
 
     of sAQQInfo:
       allquestions[^1].description = input
       /-> sAQQAns
-      discard chatId << enterQuestionAnswerT
+      asyncCheck chatId << enterQuestionAnswerT
 
     of sAQQAns:
       trySendInvalid:
@@ -157,7 +176,7 @@ newRouter router:
 
       of sfindQuizMain:
         uctx.quizQuery = some QuizQuery()
-        discard chatid << findQuizDialogT
+        asyncCheck chatid << findQuizDialogT
 
       of sFQname:
         myquery.name = some input
@@ -171,7 +190,6 @@ newRouter router:
       of sFQlesson:
         myquery.lesson = some input
         goBack()
-
 
       else: discard
 
@@ -279,6 +297,7 @@ proc dispatcher*(bot: TeleBot, u: Update): Future[bool] {.async.} =
     let m = getMember(db, u.getchatid)
     if issome m:
       uctx.membership = m
+      uctx.stage = sEnterMainMenu
 
     uctx.firsttime = false
 
@@ -296,6 +315,8 @@ proc dispatcher*(bot: TeleBot, u: Update): Future[bool] {.async.} =
       of sSendContact: "verify-user"
       of sAddQuiz: "add-quiz"
       of sAQQuestion: "add-question"
+      of sEnterMainMenu: "enter-menu"
+      of sMainMenu: "menu"
       else: raise newException(ValueError, "what?")
 
     fakeSafety:
@@ -315,11 +336,11 @@ proc dispatcher*(bot: TeleBot, u: Update): Future[bool] {.async.} =
 
 
 when isMainModule:
-  # addHandler newConsoleLogger(fmtStr = "$levelname, [$time]")
-
   const API_KEY = "2004052302:AAHm_oICftfs5xLmY0QwGVTE3o-gYgD6ahw"
   let bot = newTeleBot API_KEY
   bot.onUpdate dispatcher
+
+  # TODO do some assertions before running like checking the database
 
   addHandler(newConsoleLogger(fmtStr = "$levelname, [$time] "))
 

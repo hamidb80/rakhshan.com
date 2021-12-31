@@ -8,6 +8,7 @@ import ../database/models
 type
   Stages* = enum
     sMain, sSendContact # primary
+    sEnterMainMenu, sMainMenu, sRemoveQuiz # admin
     sAddQuiz, sAQName, sAQDesc, sAQTime, sAQGrade, sAQLesson, sAQchapter # admin
     sAQQuestion, sAQQPic, sAQQInfo, sAQQAns
     sFindQuizMain, sFQname, sFQgrade, sFQlesson

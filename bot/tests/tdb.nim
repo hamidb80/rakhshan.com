@@ -13,10 +13,7 @@ suite "general":
             for command in initQuery:
                 db.exec (command & ";").sql
 
-            let insertedTables =
-                (db.getAllRows "SELECT name FROM sqlite_master WHERE type='table';".sql)
-                .mapIt it[0]
-
+            let insertedTables = getAllTables(db)
             check insertedTables.toHashSet == tables.toHashSet
 
     removeFile "play.db"
