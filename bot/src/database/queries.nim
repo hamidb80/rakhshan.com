@@ -85,7 +85,7 @@ const quizInfoQuery = """
         (
             SELECT COUNT(*) 
             FROM question
-            WHERE quiz_id = {lookfor}
+            WHERE quiz_id = quiz.id
         ) AS qscount
     FROM 
         quiz
@@ -117,13 +117,14 @@ proc findQuizzes*(db;
 ): seq[QuizInfoModel] =
     var conditions: seq[string]
 
-    if issome qq.name:
-        # TODO security checks
-        conditions.add fmt"qname = %{qq.name.get}%"
     if issome qq.grade:
         conditions.add fmt"tgrade = {qq.grade.get}"
     if issome qq.lesson:
-        conditions.add fmt"tlesson = {qq.lesson.get}"
+        # TODO security checks
+        conditions.add fmt "tlesson = \"{qq.lesson.get}\""
+    if issome qq.name:
+        # TODO security checks
+        conditions.add fmt "qname LIKE \"%{qq.name.get}%\""
 
     let query = quizInfoQuery & (
         if conditions.len == 0: ""
@@ -161,11 +162,11 @@ proc deleteQuiz*(db; quizid: int64) =
 
 proc addRecord*(db;
     quizId, member_chatId: int64,
-    answers: openArray[int], precent: float
+    answers: string, precent: float
 ): int64 =
     db.insertID(
         sql"INSERT INTO record (quiz_id, member_chatid, answer_list, percent) VALUES (?, ?, ?, ?)",
-        quizId, member_chatId, answers.join, precent)
+        quizId, member_chatId, answers, precent)
 
 proc getRecordFor*(db; memberId, quizId: int64): Option[RecordModel] =
     let row = db.getSingleRow(sql"""
@@ -206,5 +207,5 @@ proc getMyRecords*(db;
             description: it[4]),
         RecordModel(
             id: it[0].parseint,
-            quiz_id: it[3].parseint,
-            percent: it[2].parseFloat))
+            quiz_id: it[2].parseint,
+            percent: it[1].parseFloat))
