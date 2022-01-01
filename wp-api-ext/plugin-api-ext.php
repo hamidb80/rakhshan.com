@@ -18,12 +18,16 @@ define("WPS_DIRECTORY", dirname(__FILE__));
 // def ----------------------------------------------------
 
 # ------ hooks -------
+# api token will be stored here as "WPAPIEXT_API_TOKEN"
 function WPAPIEXT_activate()
 {
-  # api token will be stored here as "WPAPIEXT_API_TOKEN"
-  add_option("WPAPIEXT_settings"); 
+  if (get_option("WPAPIEXT_settings", null) == null) {
+    add_option("WPAPIEXT_settings", [
+      "WPAPIEXT_API_TOKEN" => "xxx"
+    ]);
+  }
 }
-function WPAPIEXT_deactivate()
+function WPAPIEXT_unis()
 {
   delete_option("WPAPIEXT_settings");
 }
@@ -58,7 +62,7 @@ function WPAPIEXT_getUser(WP_REST_Request $req)
     return new WP_Error(401, 'Invalid api-token');
 
   $result = runQuery(
-    "SELECT * FROM wp_users WHERE user_nicename = '" . $req->get_param("number") . "'"
+    "SELECT * FROM wp_users WHERE user_nicename = '" . $req->get_param("identifier") . "'"
   );
 
   if (empty($result))
@@ -67,7 +71,7 @@ function WPAPIEXT_getUser(WP_REST_Request $req)
   $user = (array)$result[0];
   $userLevel = getUserLevel($user["ID"]);
   $user["user_level"] = $userLevel;
-  $user["is_admin"] = $userLevel > 2;
+  $user["is_admin"] = $userLevel > 3;
   return $user;
 }
 
@@ -85,14 +89,14 @@ function WPAPIEXT_settings_init()
 
   add_settings_section(
     'WPAPIEXT_pluginPage_section',
-    __('Your section description', 'set token api'),
+    __('setting page for WP-API-EXT', 'set token api'),
     'WPAPIEXT_settings_section_callback',
     'pluginPage'
   );
 
   add_settings_field(
     'WPAPIEXT_API_TOKEN',
-    __('Settings field description', 'set token api'),
+    __("token api (do not share this)", 'set token api'),
     'WPAPIEXT_API_TOKEN_render',
     'pluginPage',
     'WPAPIEXT_pluginPage_section'
@@ -109,7 +113,7 @@ function WPAPIEXT_API_TOKEN_render()
 
 function WPAPIEXT_settings_section_callback()
 {
-  echo __('This section description', 'set token api');
+  echo __('the telegram bot uses this code to connect to the website', 'set token api');
 }
 
 function WPAPIEXT_options_page()
@@ -129,15 +133,15 @@ function WPAPIEXT_options_page()
 // register ----------------------------------------------------
 
 register_activation_hook(__FILE__, 'WPAPIEXT_activate');
-register_deactivation_hook(__FILE__, 'WPAPIEXT_deactivate');
+register_uninstall_hook(__FILE__, 'WPAPIEXT_unis');
 
 add_action('admin_menu', 'WPAPIEXT_add_admin_menu');
 add_action('admin_init', 'WPAPIEXT_settings_init');
 
 // http://example.com/wp-json/myplugin/v1/author/(?P\d+).
 add_action('rest_api_init', function () {
-  register_rest_route('wp_api_ext', '/getUser/(?P<number>[+\w]+)', array(
+  register_rest_route('wp_api_ext', '/getUser/(?P<identifier>[+\w]+)', [
     'methods' => 'GET',
     'callback' => 'WPAPIEXT_getUser',
-  ));
+  ]);
 });

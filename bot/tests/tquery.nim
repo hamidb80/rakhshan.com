@@ -73,7 +73,7 @@ let
     (2, 1, membersRaw[1].id, "132", 48.5),
     (3, 2, membersRaw[1].id, "00", 12.4),
     (4, 3, membersRaw[1].id, "21334", 100.0),
-    (5, 2, membersRaw[2].id, "22", 10.4),
+    (5, 4, membersRaw[2].id, "22", 10.4),
     (6, 3, membersRaw[3].id, "22021", 7.8),
   ]
 
@@ -105,6 +105,8 @@ suite "INSERT":
       discard db.addRecord(r[1].int64, r[2].int64, r[3], r[4])
 
 suite "SELECT":
+  test "single member":
+    check db.getMember(118721).get.name == "ali"
 
   test "single quiz":
     let r = db.getQuizInfo(quizzesRaw[0].id.int64).get
@@ -137,5 +139,14 @@ suite "SELECT":
       rs.len == 3
       rs.mapIt(it.record.percent).sorted == [12.4, 48.5, 100.0]
 
+  test "get record for":
+    let res = db.getRecordFor(membersRaw[2].id, 4)
+    check res.get.percent == 10.4
+
 suite "DELETE":
-  discard
+  test "quiz":
+    db.deleteQuiz(1)
+    check:
+      isNone db.getQuizInfo(1) # delete quiz
+      db.getMyRecords(membersRaw[1].id, 0, 0).mapIt(it.quiz.id).sorted == @[2'i64, 3] # delete records
+      db.getQuestions(1).len == 0 # delete question

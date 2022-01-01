@@ -33,7 +33,7 @@ proc getAllTables*(db; ): seq[string] =
 
 proc getMember*(db; chatId: int64): Option[MemberModel] =
     let row = db.getSingleRow(
-        sql"SELECT chat_id, name, phone_number, is_admin FROM member WHERE chat_id = ? LIMIT 1",
+        sql"SELECT chat_id, name, phone_number, is_admin FROM member WHERE chat_id = ?",
         chatId)
 
     if row.issome:
@@ -170,10 +170,10 @@ proc addRecord*(db;
 
 proc getRecordFor*(db; memberId, quizId: int64): Option[RecordModel] =
     let row = db.getSingleRow(sql"""
-        SELECT id, answer_list, precent 
+        SELECT id, answer_list, percent 
         FROM record 
         WHERE member_chatid = ? AND quiz_id = ? 
-    """)
+    """, memberid, quizid)
 
     if issome row:
         result = some RecordModel(
