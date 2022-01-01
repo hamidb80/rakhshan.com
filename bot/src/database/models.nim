@@ -2,6 +2,7 @@ import easydb
 
 var initQuery*: seq[string]
 
+# TODO add timestamp
 Blueprint [queryHolder: initQuery, postfix: "Model"]:
     Table member:
         chat_id: int {.primary.}

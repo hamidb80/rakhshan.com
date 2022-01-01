@@ -1,22 +1,11 @@
-import db_sqlite, sequtils, strutils, options
+import db_sqlite, sequtils, strutils, options, strformat
 import models, ../telegram/controller
 
 type
-    QuizSearchModel* = object
-        name*: string
-        grade*: int
-        lesson*: string
-        time*: int
-        questions_number*: int
-
     QuizInfoModel* = tuple
         quiz: QuizModel
         tag: TagModel
         questions_number: int
-
-    RecordInfoModel* = tuple
-        record: RecordModel
-        quiz: QuizModel
 
 using db: DbConn
 
@@ -48,23 +37,16 @@ proc getMember*(db; chatId: int64): Option[MemberModel] =
         chatId)
 
     if row.issome:
-        some MemberModel(
+        result = some MemberModel(
             chatid: row.get[0].parseBiggestInt,
             name: row.get[1],
             phone_number: row.get[2],
             isAdmin: row.get[3].parseInt)
 
-    else:
-        none MemberModel
-
-proc addMember*(db;
-     chatId: int64, name, phone_number: string, isAdmin: int,
-): MemberModel =
+proc addMember*(db; chatId: int64, name, phone_number: string, isAdmin: int) =
     discard db.insertID(
         sql"INSERT INTO member (chat_id, name, phone_number, is_admin) VALUES (?, ?, ?, ?)",
         chatId, name, phone_number, isAdmin)
-
-    get db.getMember chatId
 
 # quiz -------------------------------------------
 
@@ -97,63 +79,83 @@ const quizInfoQuery = """
         quiz.time,
         tag.id as tid,
         tag.name as tname,
-        tag.grade,
-        tag.lesson,
-        tag.chapter,
+        tag.grade as tgrade,
+        tag.lesson as tlesson,
+        tag.chapter as tchapter,
         (
             SELECT COUNT(*) 
-            FROM QUESTION
-            WHERE QUIZ_ID = ?
-        ) AS qcount
+            FROM question
+            WHERE quiz_id = {lookfor}
+        ) AS qscount
     FROM 
         quiz
     INNER JOIN tag
         ON quiz.tag_id = tag.id
 """
 
+func toQuizInfoModel(row: Row): QuizInfoModel =
+    doAssert row.len == 10
+
+    result.quiz = QuizModel(
+        id: row[0].parseInt,
+        name: row[1],
+        description: row[2],
+        time: row[3].parseInt,
+        tag_id: row[4].parseInt)
+
+    result.tag = TagModel(
+        id: row[4].parseInt,
+        name: row[5],
+        grade: row[6].parseInt,
+        lesson: row[7],
+        chapter: row[8].parseInt)
+
+    result.questions_number = parseInt row[^1]
+
 proc findQuizzes*(db;
     qq: QuizQuery, pageIndex, pageSize: int
-): seq[QuizSearchModel] =
-    discard
+): seq[QuizInfoModel] =
+    var conditions: seq[string]
 
-proc getQuizInfo*(db; quizid: int64): QuizInfoModel =
+    if issome qq.name:
+        # TODO security checks
+        conditions.add fmt"qname = %{qq.name.get}%"
+    if issome qq.grade:
+        conditions.add fmt"tgrade = {qq.grade.get}"
+    if issome qq.lesson:
+        conditions.add fmt"tlesson = {qq.lesson.get}"
+
+    let query = quizInfoQuery & (
+        if conditions.len == 0: ""
+        else: "WHERE " & join(conditions, " AND ")
+    )
+
+    # TODO add limit & offset
+    db.getAllRows(query.sql).map(toQuizInfoModel)
+
+proc getQuizInfo*(db; quizid: int64): Option[QuizInfoModel] =
     let row = db.getSingleRow(
         (quizInfoQuery & "WHERE qid = ?").sql, quizid, quizid)
 
     if issome row:
-        let tmp = row.get
-        result.quiz = QuizModel(
-            id: quizid,
-            name: tmp[1],
-            description: tmp[2],
-            time: tmp[3].parseInt,
-            tag_id: tmp[4].parseInt)
-
-        result.tag = TagModel(
-            id: tmp[4].parseInt,
-            name: tmp[5],
-            grade: tmp[6].parseInt,
-            lesson: tmp[7],
-            chapter: tmp[8].parseInt)
-
-        result.questions_number = parseInt tmp[^1]
+        result = some row.get.toQuizInfoModel
 
 proc getQuestions*(db; quizid: int64): seq[QuestionModel] =
     let rows = db.getAllRows(
         "SELECT photo_path, description, answer FROM question WHERE quiz_id = ?".sql,
         quizid)
 
-    rows.mapIt:
-        QuestionModel(
-            quiz_id: quizid,
-            photo_path: it[0],
-            description: it[1],
-            answer: it[2])
+    rows.mapIt QuestionModel(
+        quiz_id: quizid,
+        photo_path: it[0],
+        description: it[1],
+        answer: it[2])
 
 proc deleteQuiz*(db; quizid: int64) =
-    # remove quiz + questions + records + part
     transaction db:
-        discard
+        db.exec("DELETE FROM record WHERE quiz_id = ?".sql, quizid)
+        db.exec("DELETE FROM question WHERE quiz_id = ?".sql, quizid)
+        db.exec("DELETE FROM quiz WHERE id = ?".sql, quizid)
 
 # quiz -------------------------------------------
 
@@ -165,7 +167,44 @@ proc addRecord*(db;
         sql"INSERT INTO record (quiz_id, member_chatid, answer_list, percent) VALUES (?, ?, ?, ?)",
         quizId, member_chatId, answers.join, precent)
 
-proc getRecords*(db;
+proc getRecordFor*(db; memberId, quizId: int64): Option[RecordModel] =
+    let row = db.getSingleRow(sql"""
+        SELECT id, answer_list, precent 
+        FROM record 
+        WHERE member_chatid = ? AND quiz_id = ? 
+    """)
+
+    if issome row:
+        result = some RecordModel(
+            id: row.get[0].parseInt,
+            quiz_id: quizid,
+            memberchatid: memberId,
+            answerlist: row.get[1],
+            percent: row.get[2].parseFloat)
+
+proc getMyRecords*(db;
     memberId: int64, pageIndex, pageSize: int
-): seq[RecordInfoModel] =
-    result
+): seq[tuple[quiz: QuizModel, record: RecordModel]] =
+    # TODO add limit and offset
+    let rows = db.getAllRows(sql"""
+        SELECT  
+            r.id,
+            r.percent,
+            q.id as qid,
+            q.name as qname,
+            q.description as qinfo
+        FROM  record r
+        INNER JOIN quiz q 
+            ON q.id = r.quiz_id
+        WHERE r.member_chatid = ?
+    """, memberid)
+
+    rows.mapIt (
+        QuizModel(
+            id: it[2].parseInt,
+            name: it[3],
+            description: it[4]),
+        RecordModel(
+            id: it[0].parseint,
+            quiz_id: it[3].parseint,
+            percent: it[2].parseFloat))
