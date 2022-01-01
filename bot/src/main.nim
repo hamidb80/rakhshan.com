@@ -1,6 +1,6 @@
 import
   sequtils, tables, strutils, options, json, times, random, logging,
-  asyncdispatch, threadpool, db_sqlite, os
+  asyncdispatch, threadpool, db_sqlite, os, strformat
 import telebot
 import
   telegram/[controller, helper, messages, comfortable],
@@ -32,12 +32,13 @@ newRouter router:
     try:
       let msg = u.message.get
       if issome msg.contact:
-        let 
+        let
           ct = msg.contact.get
           userInfo = await ct.phoneNumber.getUserInfo # number
 
         dbworks dbPath:
-          db.addMember(chatid, userinfo.display_name, input, userInfo.is_admin.int)
+          db.addMember(chatid, userinfo.display_name, input,
+              userInfo.is_admin.int)
           uctx.membership = db.getMember chatid
 
         asyncCheck chatid << (greeting(userinfo.displayName), noReply)
@@ -171,20 +172,20 @@ newRouter router:
 
     case input:
     of findQuizT:
-      let 
+      let
         quizList = dbworksCapture dbpath: findQuizzes(db, myquery, 0, 0)
-        str = quizList.map(quizInfoSerializer).join "\n"
+        str = quizList.map(miniQuizInfo).join "\n"
 
       if issome myquery.resultMsgId:
         asynccheck (chatid, myquery.resultMsgId.get) <^ str
       else:
-          myquery.resultMsgId = some await(chatid << str).messageId
+        myquery.resultMsgId = some await(chatid << str).messageId
 
     of findQuizChangeNameT: /-> sFQname
     of findQuizChangeGradeT: /-> sFQgrade
     of findQuizChangeLessonT: /-> sFQlesson
     of findQuizClearFiltersT: /-> sFindQuizMain
-    of cancelT: 
+    of cancelT:
       uctx.quizQuery = none QuizQuery
       discard redirect("enter-menu", %*[chatid, ""])
 
@@ -210,14 +211,34 @@ newRouter router:
 
   # TODO edit quiz and question
 
-  command(chatid: int64, quizid: int) as "show-quiz":
-    # show record if has
-    discard
+  command(chatid: int64) as "invalid-command":
+    asynccheck chatid << invalidCommandT
+
+  command(chatid: int64, param: string) as "show-quiz":
+    let
+      quizid = parseint param
+      qm = dbworksCapture dbpath: db.getQuizInfo(quizid)
+
+    asynccheck:
+      if qm.issome:
+        let 
+          rec = dbworksCapture dbpath: db.getRecordFor(chatid, qm.get.quiz.id)
+          text = fullQuizInfo(qm.get, rec)
+        
+        if rec.issome:
+          chatid << text
+        else:
+          # chatid << (text, genTakeQuizInlineBtn(quizid))
+          # FIXME
+          chatid << fmt "{text}\n{takeQuizT}: /t{quizid}"
+      
+      else:
+        chatid << quizNotFoundT
 
   callbackQuery(chatid: int64) as "delete-quiz":
     discard
 
-  callbackQuery(chatid: int64, quizid: int64) as "take-quiz":
+  callbackQuery(chatid: int64, quizid: string) as "take-quiz":
     asyncCheck chatid << (quizWillStartSoonT, cancelReply)
 
     uctx.record = some QuizTaking()
@@ -230,12 +251,11 @@ newRouter router:
     myrecord.starttime = now()
     myrecord.lastCheckedTime = now()
 
-    myrecord.quizTimeMsgId = (await chatid <<
-        timeSerializer myrecord.quiz.time).messageId
+    # FIXME messages can't be empty
+    myrecord.quizTimeMsgId = (await chatid <<timeSerializer myrecord.quiz.time).messageId
     myrecord.questionPicMsgId = (await chatid << "message").messageId
     myrecord.questionInfoMsgId = (await chatid << "message").messageId
-    myrecord.answerSheetMsgId = (await chatid <<
-        answerSheetSerializer myrecord.answerSheet).messageId
+    myrecord.answerSheetMsgId = (await chatid << answerSheetSerializer myrecord.answerSheet).messageId
 
   callbackQuery(chatid: int64, selectedAnswer: string) as "quiz-select-answer":
     myrecord.answerSheet[myrecord.currentQuestionIndex] = parseInt selectedAnswer
@@ -318,36 +338,63 @@ proc dispatcher*(bot: TeleBot, u: Update): Future[bool] {.async.} =
 
     uctx.firsttime = false
 
+  # TODO catch if error accured and tell the user
+
   if u.message.issome:
-    let msg = u.message.get
+    let
+      msg = u.message.get
+      text = msg.text.get("")
 
-    args.add %msg.chat.id
-    args.add %(
-      if issome msg.text: msg.text.get
-      else: ""
-    )
+    # it's a command
+    if text.startsWith("/") and text.len > 2:
+      let
+        parameter = text[2..^1]
+        route =
+          case text[1]:
+            of 'q': "show-quiz"
+            of 'a': "analyze"
+            of 't': "take-quiz" #FIXME 
+            else: "invalid-command"
 
-    let route = case uctx.stage:
-      of sMain: "home"
-      of sSendContact: "verify-user"
-      of sAddQuiz: "add-quiz"
-      of sAQQuestion: "add-question"
-      of sEnterMainMenu: "enter-menu"
-      of sMainMenu: "menu"
-      of FindQuizStages: "find-quiz"
-      else: raise newException(ValueError, "the state is " & $uctx.stage)
+      castSafety:
+        discard await trigger(router, route, bot, uctx, u, %*[msg.chat.id, parameter])
+    
+    # it's a text message
+    else:
+      args.add %msg.chat.id
+      args.add %text
 
-    castSafety:
-      discard await trigger(router, route, bot, uctx, u, args)
+      let route = case uctx.stage:
+        of sMain: "home"
+        of sSendContact: "verify-user"
+        of sAddQuiz: "add-quiz"
+        of sAQQuestion: "add-question"
+        of sEnterMainMenu: "enter-menu"
+        of sMainMenu: "menu"
+        of FindQuizStages: "find-quiz"
+        else: "invalid-command"
+
+      castSafety:
+        discard await trigger(router, route, bot, uctx, u, args)
 
   elif u.callbackQuery.issome:
-    let cq = u.callbackQuery.get
+    # debugEcho "\n".repeat 10
+    # debugecho "++++++=", u.callbackQuery.get.data
+
+    let 
+      cq = u.callbackQuery.get
+      cmd = cq.data.get("/n0")
+      parameter = cmd[2..^1]
+      route =
+        case cmd[1]:
+        of 't': "take-quiz"
+        else: "invalid-command"
 
     castSafety:
       let res = await trigger(
-        router, "select-quiz",
+        router, route,
         bot, uctx, u,
-        %*[cq.message.get.chat.id, cq.data.get]
+        %*[cq.message.get.chat.id, parameter]
       )
 
     discard await bot.answerCallbackQuery($cq.id, res)

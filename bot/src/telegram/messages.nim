@@ -1,6 +1,6 @@
 import options, strutils, strformat
 import telebot
-import ./helper, ../database/queries
+import ./helper, ../database/queries, ../database/models
 
 # texts: texts that are recieved from the client
 const
@@ -35,6 +35,9 @@ const
     enterQuizLessonT* = "نام درس آزمون را انتخاب کنید"
     enterQuizChapterT* = "شماره فصل درس آزمون را وارد کنید"
 
+    invalidCommandT* = "دستور اشتباه"
+    quizNotFoundT* = "آزمون مورد نظر پیدا نشد"
+
     findQuizDialogT* = "میتوانید به طور اختیاری فیلتر هایی اعمال کنید و سپس روی دکمه جستجوی آزمون بزنید"
     findQuizT* = "جستجوی آزمون"
     findQuizChangeNameT* = "نام آزمون"
@@ -53,7 +56,10 @@ const
     quizWillStartSoonT* = "آزمون انتخابی تا لحظاتی دیگر شروع میشود"
 
     askPasswordAdmin* = "رمز ادمین را وارد کنید"
-
+    youWereAttendedBeforeT* = "کردهشما قبلا در این آزمون شرکت بودید"
+    yourLastResultIsT* = "نتیجه قبلی شما"
+    analyzeYourAnswersT* = "آزمونت رو تحلیل کن"
+    takeQuizT* = "شرکت در آزمون"
 
 let
     notLoggedInReply* = newReplyKeyboardMarkup @[
@@ -86,7 +92,6 @@ let
 
     noReply* = newReplyKeyboardRemove(true)
 
-
 let
     answerBtns* = [
       ("1", "1"),
@@ -100,6 +105,14 @@ let
       ("prev", "prev"),
       ("next", "next"),
     ].toInlineButtons
+
+func genTakeQuizInlineBtn*(quizId: int64): InlineKeyboardMarkup =
+    result = InlineKeyboardMarkup(`type`: kInlineKeyboardMarkup)
+    result.inlineKeyboard = @[@[
+      InlineKeyboardButton(
+        text: takeQuizT,
+        callbackData: some fmt"/t{quizid}"
+    )]]
 
 func escapeMarkdownV2*(s: sink string): string =
     for c in s:
@@ -121,11 +134,30 @@ func greeting*(uname: string): string =
       "خوش آمدید",
     ].join " "
 
-func quizInfoSerializer*(qi: QuizInfoModel): string =
+func miniQuizInfo*(qi: QuizInfoModel): string =
     [
-      [bold ":نام آزمون", qi.quiz.name].join " ",
-      [bold ":تعداد سوال", $qi.questions_number].join " ",
-      # [bold ":", qi.questions_number].join " ",
+      [bold "نام آزمون", ": ", qi.quiz.name].join,
+      [bold "تعداد سوال", ": ", $qi.questions_number].join,
+      ["جزییات", ": ", fmt"/q{qi.quiz.id}"].join,
+      "\n",
+    ].join "\n"
+
+func fullQuizInfo*(qi: QuizInfoModel, rec: Option[RecordModel]): string =
+    let recSection =
+        if issome rec:
+            [
+              youWereAttendedBeforeT,
+              [yourLastResultIsT, ": ", $rec.get.percent].join,
+              [analyzeYourAnswersT, ": ", fmt"/a{rec.get.id}"].join,
+            ].join "\n"
+
+        else:
+            "\n"
+
+    [
+        [bold "نام آزمون", ": ", qi.quiz.name].join,
+        [bold "تعداد سوال", ": ", $qi.questions_number].join,
+        "\n", recSection,
     ].join "\n"
 
 func timeSerializer*(lastTime: int64): string =
