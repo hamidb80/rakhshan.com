@@ -1,4 +1,4 @@
-import db_sqlite, sequtils, unittest, options, os, algorithm
+import db_sqlite, strutils, sequtils, unittest, options, os, algorithm
 import database/[models, queries], telegram/controller
 
 # init
@@ -87,6 +87,12 @@ suite "INIT":
   for q in initQuery:
     db.exec q.sql
 
+  let allTables = initQuery
+    .filterit(it.startswith "CREATE TABLE")
+    .mapit(it[13..^1].split('(')[0].strip)
+
+  check db.getAllTables() == allTables
+
 suite "INSERT":
   test "add member":
     for m in membersRaw:
@@ -148,5 +154,8 @@ suite "DELETE":
     db.deleteQuiz(1)
     check:
       isNone db.getQuizInfo(1) # delete quiz
-      db.getMyRecords(membersRaw[1].id, 0, 0).mapIt(it.quiz.id).sorted == @[2'i64, 3] # delete records
+
+      db.getMyRecords(membersRaw[1].id, 0, 0)
+        .mapIt(it.quiz.id).sorted == @[2'i64, 3] # delete records
+
       db.getQuestions(1).len == 0 # delete question

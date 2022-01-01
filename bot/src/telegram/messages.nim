@@ -25,6 +25,7 @@ const
 
     removeQuizT* = "حذف آزمون"
     sendContactIntoT* = "ارسال اطلاعات حساب تلگرام"
+    pleaseSendByYourCantactT* = "لطفا از طریق کیبرد ربات تلگرام، شماره خود را ارسال کنید"
 
     addQuizT* = "اضافه کردن آزمون"
     enterQuizNameT* = "نام آزمون را وارد کنید"

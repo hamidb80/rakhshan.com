@@ -1,4 +1,4 @@
-import asyncdispatch, httpclient, json, strformat
+import asyncdispatch, httpclient, json, strformat, strutils
 
 const
   baseUrl = "https://rakhshan.com/wp-json/wp_api_ext"
@@ -23,9 +23,15 @@ func toUserApiModel(js: JsonNode): UserApiModel =
     is_admin: js["is_admin"].getBool
   )
   
+func removeContryCode(number: string): string =
+  if number.startswith("+98"):
+    number[3..^1]
+  else:
+    number
+  
 proc getUserInfo*(identifier: string): Future[UserApiModel] {.async.} =
   let resp = await newAsyncHttpClient().request(
-    fmt"{baseUrl}/getUser/{identifier}",
+    fmt"{baseUrl}/getUser/{removeContryCode identifier}",
     HttpGet, "", accessHeader
   )
 

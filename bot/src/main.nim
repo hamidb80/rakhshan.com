@@ -11,8 +11,6 @@ import
 randomize()
 let dbPath = getenv("DB_PATH")
 
-# TODO PREPARE some random data
-
 # init -----------------------------------
 
 template adminRequired(body): untyped {.dirty.} =
@@ -32,15 +30,22 @@ newRouter router:
 
   route(chatid: int64, input: string) as "verify-user":
     try:
-      let userInfo = await input.getUserInfo # number
+      let msg = u.message.get
+      if issome msg.contact:
+        let 
+          ct = msg.contact.get
+          userInfo = await ct.phoneNumber.getUserInfo # number
 
-      dbworks dbPath:
-        db.addMember(chatid, userinfo.display_name, input, userInfo.is_admin.int)
-        uctx.membership = db.getMember chatid
+        dbworks dbPath:
+          db.addMember(chatid, userinfo.display_name, input, userInfo.is_admin.int)
+          uctx.membership = db.getMember chatid
 
-      asyncCheck chatid << (greeting(userinfo.displayName), noReply)
-      /-> sEnterMainMenu
-      discard redirect("enter-menu", %*[chatid, ""])
+        asyncCheck chatid << (greeting(userinfo.displayName), noReply)
+        /-> sEnterMainMenu
+        discard redirect("enter-menu", %*[chatid, ""])
+
+      else:
+        asyncCheck chatid << pleaseSendByYourCantactT
 
     except ValueError:
       asyncCheck chatid << (wrongNumberT, noReply)
@@ -329,7 +334,8 @@ proc dispatcher*(bot: TeleBot, u: Update): Future[bool] {.async.} =
       of sAQQuestion: "add-question"
       of sEnterMainMenu: "enter-menu"
       of sMainMenu: "menu"
-      else: raise newException(ValueError, "what?")
+      of FindQuizStages: "find-quiz"
+      else: raise newException(ValueError, "the state is " & $uctx.stage)
 
     castSafety:
       discard await trigger(router, route, bot, uctx, u, args)
