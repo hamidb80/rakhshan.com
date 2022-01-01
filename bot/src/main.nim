@@ -228,9 +228,7 @@ newRouter router:
         if rec.issome:
           chatid << text
         else:
-          # chatid << (text, genTakeQuizInlineBtn(quizid))
-          # FIXME
-          chatid << fmt "{text}\n{takeQuizT}: /t{quizid}"
+          chatid << (text, genTakeQuizInlineBtn(quizid))
       
       else:
         chatid << quizNotFoundT
@@ -252,10 +250,11 @@ newRouter router:
     myrecord.lastCheckedTime = now()
 
     # FIXME messages can't be empty
-    myrecord.quizTimeMsgId = (await chatid <<timeSerializer myrecord.quiz.time).messageId
-    myrecord.questionPicMsgId = (await chatid << "message").messageId
-    myrecord.questionInfoMsgId = (await chatid << "message").messageId
-    myrecord.answerSheetMsgId = (await chatid << answerSheetSerializer myrecord.answerSheet).messageId
+    
+    # myrecord.quizTimeMsgId = (await chatid << timeSerializer myrecord.quiz.time).messageId
+    # myrecord.questionPicMsgId = (await chatid << "message").messageId
+    # myrecord.questionInfoMsgId = (await chatid << "message").messageId
+    # myrecord.answerSheetMsgId = (await chatid << answerSheetSerializer myrecord.answerSheet).messageId
 
   callbackQuery(chatid: int64, selectedAnswer: string) as "quiz-select-answer":
     myrecord.answerSheet[myrecord.currentQuestionIndex] = parseInt selectedAnswer
@@ -268,6 +267,8 @@ newRouter router:
     # update question view
 
   event(chatId: int64) as "update-timer":
+    return
+
     let
       record = myrecord
       quiz = record.quiz
@@ -275,6 +276,7 @@ newRouter router:
     asyncCheck (chatid, myrecord.quizTimeMsgId) <^ timeSerializer(newtime)
 
   event(chatId: int64) as "end-quiz":
+    return
     # NOTE: can be called with end of the tiem of cancel by user
 
     # delete quiz messages
@@ -353,7 +355,6 @@ proc dispatcher*(bot: TeleBot, u: Update): Future[bool] {.async.} =
           case text[1]:
             of 'q': "show-quiz"
             of 'a': "analyze"
-            of 't': "take-quiz" #FIXME 
             else: "invalid-command"
 
       castSafety:
@@ -378,9 +379,6 @@ proc dispatcher*(bot: TeleBot, u: Update): Future[bool] {.async.} =
         discard await trigger(router, route, bot, uctx, u, args)
 
   elif u.callbackQuery.issome:
-    # debugEcho "\n".repeat 10
-    # debugecho "++++++=", u.callbackQuery.get.data
-
     let 
       cq = u.callbackQuery.get
       cmd = cq.data.get("/n0")
@@ -394,10 +392,9 @@ proc dispatcher*(bot: TeleBot, u: Update): Future[bool] {.async.} =
       let res = await trigger(
         router, route,
         bot, uctx, u,
-        %*[cq.message.get.chat.id, parameter]
-      )
+        %*[cq.message.get.chat.id, parameter])
 
-    discard await bot.answerCallbackQuery($cq.id, res)
+      discard await bot.answerCallbackQuery($cq.id)
 
 
 when isMainModule:
