@@ -10,10 +10,17 @@ type
 using db: DbConn
 
 template dbworks*(path: string, body): untyped =
-    block:
-        let db {.inject.} = open(path, "", "", "")
-        body
-        db.close()
+    let db {.inject.} = open(path, "", "", "")
+    body
+    db.close()
+
+template dbworksCapture*(path: string, body): untyped =
+    let 
+        db {.inject.} = open(path, "", "", "")
+        result = body
+    
+    db.close()
+    result
 
 template transaction(db, body): untyped =
     db.exec sql"BEGIN"
@@ -157,6 +164,8 @@ proc deleteQuiz*(db; quizid: int64) =
         db.exec("DELETE FROM record WHERE quiz_id = ?".sql, quizid)
         db.exec("DELETE FROM question WHERE quiz_id = ?".sql, quizid)
         db.exec("DELETE FROM quiz WHERE id = ?".sql, quizid)
+
+# TODO get quiz by id
 
 # quiz -------------------------------------------
 

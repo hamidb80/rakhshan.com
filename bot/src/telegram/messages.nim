@@ -1,6 +1,6 @@
-import options, strutils
+import options, strutils, strformat
 import telebot
-import ./helper
+import ./helper, ../database/queries
 
 # texts: texts that are recieved from the client
 const
@@ -77,6 +77,12 @@ let
       KeyboardButton(text: sendContactIntoT, requestContact: some true)
     ]]
 
+    quizFilterReply* = newReplyKeyboardMarkup @[
+      @[findQuizChangeGradeT, findQuizChangeLessonT],
+      @[findQuizChangeNameT],
+      @[findQuizT, cancelT]
+    ]
+
     noReply* = newReplyKeyboardRemove(true)
 
 
@@ -94,13 +100,32 @@ let
       ("next", "next"),
     ].toInlineButtons
 
+func escapeMarkdownV2*(s: sink string): string =
+    for c in s:
+        if c in "_*[]()~`>#+-=|{}.!":
+            result.add '\\'
+
+        result.add c
+
+func bold*(s: string): string = fmt"*{s}*"
+func italic*(s: string): string = fmt"_{s}_"
+func underline*(s: string): string = fmt"__{s}__"
+func spoiler*(s: string): string = fmt"||{s}||"
+func link*(url, hover: string): string = fmt"[{url}]({hover})"
 
 func greeting*(uname: string): string =
     [
       "کاربر",
-      uname,
+      uname.escapeMarkdownV2,
       "خوش آمدید",
     ].join " "
+
+func quizInfoSerializer*(qi: QuizInfoModel): string =
+    [
+      [bold ":نام آزمون", qi.quiz.name].join " ",
+      [bold ":تعداد سوال", $qi.questions_number].join " ",
+      # [bold ":", qi.questions_number].join " ",
+    ].join "\n"
 
 func timeSerializer*(lastTime: int64): string =
     ""

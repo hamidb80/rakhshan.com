@@ -32,11 +32,11 @@ newRouter router:
 
   route(chatid: int64, input: string) as "verify-user":
     try:
-      let userInfo = await input.getUserInfo
+      let userInfo = await input.getUserInfo # number
 
       dbworks dbPath:
-        uctx.membership = some addMember(
-            db, chatid, userinfo.display_name, input, userInfo.is_admin.int)
+        db.addMember(chatid, userinfo.display_name, input, userInfo.is_admin.int)
+        uctx.membership = db.getMember chatid
 
       asyncCheck chatid << (greeting(userinfo.displayName), noReply)
       /-> sEnterMainMenu
@@ -68,7 +68,8 @@ newRouter router:
 
     of findQuizT:
       /-> sFindQuizMain
-      discard redirect("find-quiz", %*[chatid, ""])
+      uctx.quizQuery = some QuizQuery()
+      asynccheck chatid << (findQuizDialogT, quizFilterReply)
 
     else:
       asyncCheck chatid << wrongCommandT
@@ -165,18 +166,26 @@ newRouter router:
 
     case input:
     of findQuizT:
-      discard # TODO actually send the result + show filters top of result
+      let 
+        quizList = dbworksCapture dbpath: findQuizzes(db, myquery, 0, 0)
+        str = quizList.map(quizInfoSerializer).join "\n"
+
+      if issome myquery.resultMsgId:
+        asynccheck (chatid, myquery.resultMsgId.get) <^ str
+      else:
+          myquery.resultMsgId = some await(chatid << str).messageId
 
     of findQuizChangeNameT: /-> sFQname
     of findQuizChangeGradeT: /-> sFQgrade
     of findQuizChangeLessonT: /-> sFQlesson
     of findQuizClearFiltersT: /-> sFindQuizMain
+    of cancelT: 
+      uctx.quizQuery = none QuizQuery
+      discard redirect("enter-menu", %*[chatid, ""])
 
     else:
       case uctx.stage:
-
       of sfindQuizMain:
-        uctx.quizQuery = some QuizQuery()
         asyncCheck chatid << findQuizDialogT
 
       of sFQname:
@@ -193,6 +202,8 @@ newRouter router:
         goBack()
 
       else: discard
+
+  # TODO edit quiz and question
 
   command(chatid: int64, quizid: int) as "show-quiz":
     # show record if has
@@ -216,7 +227,6 @@ newRouter router:
 
     myrecord.quizTimeMsgId = (await chatid <<
         timeSerializer myrecord.quiz.time).messageId
-
     myrecord.questionPicMsgId = (await chatid << "message").messageId
     myrecord.questionInfoMsgId = (await chatid << "message").messageId
     myrecord.answerSheetMsgId = (await chatid <<
@@ -296,11 +306,10 @@ proc dispatcher*(bot: TeleBot, u: Update): Future[bool] {.async.} =
 
   if uctx.firstTime:
     castSafety:
-      dbworks dbPath:
-        let m = getMember(db, u.getchatid)
-        if issome m:
-          uctx.membership = m
-          uctx.stage = sEnterMainMenu
+      let m = dbworksCapture dbPath: getMember(db, u.getchatid)
+      if issome m:
+        uctx.membership = m
+        uctx.stage = sEnterMainMenu
 
     uctx.firsttime = false
 
