@@ -1,3 +1,3 @@
-template fakeSafety*(body): untyped =
+template castSafety*(body): untyped =
   {.cast(gcsafe).}:
     body

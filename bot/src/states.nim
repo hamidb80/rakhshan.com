@@ -32,7 +32,7 @@ proc getOrCreateUser*(chatId: int64): UserCtx =
     result = users[chatId]
 
 proc startTimer*(delay: int) {.thread.} =
-  fakeSafety:
+  castSafety:
     while true:
       var offlineUsers: seq[int64]
       let currentTime = now()

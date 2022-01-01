@@ -15,7 +15,6 @@ let dbPath = getenv("DB_PATH")
 
 # init -----------------------------------
 
-let db = open(dbPath, "", "", "")
 template adminRequired(body): untyped {.dirty.} =
   if issome(uctx.membership) and uctx.membership.get.isAdmin == 1:
     body
@@ -34,8 +33,10 @@ newRouter router:
   route(chatid: int64, input: string) as "verify-user":
     try:
       let userInfo = await input.getUserInfo
-      uctx.membership = some addMember(
-          db, chatid, userinfo.display_name, input, userInfo.is_admin)
+
+      dbworks dbPath:
+        uctx.membership = some addMember(
+            db, chatid, userinfo.display_name, input, userInfo.is_admin.int)
 
       asyncCheck chatid << (greeting(userinfo.displayName), noReply)
       /-> sEnterMainMenu
@@ -291,13 +292,15 @@ proc checkNofitications(
 
 proc dispatcher*(bot: TeleBot, u: Update): Future[bool] {.async.} =
   var args = %*[]
-  let uctx = fakeSafety: getOrCreateUser findChatId u
+  let uctx = castSafety: getOrCreateUser findChatId u
 
   if uctx.firstTime:
-    let m = getMember(db, u.getchatid)
-    if issome m:
-      uctx.membership = m
-      uctx.stage = sEnterMainMenu
+    castSafety:
+      dbworks dbPath:
+        let m = getMember(db, u.getchatid)
+        if issome m:
+          uctx.membership = m
+          uctx.stage = sEnterMainMenu
 
     uctx.firsttime = false
 
@@ -319,13 +322,13 @@ proc dispatcher*(bot: TeleBot, u: Update): Future[bool] {.async.} =
       of sMainMenu: "menu"
       else: raise newException(ValueError, "what?")
 
-    fakeSafety:
+    castSafety:
       discard await trigger(router, route, bot, uctx, u, args)
 
   elif u.callbackQuery.issome:
     let cq = u.callbackQuery.get
 
-    fakeSafety:
+    castSafety:
       let res = await trigger(
         router, "select-quiz",
         bot, uctx, u,
