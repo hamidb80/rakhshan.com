@@ -71,7 +71,7 @@ const
     emptyBoxJ* = "◻"
     correctBoxJ* = "✅"
 
-    gotoQuestiionT* = "برو به سوال"
+    gotoQuestionT* = "برو به سوال"
 
 let
     notLoggedInReply* = newReplyKeyboardMarkup @[
@@ -106,17 +106,19 @@ let
 
 let
     answerBtns* = [
-      ("1", "1"),
-      ("2", "2"),
-      ("3", "3"),
-      ("4", "4"),
-      ("empty", "0"),
+      ("1",     "/p1"),
+      ("2",     "/p2"),
+      ("3",     "/p3"),
+      ("4",     "/p4"),
+      ("empty", "/p0"),
     ].toInlineButtons
 
     moveBtns* = @[
-      ("prev", "prev"),
-      ("next", "next"),
+      ("prev", "/g-"),
+      ("next", "/g+"),
     ].toInlineButtons
+
+    answerKeyboard* = newInlineKeyboardMarkup(answerBtns, moveBtns)
 
 func genTakeQuizInlineBtn*(quizId: int64): InlineKeyboardMarkup =
     result = InlineKeyboardMarkup(`type`: kInlineKeyboardMarkup)

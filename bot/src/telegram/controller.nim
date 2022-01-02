@@ -43,12 +43,14 @@ type
 
     startTime*: DateTime
     lastCheckedTime*: Datetime
+    isReady*: bool
     isEnded*: bool
     # isWatingForResult: bool
 
     quizTimeMsgId*: int
     questionPicMsgId*: int
     questionDescMsgId*: int
+    jumpQuestionMsgId*: int
     answerSheetMsgId*: int
 
   QuizCreate* = object

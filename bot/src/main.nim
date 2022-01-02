@@ -11,7 +11,9 @@ import
 randomize()
 let dbPath = getenv("DB_PATH")
 
-# init -----------------------------------
+# init -------------------------------------
+
+# router ---
 
 template adminRequired(body): untyped {.dirty.} =
   if issome(uctx.membership) and uctx.membership.get.isAdmin == 1:
@@ -241,11 +243,7 @@ newRouter router:
       quizid = parseint param
       quiz = dbworksCapture dbpath: db.getQuizItself(quizid)
 
-    if isnone quiz:
-      asyncCheck chatid << quizNotFoundT
-      # TODO forward to another route
-
-    else:
+    if issome quiz:
       asyncCheck chatid << (quizWillStartSoonT, cancelReply)
 
       uctx.record = some QuizTaking()
@@ -264,39 +262,44 @@ newRouter router:
       # FIXME send quesition pic
       # myrecord.questionPicMsgId = (await chatid << "message").messageId
       myrecord.questionDescMsgId = (await chatid <<
-        questionSerialize(myrecord.questions[0], 0)).messageId
+        (questionSerialize(myrecord.questions[0], 0), answerKeyboard)).messageId
 
-      myrecord.answerSheetMsgId = (await chatid << (
-        answerSheetSerialize(myrecord.answerSheet),
-        genQuestionJumpBtns(myrecord.questions.len)
-      )).messageId
+      myrecord.answerSheetMsgId = (await chatid <<
+        answerSheetSerialize(myrecord.answerSheet)).messageId
 
-  callbackQuery(chatid: int64, selectedAnswer: string) as "quiz-select-answer":
-    myrecord.answerSheet[myrecord.qi] = parseInt selectedAnswer
+      myrecord.jumpQuestionMsgId = (await chatid <<
+        (gotoQuestionT, genQuestionJumpBtns(myrecord.questions.len))).messageId
 
-    asyncCheck (chatid, myrecord.answerSheetMsgId) <^ answerSheetSerialize(
-          myrecord.answerSheet)
+      myrecord.isReady = true
+
+    else:
+      asyncCheck chatid << quizNotFoundT
+      # TODO forward to another route
 
   callbackQuery(chatid: int64, param: string) as "jump-question":
     let newQuestionIndex = parseint param
 
     if myrecord.qi != newQuestionIndex:
       myrecord.qi = newQuestionIndex
-      asynccheck (chatid, myrecord.questionDescMsgId) <^
-        questionSerialize(myrecord.questions[newQuestionIndex], newQuestionIndex)
+      asynccheck (chatid, myrecord.questionDescMsgId) <^ (
+        questionSerialize(myrecord.questions[newQuestionIndex], newQuestionIndex), answerKeyboard)
 
   callbackQuery(chatid: int64, param: string) as "select-answer":
-    let newQuestionIndex = parseint param
-    # asynccheck (chatid, myrecord.answerSheetMsgId) <^ answerSheetSerialize()
+    myrecord.answerSheet[myrecord.qi] = parseint param
+
+    asyncCheck (chatid, myrecord.answerSheetMsgId) <^
+      answerSheetSerialize(myrecord.answerSheet)
 
   event(chatId: int64) as "update-timer":
-    return
+    debugecho "fire time update"
 
-    let
-      record = myrecord
-      quiz = record.quiz
-      newtime = quiz.time - (now() - record.startTime).inseconds
-    asyncCheck (chatid, myrecord.quizTimeMsgId) <^ timeformat(newtime)
+    if myrecord.isReady:
+      let 
+        quiz = myrecord.quiz
+        newtime = quiz.time - (now() - myrecord.startTime).inseconds
+
+      if newtime > 0:
+        asyncCheck (chatid, myrecord.quizTimeMsgId) <^ timeformat(newtime)
 
   event(chatId: int64) as "end-quiz":
     return
@@ -327,7 +330,7 @@ newRouter router:
 
     uctx.record = none QuizTaking
 
-# ---
+# controllers ---
 
 proc checkNofitications(
   pch: ptr Channel[Notification], delay: int,
@@ -336,19 +339,20 @@ proc checkNofitications(
   while true:
     await sleepAsync delay
 
-    let (ok, notif) = pch[].tryRecv
-    if not ok: continue
+    while true:
+      let (ok, notif) = pch[].tryRecv
+      if not ok: break
 
-    let
-      args = %[notif.user_chatid]
-      routeName =
-        case notif.kind:
-        of nkEndQuizTime: "end-quiz"
-        of nkUpdateQuizTime: "update-timer"
+      let
+        args = %[notif.user_chatid]
+        routeName =
+          case notif.kind:
+          of nkEndQuizTime: "end-quiz"
+          of nkUpdateQuizTime: "update-timer"
 
-    asyncCheck router[routeName](
-      bot, getOrCreateUser(notif.user_chatid),
-      Update(), args)
+      asyncCheck router[routeName](
+        bot, getOrCreateUser(notif.user_chatid),
+        Update(), args)
 
 proc dispatcher*(bot: TeleBot, u: Update): Future[bool] {.async.} =
   var args = %*[]
@@ -370,7 +374,6 @@ proc dispatcher*(bot: TeleBot, u: Update): Future[bool] {.async.} =
       msg = u.message.get
       text = msg.text.get("")
 
-    # it's a command
     if text.startsWith("/") and text.len > 2:
       let
         parameter = text[2..^1]
@@ -410,6 +413,7 @@ proc dispatcher*(bot: TeleBot, u: Update): Future[bool] {.async.} =
         case cmd[1]:
         of 't': "take-quiz"
         of 'j': "jump-question"
+        of 'p': "select-answer"
         else: "invalid-command"
 
     castSafety:
@@ -419,7 +423,6 @@ proc dispatcher*(bot: TeleBot, u: Update): Future[bool] {.async.} =
         %*[cq.message.get.chat.id, parameter])
 
       discard await bot.answerCallbackQuery($cq.id)
-
 
 when isMainModule:
   const API_KEY = "2004052302:AAHm_oICftfs5xLmY0QwGVTE3o-gYgD6ahw"
