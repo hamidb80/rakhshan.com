@@ -16,10 +16,10 @@ template id(rawRow): untyped = rawRow[0]
 
 let
   membersRaw = [
-    (118721, "ali", "0912", 0),
-    (81321257, "mahdi", "0913", 1),
-    (98312873, "hamid", "0914", 1),
-    (53622231, "maher", "0915", 0),
+    (118721, "ali site", "ali tg", "0912", 0),
+    (81321257, "mahdi site", "mahdi tg", "0913", 1),
+    (98312873, "hamid site", "hamid tg", "0914", 1),
+    (53622231, "maher site", "maher tg", "0915", 0),
   ]
 
   tagsRaw = [
@@ -96,7 +96,7 @@ suite "INIT":
 suite "INSERT":
   test "add member":
     for m in membersRaw:
-      db.addMember(m[0], m[1], m[2], m[3])
+      db.addMember(m[0], m[1], m[2], m[3], m[4])
 
   test "add tag":
     for t in tagsRaw:
@@ -112,7 +112,10 @@ suite "INSERT":
 
 suite "SELECT":
   test "single member":
-    check db.getMember(118721).get.name == "ali"
+    let member = db.getMember(118721).get
+    check:
+      member.site_name == "ali site"
+      member.tg_name == "ali tg"
 
   test "single quiz info":
     let r = db.getQuizInfo(quizzesRaw[0].id.int64).get

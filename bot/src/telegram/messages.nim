@@ -1,4 +1,4 @@
-import options, strutils, strformat, times, strformat, sequtils
+import options, strutils, strformat, times
 import telebot
 import ./helper, ../database/queries, ../database/models
 
@@ -82,11 +82,13 @@ const
     youGotT* = "را کسب کردید"
 
     durationT* = "مدت"
-    endT* = "خاتمه" 
+    endT* = "خاتمه"
+
+    pointRightJ* = "👉"
+    pointLeftJ* = "👈"
 
 let
     notLoggedInReply* = newReplyKeyboardMarkup @[
-        @[adminT],
         @[loginT],
     ]
 
@@ -129,8 +131,8 @@ let
     ].toInlineButtons
 
     moveBtns* = @[
-      (previousT, "/g-"),
-      (nextT, "/g+"),
+      (fmt"{previousT} {pointLeftJ}", "/g-"),
+      (fmt"{pointRightJ} {nextT}", "/g+"),
     ].toInlineButtons
 
     answerKeyboard* = newInlineKeyboardMarkup(answerBtns, moveBtns)
@@ -174,7 +176,6 @@ func link*(url, hover: string): string = fmt"[{url}]({hover})"
 
 func greeting*(uname: string): string =
     fmt"'{uname.escapeMarkdownV2}' {dearT} {welcomeT}"
-
 
 func timeFormat*[T: SomeInteger](t: T): string =
     let d = initDuration(seconds = t).toParts
@@ -225,7 +226,7 @@ func answerSerialize(ans: int): string =
 
 func answerSheetSerialize*(sheet: seq[int]): string =
     for i, n in sheet.pairs:
-        result.add fmt"{(i+1):<3} {answerSerialize(n)}{'\n'}"
+        result.add fmt"{(i+1):<3}\) {answerSerialize(n)}{'\n'}"
 
 func recordResultDialog*(quiz: QuizModel, percent: float): string =
     let score = spoiler(percentSerialize percent)

@@ -15,10 +15,6 @@ let dbPath = getenv("DB_PATH")
 
 # router ---
 
-template adminRequired(body): untyped {.dirty.} =
-  if issome(uctx.membership) and uctx.membership.get.isAdmin == 1:
-    body
-
 var router = new RouterMap
 newRouter router:
   route(chatid: int64, msgtext: string) as "home":
@@ -39,13 +35,15 @@ newRouter router:
           userInfo = await ct.phoneNumber.getUserInfo # number
 
         dbworks dbPath:
-          db.addMember(chatid, userinfo.display_name, ct.phoneNumber,
-              userInfo.is_admin.int)
+          db.addMember(chatid, userinfo.display_name,
+            (ct.firstname & " " & ct.lastname.get("")),
+            ct.phoneNumber, userInfo.is_admin.int)
+
           uctx.membership = db.getMember chatid
 
         asyncCheck chatid << (greeting(userinfo.displayName), noReply)
         /-> sEnterMainMenu
-        discard redirect("enter-menu", %*[chatid, ""])
+        asyncCheck redirect("enter-menu", %*[chatid, ""])
 
       else:
         asyncCheck chatid << pleaseSendByYourCantactT
@@ -68,7 +66,7 @@ newRouter router:
     of addQuizT:
       adminRequired:
         /-> sAddQuiz
-        discard redirect("add-quiz", %*[chatid, ""])
+        asyncCheck redirect("add-quiz", %*[chatid, ""])
 
     of removeQuizT:
       adminRequired:
@@ -122,7 +120,7 @@ newRouter router:
       trySendInvalid:
         myquiz.chapter = input.parseInt
         /-> sAQQuestion
-        discard redirect("add-quiestion", %[%chatid, %""])
+        asyncCheck redirect("add-quiestion", %[%chatid, %""])
 
     else:
       asyncCheck chatid << wrongCommandT
@@ -164,7 +162,7 @@ newRouter router:
       trySendInvalid:
         allquestions[^1].answer = parseint $input[0]
         /-> sAQQuestion
-        discard redirect("add-question", %[%chatid, %""])
+        asyncCheck redirect("add-question", %[%chatid, %""])
 
     else: discard
 
@@ -189,7 +187,7 @@ newRouter router:
     of findQuizClearFiltersT: /-> sFindQuizMain
     of cancelT:
       uctx.quizQuery = none QuizQuery
-      discard redirect("enter-menu", %*[chatid, ""])
+      asyncCheck redirect("enter-menu", %*[chatid, ""])
 
     else:
       case uctx.stage:
@@ -288,6 +286,16 @@ newRouter router:
           questionSerialize(myrecord.questions[newQuestionIndex],
               newQuestionIndex), answerKeyboard)
 
+  callbackQuery(chatid: int64, param: string) as "goto":
+    if isDoingQuiz:
+      let targetQuestionIndex = 
+        if param[0] == '+': 
+          min(myrecord.qi + 1, myrecord.questions.high)
+        else:
+          max(myrecord.qi - 1, 0)
+
+      asyncCheck redirect("jump-question", %*[chatid, $targetQuestionIndex])
+
   callbackQuery(chatid: int64, param: string) as "select-answer":
     if isDoingQuiz:
       myrecord.answerSheet[myrecord.qi] = parseint param
@@ -330,15 +338,16 @@ newRouter router:
       asyncCheck chatid << recordResultDialog(r.quiz, percent)
 
       uctx.record = none QuizTaking
-      discard redirect("enter-menu", %*[chatid, ""])
+      asyncCheck redirect("enter-menu", %*[chatid, ""])
 
   route(chatid: int64, input: string) as "middle-of-quiz":
     case input
-    of endT: 
-      discard redirect("end-quiz", %*[chatid, ""])
+    of endT:
+      asyncCheck redirect("end-quiz", %*[chatid, ""])
     of cancelT:
+      uctx.record = none QuizTaking
       asyncCheck chatid << quizCancelledT
-      discard redirect("enter-menu", %*[chatid, ""])
+      asyncCheck redirect("enter-menu", %*[chatid, ""])
 
     else:
       asyncCheck chatid << invalidInputT
@@ -428,6 +437,7 @@ proc dispatcher*(bot: TeleBot, u: Update): Future[bool] {.async.} =
         of 't': "take-quiz"
         of 'j': "jump-question"
         of 'p': "select-answer"
+        of 'g': "goto"
         else: "invalid-command"
 
     castSafety:

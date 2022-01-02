@@ -39,3 +39,7 @@ template myrecord*: untyped {.dirty.} =
 
 template isDoingQuiz*: untyped {.dirty.} =
   uctx.record.issome
+
+template adminRequired*(body): untyped {.dirty.} =
+  if issome(uctx.membership) and uctx.membership.get.isAdmin == 1:
+    body

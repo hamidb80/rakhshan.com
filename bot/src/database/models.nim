@@ -6,7 +6,8 @@ var initQuery*: seq[string]
 Blueprint [queryHolder: initQuery, postfix: "Model"]:
     Table member:
         chat_id: int {.primary.}
-        name: char[255]
+        site_name: char[255]
+        tg_name: char[255] # FIXME
         phone_number: char[15]
         is_admin: int # fake bool
 
