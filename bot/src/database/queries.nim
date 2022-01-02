@@ -15,10 +15,10 @@ template dbworks*(path: string, body): untyped =
     db.close()
 
 template dbworksCapture*(path: string, body): untyped =
-    let 
+    let
         db {.inject.} = open(path, "", "", "")
         result = body
-    
+
     db.close()
     result
 
@@ -147,6 +147,21 @@ proc getQuizInfo*(db; quizid: int64): Option[QuizInfoModel] =
 
     if issome row:
         result = some row.get.toQuizInfoModel
+
+proc getQuizItself*(db; quizid: int64): Option[QuizModel] =
+    let row = db.getSingleRow("""
+        SELECT name, description, time, tag_id
+        FROM quiz
+        WHERE id = ?
+    """.sql, quizid)
+
+    if issome row:
+        result = some QuizModel(
+            id: quizid,
+            name: row.get[0],
+            description: row.get[1],
+            time: parseint row.get[2],
+            tag_id: parseint row.get[3])
 
 proc getQuestions*(db; quizid: int64): seq[QuestionModel] =
     let rows = db.getAllRows(

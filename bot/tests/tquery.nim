@@ -114,14 +114,21 @@ suite "SELECT":
   test "single member":
     check db.getMember(118721).get.name == "ali"
 
-  test "single quiz":
+  test "single quiz info":
     let r = db.getQuizInfo(quizzesRaw[0].id.int64).get
     check:
       r.quiz.name == "Qz1"
       r.quiz.time == 100
       r.quiz.tagid == 1
 
+  test "get quiz itself with no join":
+    let q = db.getQuizItself(4)
+
+    check q.get.name == "Qz4"
+
   test "find quizzes":
+    # TODO check multi filter or non filter
+
     block by_grade:
       let qs = db.findQuizzes(QuizQuery(grade: some 11), 0, 0)
       check qs.mapIt(it.quiz.name).sorted == @["Qz1", "Qz2", "Qz3"]

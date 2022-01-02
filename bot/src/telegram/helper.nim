@@ -15,8 +15,7 @@ func toKeyboardButtons*(btntexts: openArray[string]): seq[KeyboardButton] =
 func newInlineKeyboardMarkup*(
   keyboards: seq[seq[InlineKeyBoardButton]]
 ): InlineKeyboardMarkup =
-  new(result)
-  result.type = kInlineKeyboardMarkup
+  result = newInlineKeyboardMarkup()
   result.inlineKeyboard = keyboards
 
 func newReplyKeyboardMarkup*(

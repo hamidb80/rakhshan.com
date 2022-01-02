@@ -1,4 +1,4 @@
-import options, strutils, strformat
+import options, strutils, strformat,times, strformat, sequtils
 import telebot
 import ./helper, ../database/queries, ../database/models
 
@@ -61,6 +61,18 @@ const
     analyzeYourAnswersT* = "آزمونت رو تحلیل کن"
     takeQuizT* = "شرکت در آزمون"
 
+    questionT* = "سوال"
+    quizNameT* = "نام آزمون"
+    numberOfQuestionsT* = "تعداد سوالات"
+    detailsT* = "جزئیات"
+    dearT* = "عزیز"
+    welcomeT* = "خوش آمدید"
+
+    emptyBoxJ* = "◻"
+    correctBoxJ* = "✅"
+
+    gotoQuestiionT* = "برو به سوال"
+
 let
     notLoggedInReply* = newReplyKeyboardMarkup @[
         @[adminT],
@@ -114,6 +126,19 @@ func genTakeQuizInlineBtn*(quizId: int64): InlineKeyboardMarkup =
         callbackData: some fmt"/t{quizid}"
     )]]
 
+func genQuestionJumpBtns*(number: int): InlineKeyboardMarkup =
+  var btnRows = newSeqOfCap[seq[InlineKeyboardButton]](number div 4)
+
+  for offset in countup(1, number, 4):
+    var acc = newSeqOfCap[InlineKeyboardButton](4) 
+    for n in offset .. min(offset + 3, number):
+      acc.add InlineKeyboardButton(text: $n, callbackData: some fmt"/j{(n-1)}")
+
+    btnRows.add acc
+
+  result = newInlineKeyboardMarkup()
+  result.inlineKeyboard = btnRows
+
 func escapeMarkdownV2*(s: sink string): string =
     for c in s:
         if c in "_*[]()~`>#+-=|{}.!":
@@ -128,17 +153,13 @@ func spoiler*(s: string): string = fmt"||{s}||"
 func link*(url, hover: string): string = fmt"[{url}]({hover})"
 
 func greeting*(uname: string): string =
-    [
-      "کاربر",
-      uname.escapeMarkdownV2,
-      "خوش آمدید",
-    ].join " "
+  fmt"{dearT} {uname.escapeMarkdownV2} {welcomeT}"
 
 func miniQuizInfo*(qi: QuizInfoModel): string =
     [
-      [bold "نام آزمون", ": ", qi.quiz.name].join,
-      [bold "تعداد سوال", ": ", $qi.questions_number].join,
-      ["جزییات", ": ", fmt"/q{qi.quiz.id}"].join,
+      fmt"{quizNameT}: {qi.quiz.name}",
+      fmt"{numberOfQuestionsT}: {qi.questions_number}",
+      fmt"{detailsT}: /q{qi.quiz.id}",
       "\n",
     ].join "\n"
 
@@ -155,13 +176,28 @@ func fullQuizInfo*(qi: QuizInfoModel, rec: Option[RecordModel]): string =
             "\n"
 
     [
-        [bold "نام آزمون", ": ", qi.quiz.name].join,
-        [bold "تعداد سوال", ": ", $qi.questions_number].join,
-        "\n", recSection,
+      fmt"{quizNameT}: {qi.quiz.name}",
+      fmt"{numberOfQuestionsT}: {qi.questions_number}",
+       recSection,
     ].join "\n"
 
-func timeSerializer*(lastTime: int64): string =
-    ""
+func timeFormat*[T: SomeInteger](t: T): string =
+  let d = initDuration(seconds=t).toParts
+  fmt"{d[Hours]:02}:{d[Minutes]:02}:{d[Seconds]:02}"
 
-func answerSheetSerializer*(sheet: seq[int]): string =
-    ""
+func questionSerialize*(q: QuestionModel, index:int): string =
+  fmt"""
+    {questionT} {index+1}:
+    
+    {q.description.escapeMarkdownV2}
+  """
+
+func answerSerialize(ans: int): string =
+  for i in 1..4:
+    result.add:
+      if ans == i: correctBoxJ
+      else: emptyBoxJ
+
+func answerSheetSerialize*(sheet: seq[int]): string =
+  for i, n in sheet.pairs: 
+    result.add fmt"{(i+1):<3} {answerSerialize(n)}{'\n'}"

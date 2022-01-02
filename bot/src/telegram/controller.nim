@@ -38,7 +38,7 @@ type
     # FIXME this can be improved for ram usage
     quiz*: QuizModel
     questions*: seq[QuestionModel]
-    currentQuestionIndex*: int
+    qi*: int # question index
     answerSheet*: seq[int]
 
     startTime*: DateTime
@@ -48,7 +48,7 @@ type
 
     quizTimeMsgId*: int
     questionPicMsgId*: int
-    questionInfoMsgId*: int
+    questionDescMsgId*: int
     answerSheetMsgId*: int
 
   QuizCreate* = object

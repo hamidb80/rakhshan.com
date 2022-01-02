@@ -221,50 +221,73 @@ newRouter router:
 
     asynccheck:
       if qm.issome:
-        let 
+        let
           rec = dbworksCapture dbpath: db.getRecordFor(chatid, qm.get.quiz.id)
           text = fullQuizInfo(qm.get, rec)
-        
+
         if rec.issome:
           chatid << text
         else:
           chatid << (text, genTakeQuizInlineBtn(quizid))
-      
+
       else:
         chatid << quizNotFoundT
 
   callbackQuery(chatid: int64) as "delete-quiz":
     discard
 
-  callbackQuery(chatid: int64, quizid: string) as "take-quiz":
-    asyncCheck chatid << (quizWillStartSoonT, cancelReply)
+  callbackQuery(chatid: int64, param: string) as "take-quiz":
+    let
+      quizid = parseint param
+      quiz = dbworksCapture dbpath: db.getQuizItself(quizid)
 
-    uctx.record = some QuizTaking()
+    if isnone quiz:
+      asyncCheck chatid << quizNotFoundT
+      # TODO forward to another route
 
-    # qet quiz and it's questions from database & save them into memory uctx.record
-    # myrecord.quiz =
-    # myrecord.questions =
-    shuffle myrecord.questions
-    myrecord.answersheet = newSeqWith(myrecord.questions.len, 0)
-    myrecord.starttime = now()
-    myrecord.lastCheckedTime = now()
+    else:
+      asyncCheck chatid << (quizWillStartSoonT, cancelReply)
 
-    # FIXME messages can't be empty
-    
-    # myrecord.quizTimeMsgId = (await chatid << timeSerializer myrecord.quiz.time).messageId
-    # myrecord.questionPicMsgId = (await chatid << "message").messageId
-    # myrecord.questionInfoMsgId = (await chatid << "message").messageId
-    # myrecord.answerSheetMsgId = (await chatid << answerSheetSerializer myrecord.answerSheet).messageId
+      uctx.record = some QuizTaking()
+      myrecord.quiz = quiz.get
+      myrecord.questions = dbworksCapture dbpath: db.getQuestions(quizid)
+
+      # TODO shuffle myrecord.questions
+
+      myrecord.answersheet = newSeqWith(myrecord.questions.len, 0)
+      myrecord.starttime = now()
+      myrecord.lastCheckedTime = now()
+
+      myrecord.quizTimeMsgId = (await chatid <<
+          timeformat myrecord.quiz.time).messageId
+      myrecord.qi = 0
+      # FIXME send quesition pic
+      # myrecord.questionPicMsgId = (await chatid << "message").messageId
+      myrecord.questionDescMsgId = (await chatid <<
+        questionSerialize(myrecord.questions[0], 0)).messageId
+
+      myrecord.answerSheetMsgId = (await chatid << (
+        answerSheetSerialize(myrecord.answerSheet),
+        genQuestionJumpBtns(myrecord.questions.len)
+      )).messageId
 
   callbackQuery(chatid: int64, selectedAnswer: string) as "quiz-select-answer":
-    myrecord.answerSheet[myrecord.currentQuestionIndex] = parseInt selectedAnswer
+    myrecord.answerSheet[myrecord.qi] = parseInt selectedAnswer
 
-    asyncCheck (chatid, myrecord.answerSheetMsgId) <^ answerSheetSerializer(
+    asyncCheck (chatid, myrecord.answerSheetMsgId) <^ answerSheetSerialize(
           myrecord.answerSheet)
 
-  callbackQuery(chatid: int64, selectedQuestionNumber: string) as "quiz-select-question":
-    myrecord.currentQuestionIndex = parseint selectedQuestionNumber
-    # update question view
+  callbackQuery(chatid: int64, param: string) as "jump-question":
+    let newQuestionIndex = parseint param
+
+    if myrecord.qi != newQuestionIndex:
+      myrecord.qi = newQuestionIndex
+      asynccheck (chatid, myrecord.questionDescMsgId) <^
+        questionSerialize(myrecord.questions[newQuestionIndex], newQuestionIndex)
+
+  callbackQuery(chatid: int64, param: string) as "select-answer":
+    let newQuestionIndex = parseint param
+    # asynccheck (chatid, myrecord.answerSheetMsgId) <^ answerSheetSerialize()
 
   event(chatId: int64) as "update-timer":
     return
@@ -273,7 +296,7 @@ newRouter router:
       record = myrecord
       quiz = record.quiz
       newtime = quiz.time - (now() - record.startTime).inseconds
-    asyncCheck (chatid, myrecord.quizTimeMsgId) <^ timeSerializer(newtime)
+    asyncCheck (chatid, myrecord.quizTimeMsgId) <^ timeformat(newtime)
 
   event(chatId: int64) as "end-quiz":
     return
@@ -284,7 +307,7 @@ newRouter router:
     for msgId in [
       r.quizTimeMsgId,
       r.questionPicMsgId,
-      r.questionInfoMsgId,
+      r.questionDescMsgId,
       r.answerSheetMsgId
     ]:
       asynccheck chatId <! msgid
@@ -359,7 +382,7 @@ proc dispatcher*(bot: TeleBot, u: Update): Future[bool] {.async.} =
 
       castSafety:
         discard await trigger(router, route, bot, uctx, u, %*[msg.chat.id, parameter])
-    
+
     # it's a text message
     else:
       args.add %msg.chat.id
@@ -379,13 +402,14 @@ proc dispatcher*(bot: TeleBot, u: Update): Future[bool] {.async.} =
         discard await trigger(router, route, bot, uctx, u, args)
 
   elif u.callbackQuery.issome:
-    let 
+    let
       cq = u.callbackQuery.get
       cmd = cq.data.get("/n0")
       parameter = cmd[2..^1]
       route =
         case cmd[1]:
         of 't': "take-quiz"
+        of 'j': "jump-question"
         else: "invalid-command"
 
     castSafety:
