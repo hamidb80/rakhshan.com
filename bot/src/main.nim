@@ -474,6 +474,8 @@ proc dispatcher*(bot: TeleBot, u: Update): Future[bool] {.async.} =
   var args = %*[]
   let uctx = castSafety: getOrCreateUser findChatId u
 
+  # TODO NOT async | do multiplie threads and pass them hits
+
   if uctx.firstTime:
     castSafety:
       let m = dbworksCapture dbPath: getMember(db, u.getchatid)

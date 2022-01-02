@@ -9,8 +9,6 @@ type
 
 using db: DbConn
 
-# TODO use async anything
-
 template dbworks*(path: string, body): untyped =
     let db {.inject.} = open(path, "", "", "")
     body
