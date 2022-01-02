@@ -161,4 +161,4 @@ proc trigger*(
   if alias in router:
     return await router[alias](bot, uctx, u, args)
 
-  raise newException(ValueError, "route alias is not defined")
+  raise newException(ValueError, "route alias is not defined: " & alias)

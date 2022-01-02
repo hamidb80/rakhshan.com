@@ -9,4 +9,4 @@ func getPercent*(userAnswers, correctAnswers: seq[int]): float =
         elif userAnswers[i] == correctAnswers[i]: corrects.inc
         else: wrongs.inc
 
-    (corrects * 3 - wrongs) / (userAnswers.len * 3)
+    (corrects * 3 - wrongs) / (userAnswers.len * 3) * 100

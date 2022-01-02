@@ -1,4 +1,4 @@
-import options, strutils, strformat,times, strformat, sequtils
+import options, strutils, strformat, times, strformat, sequtils
 import telebot
 import ./helper, ../database/queries, ../database/models
 
@@ -56,7 +56,7 @@ const
     quizWillStartSoonT* = "آزمون انتخابی تا لحظاتی دیگر شروع میشود"
 
     askPasswordAdmin* = "رمز ادمین را وارد کنید"
-    youWereAttendedBeforeT* = "کردهشما قبلا در این آزمون شرکت بودید"
+    youWereAttendedBeforeT* = "قبلا در این آزمون شرکت بودید"
     yourLastResultIsT* = "نتیجه قبلی شما"
     analyzeYourAnswersT* = "آزمونت رو تحلیل کن"
     takeQuizT* = "شرکت در آزمون"
@@ -72,6 +72,17 @@ const
     correctBoxJ* = "✅"
 
     gotoQuestionT* = "برو به سوال"
+    emptyT* = "خالی"
+    nextT* = "بعدی"
+    previousT* = "قبلی"
+    quizCancelledT* = "آزمون لغو شد"
+
+    youInTheQuizT* = "شما در آزمون"
+    gradeT* = "نمره"
+    youGotT* = "را کسب کردید"
+
+    durationT* = "مدت"
+    endT* = "خاتمه" 
 
 let
     notLoggedInReply* = newReplyKeyboardMarkup @[
@@ -102,20 +113,24 @@ let
       @[findQuizT, cancelT]
     ]
 
+    doingQuizReply* = newReplyKeyboardMarkup @[
+      @[endT],
+      @[cancelT]
+    ]
+
     noReply* = newReplyKeyboardRemove(true)
 
-let
     answerBtns* = [
-      ("1",     "/p1"),
-      ("2",     "/p2"),
-      ("3",     "/p3"),
-      ("4",     "/p4"),
-      ("empty", "/p0"),
+      ("1", "/p1"),
+      ("2", "/p2"),
+      ("3", "/p3"),
+      ("4", "/p4"),
+      (emptyT, "/p0"),
     ].toInlineButtons
 
     moveBtns* = @[
-      ("prev", "/g-"),
-      ("next", "/g+"),
+      (previousT, "/g-"),
+      (nextT, "/g+"),
     ].toInlineButtons
 
     answerKeyboard* = newInlineKeyboardMarkup(answerBtns, moveBtns)
@@ -129,19 +144,22 @@ func genTakeQuizInlineBtn*(quizId: int64): InlineKeyboardMarkup =
     )]]
 
 func genQuestionJumpBtns*(number: int): InlineKeyboardMarkup =
-  var btnRows = newSeqOfCap[seq[InlineKeyboardButton]](number div 4)
+    var btnRows = newSeqOfCap[seq[InlineKeyboardButton]](number div 4)
 
-  for offset in countup(1, number, 4):
-    var acc = newSeqOfCap[InlineKeyboardButton](4) 
-    for n in offset .. min(offset + 3, number):
-      acc.add InlineKeyboardButton(text: $n, callbackData: some fmt"/j{(n-1)}")
+    for offset in countup(1, number, 4):
+        var acc = newSeqOfCap[InlineKeyboardButton](4)
+        for n in offset .. min(offset + 3, number):
+            acc.add InlineKeyboardButton(
+              text: $n,
+              callbackData: some fmt"/j{(n-1)}")
 
-    btnRows.add acc
+        btnRows.add acc
 
-  result = newInlineKeyboardMarkup()
-  result.inlineKeyboard = btnRows
+    result = newInlineKeyboardMarkup()
+    result.inlineKeyboard = btnRows
 
 func escapeMarkdownV2*(s: sink string): string =
+    result = newStringOfCap(s.len * 2)
     for c in s:
         if c in "_*[]()~`>#+-=|{}.!":
             result.add '\\'
@@ -155,7 +173,12 @@ func spoiler*(s: string): string = fmt"||{s}||"
 func link*(url, hover: string): string = fmt"[{url}]({hover})"
 
 func greeting*(uname: string): string =
-  fmt"{dearT} {uname.escapeMarkdownV2} {welcomeT}"
+    fmt"'{uname.escapeMarkdownV2}' {dearT} {welcomeT}"
+
+
+func timeFormat*[T: SomeInteger](t: T): string =
+    let d = initDuration(seconds = t).toParts
+    fmt"{d[Hours]:02}:{d[Minutes]:02}:{d[Seconds]:02}"
 
 func miniQuizInfo*(qi: QuizInfoModel): string =
     [
@@ -165,41 +188,48 @@ func miniQuizInfo*(qi: QuizInfoModel): string =
       "\n",
     ].join "\n"
 
+func percentSerialize*(n: SomeFloat): string =
+    escapeMarkdownV2 fmt"{n:.2f}%"
+
 func fullQuizInfo*(qi: QuizInfoModel, rec: Option[RecordModel]): string =
     let recSection =
         if issome rec:
             [
               youWereAttendedBeforeT,
-              [yourLastResultIsT, ": ", $rec.get.percent].join,
-              [analyzeYourAnswersT, ": ", fmt"/a{rec.get.id}"].join,
+              fmt"{yourLastResultIsT}: {percentSerialize rec.get.percent}",
+              fmt"{analyzeYourAnswersT}: /a{qi.quiz.id}",
             ].join "\n"
 
         else:
             "\n"
 
     [
-      fmt"{quizNameT}: {qi.quiz.name}",
+      fmt"{bold quizNameT}: {escapeMarkdownV2 qi.quiz.name}",
       fmt"{numberOfQuestionsT}: {qi.questions_number}",
-       recSection,
+      fmt"{durationT}: {timeFormat qi.quiz.time}",
+      recSection,
     ].join "\n"
 
-func timeFormat*[T: SomeInteger](t: T): string =
-  let d = initDuration(seconds=t).toParts
-  fmt"{d[Hours]:02}:{d[Minutes]:02}:{d[Seconds]:02}"
-
-func questionSerialize*(q: QuestionModel, index:int): string =
-  fmt"""
+func questionSerialize*(q: QuestionModel, index: int): string =
+    fmt"""
     {questionT} {index+1}:
     
     {q.description.escapeMarkdownV2}
   """
 
 func answerSerialize(ans: int): string =
-  for i in 1..4:
-    result.add:
-      if ans == i: correctBoxJ
-      else: emptyBoxJ
+    for i in 1..4:
+        result.add:
+            if ans == i: correctBoxJ
+            else: emptyBoxJ
 
 func answerSheetSerialize*(sheet: seq[int]): string =
-  for i, n in sheet.pairs: 
-    result.add fmt"{(i+1):<3} {answerSerialize(n)}{'\n'}"
+    for i, n in sheet.pairs:
+        result.add fmt"{(i+1):<3} {answerSerialize(n)}{'\n'}"
+
+func recordResultDialog*(quiz: QuizModel, percent: float): string =
+    let score = spoiler(percentSerialize percent)
+    [
+      fmt"{youInTheQuizT} '{quiz.name.escapeMarkdownV2}' {gradeT} {score} {youGotT}",
+      fmt"{analyzeYourAnswersT}: /a{quiz.id}",
+    ].join("\n\n")

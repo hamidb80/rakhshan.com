@@ -5,16 +5,21 @@ import ./controller
 template redirect*(alias, params): untyped {.dirty.} =
   trigger(router, alias, bot, uctx, u, params)
 
-template `<<`*(chatid: int64, box: tuple[t: string, k: KeyboardMarkup]): untyped {.dirty.} =
-  bot.sendMessage(chatid, box[0], replyMarkup = box[1], parsemode = "MarkdownV2")
+template `<<`*(chatid: int64, box: tuple[t: string,
+    k: KeyboardMarkup]): untyped {.dirty.} =
+  bot.sendMessage(chatid, box[0], replyMarkup = box[1],
+      parsemode = "MarkdownV2")
 
 template `<<`*(chatid: int64, text: string): untyped {.dirty.} =
   bot.sendMessage(chatid, text, parsemode = "MarkdownV2")
 
-template `<^`*(msginfo: tuple[chatid: int64, msgid: int], box: tuple[t: string, k: KeyboardMarkup]): untyped {.dirty.} =
-  bot.editMessageText(box[0], $msginfo[0], msginfo[1], replyMarkup = box[1], parsemode = "MarkdownV2")
+template `<^`*(msginfo: tuple[chatid: int64, msgid: int], box: tuple[t: string,
+    k: KeyboardMarkup]): untyped {.dirty.} =
+  bot.editMessageText(box[0], $msginfo[0], msginfo[1], replyMarkup = box[1],
+      parsemode = "MarkdownV2")
 
-template `<^`*(msginfo: tuple[chatid: int64, msgid: int], text: string): untyped {.dirty.} =
+template `<^`*(msginfo: tuple[chatid: int64, msgid: int],
+    text: string): untyped {.dirty.} =
   bot.editMessageText(text, $msginfo[0], msginfo[1], parsemode = "MarkdownV2")
 
 template `<!`*(chatid: int64, msgid: int): untyped {.dirty.} =
@@ -29,5 +34,8 @@ template trySendInvalid*(body) =
   except:
     discard await chatid << invalidInputT
 
-template myrecord*: untyped =
+template myrecord*: untyped {.dirty.} =
   uctx.record.get
+
+template isDoingQuiz*: untyped {.dirty.} =
+  uctx.record.issome

@@ -1,6 +1,6 @@
 import
   sequtils, tables, strutils, options, json, times, random, logging,
-  asyncdispatch, threadpool, db_sqlite, os, strformat
+  asyncdispatch, threadpool, db_sqlite, os
 import telebot
 import
   telegram/[controller, helper, messages, comfortable],
@@ -39,7 +39,7 @@ newRouter router:
           userInfo = await ct.phoneNumber.getUserInfo # number
 
         dbworks dbPath:
-          db.addMember(chatid, userinfo.display_name, input,
+          db.addMember(chatid, userinfo.display_name, ct.phoneNumber,
               userInfo.is_admin.int)
           uctx.membership = db.getMember chatid
 
@@ -239,12 +239,13 @@ newRouter router:
     discard
 
   callbackQuery(chatid: int64, param: string) as "take-quiz":
+    # TODO gaurd for when is taking quiz
     let
       quizid = parseint param
       quiz = dbworksCapture dbpath: db.getQuizItself(quizid)
 
     if issome quiz:
-      asyncCheck chatid << (quizWillStartSoonT, cancelReply)
+      asyncCheck chatid << (quizWillStartSoonT, doingQuizReply)
 
       uctx.record = some QuizTaking()
       myrecord.quiz = quiz.get
@@ -271,30 +272,32 @@ newRouter router:
         (gotoQuestionT, genQuestionJumpBtns(myrecord.questions.len))).messageId
 
       myrecord.isReady = true
+      /-> sTakingQuiz
 
     else:
       asyncCheck chatid << quizNotFoundT
       # TODO forward to another route
 
   callbackQuery(chatid: int64, param: string) as "jump-question":
-    let newQuestionIndex = parseint param
+    if isDoingQuiz:
+      let newQuestionIndex = parseint param
 
-    if myrecord.qi != newQuestionIndex:
-      myrecord.qi = newQuestionIndex
-      asynccheck (chatid, myrecord.questionDescMsgId) <^ (
-        questionSerialize(myrecord.questions[newQuestionIndex], newQuestionIndex), answerKeyboard)
+      if myrecord.qi != newQuestionIndex:
+        myrecord.qi = newQuestionIndex
+        asynccheck (chatid, myrecord.questionDescMsgId) <^ (
+          questionSerialize(myrecord.questions[newQuestionIndex],
+              newQuestionIndex), answerKeyboard)
 
   callbackQuery(chatid: int64, param: string) as "select-answer":
-    myrecord.answerSheet[myrecord.qi] = parseint param
+    if isDoingQuiz:
+      myrecord.answerSheet[myrecord.qi] = parseint param
 
-    asyncCheck (chatid, myrecord.answerSheetMsgId) <^
-      answerSheetSerialize(myrecord.answerSheet)
+      asyncCheck (chatid, myrecord.answerSheetMsgId) <^
+        answerSheetSerialize(myrecord.answerSheet)
 
   event(chatId: int64) as "update-timer":
-    debugecho "fire time update"
-
-    if myrecord.isReady:
-      let 
+    if isDoingQuiz and myrecord.isReady:
+      let
         quiz = myrecord.quiz
         newtime = quiz.time - (now() - myrecord.startTime).inseconds
 
@@ -302,33 +305,43 @@ newRouter router:
         asyncCheck (chatid, myrecord.quizTimeMsgId) <^ timeformat(newtime)
 
   event(chatId: int64) as "end-quiz":
-    return
-    # NOTE: can be called with end of the tiem of cancel by user
+    if isDoingQuiz:
 
-    # delete quiz messages
-    let r = myrecord
-    for msgId in [
-      r.quizTimeMsgId,
-      r.questionPicMsgId,
-      r.questionDescMsgId,
-      r.answerSheetMsgId
-    ]:
-      asynccheck chatId <! msgid
+      # delete quiz messages
+      let r = myrecord
+      for msgId in [
+        r.quizTimeMsgId,
+        r.questionPicMsgId,
+        r.questionDescMsgId,
+        r.jumpQuestionMsgId,
+        r.answerSheetMsgId,
+      ]:
+        asynccheck chatId <! msgid
 
+      let percent = getPercent(
+        r.answerSheet,
+        r.questions.mapIt it.answer.int)
 
-    # calulate score
-    let percent = getPercent(
-      r.answerSheet,
-      r.questions.mapIt it.answer.parseInt,
-    )
+      # save record
+      dbworks dbpath:
+        discard db.addRecord(r.quiz.id, chatid, r.answerSheet.join, percent)
 
-    # save record
+      # show complete result
+      asyncCheck chatid << recordResultDialog(r.quiz, percent)
 
-    # calulate grade
+      uctx.record = none QuizTaking
+      discard redirect("enter-menu", %*[chatid, ""])
 
-    # show complete result
+  route(chatid: int64, input: string) as "middle-of-quiz":
+    case input
+    of endT: 
+      discard redirect("end-quiz", %*[chatid, ""])
+    of cancelT:
+      asyncCheck chatid << quizCancelledT
+      discard redirect("enter-menu", %*[chatid, ""])
 
-    uctx.record = none QuizTaking
+    else:
+      asyncCheck chatid << invalidInputT
 
 # controllers ---
 
@@ -399,6 +412,7 @@ proc dispatcher*(bot: TeleBot, u: Update): Future[bool] {.async.} =
         of sEnterMainMenu: "enter-menu"
         of sMainMenu: "menu"
         of FindQuizStages: "find-quiz"
+        of sTakingQuiz: "middle-of-quiz"
         else: "invalid-command"
 
       castSafety:
@@ -422,7 +436,7 @@ proc dispatcher*(bot: TeleBot, u: Update): Future[bool] {.async.} =
         bot, uctx, u,
         %*[cq.message.get.chat.id, parameter])
 
-      discard await bot.answerCallbackQuery($cq.id)
+      discard await bot.answerCallbackQuery($cq.id, res)
 
 when isMainModule:
   const API_KEY = "2004052302:AAHm_oICftfs5xLmY0QwGVTE3o-gYgD6ahw"

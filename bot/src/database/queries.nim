@@ -172,7 +172,7 @@ proc getQuestions*(db; quizid: int64): seq[QuestionModel] =
         quiz_id: quizid,
         photo_path: it[0],
         description: it[1],
-        answer: it[2])
+        answer: parseint it[2])
 
 proc deleteQuiz*(db; quizid: int64) =
     transaction db:

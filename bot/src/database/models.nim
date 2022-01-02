@@ -29,7 +29,7 @@ Blueprint [queryHolder: initQuery, postfix: "Model"]:
         quiz_id: int[ref quiz.id]
         photo_path: string
         description: string
-        answer: char[1] # 1 | 2 | 3 | 4
+        answer: int
 
     Table record:
         id: int {.primary.}

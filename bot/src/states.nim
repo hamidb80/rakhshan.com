@@ -53,14 +53,15 @@ proc startTimer*(delay: int) {.thread.} =
       # check records
       for (uid, user) in users.pairs:
         if issome user.record:
-          let
-            freshNow = now()
-            record = user.record.get
-            quiz = record.quiz
-            dtStart = (freshNow - record.startTime).inSeconds
-            dtLastCheck = (freshNow - record.lastCheckedTime).inSeconds
+          let record = user.record.get
 
-          if not record.isEnded:
+          if record.isReady and not record.isEnded:
+            let
+              freshNow = now()
+              quiz = record.quiz
+              dtStart = (freshNow - record.startTime).inSeconds
+              dtLastCheck = (freshNow - record.lastCheckedTime).inSeconds
+
             if dtStart >= quiz.time:
               record.isEnded = true
               notifier.send Notification(kind: nkEndQuizTime, quizid: quiz.id,
@@ -68,8 +69,8 @@ proc startTimer*(delay: int) {.thread.} =
 
             elif dtLastCheck > minResreshTimeSeconds:
               record.lastCheckedTime = freshNow
-              notifier.send Notification(kind: nkUpdateQuizTime, quizid: quiz.id,
-                  userchatid: uid)
+              notifier.send Notification(kind: nkUpdateQuizTime,
+                  quizid: quiz.id, userchatid: uid)
 
       sleep delay
 
