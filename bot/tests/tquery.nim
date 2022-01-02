@@ -4,7 +4,8 @@ import database/[models, queries], telegram/controller
 # init
 const dbPath = "./play.db"
 
-func toQuestion(t: tuple[quizId: int, description, why: string, answer: int]): QuestionModel =
+func toQuestion(t: tuple[quizId: int, description, why: string,
+    answer: int]): QuestionModel =
   QuestionModel(
     quiz_id: t[0],
     description: t[1],
@@ -23,12 +24,12 @@ let
   ]
 
   tagsRaw = [
-    (1, "Tmath-11-1", 11, "math", 1),
-    (2, "Tmath-11-2", 11, "math", 2),
-    (3, "Tmath-11-4", 11, "math", 4),
-    (4, "Tphyz-12-1", 12, "phyz", 1),
-    (5, "Tphyz-10-4", 10, "phyz", 4),
-    (6, "Teconomic-12-2", 12, "economic", 2),
+    (1, 11, "math", 1),
+    (2, 11, "math", 2),
+    (3, 11, "math", 4),
+    (4, 12, "phyz", 1),
+    (5, 10, "phyz", 4),
+    (6, 12, "economic", 2),
   ]
 
   quizzesRaw = [
@@ -100,7 +101,7 @@ suite "INSERT":
 
   test "add tag":
     for t in tagsRaw:
-      discard db.addTag(t[1], t[2], t[3], t[4])
+      discard db.addTag(t[1], t[2], t[3])
 
   test "add quiz":
     for q in quizzesRaw:
@@ -158,6 +159,33 @@ suite "SELECT":
   test "get record for":
     let res = db.getRecordFor(membersRaw[2].id, 4)
     check res.get.percent == 10.4
+
+suite "UPSERT":
+  test "new tag":
+    let
+      traw = (10, "chemistery", 2)
+      tg = db.upsertTag(traw[0], traw[1], traw[2])
+
+    check:
+      tg.grade == traw[0]
+      tg.lesson == traw[1]
+      tg.chapter == traw[2]
+
+  test "duplicated tag":
+    let
+      traw = tagsRaw[0]
+      tg = db.upsertTag(traw[1], traw[2], traw[3])
+
+    check:
+      tg.grade == traw[1]
+      tg.lesson == traw[2]
+      tg.chapter == traw[3]
+
+    check db.getValue("""
+      SELECT COUNT(1) 
+      FROM tag 
+      WHERE grade = ? AND lesson = ? AND chapter = ?
+    """.sql, tg.grade, tg.lesson, tg.chapter).parseint == 1
 
 suite "DELETE":
   test "quiz":

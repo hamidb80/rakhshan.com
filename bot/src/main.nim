@@ -44,7 +44,7 @@ newRouter router:
           uctx.membership = db.getMember chatid
 
         discard await chatid << (greeting(userinfo.displayName), noReply)
-        asyncCheck redirect("enter-menu", %*[chatid, ""])
+        asyncCheck redirect("enter-menu", %*[chatid])
 
       else:
         asyncCheck chatid << pleaseSendByYourCantactT
@@ -71,70 +71,87 @@ newRouter router:
 
     of removeQuizT:
       adminRequired:
-        discard
+        /-> sDeleteQuiz
+        asyncCheck redirect("delete-quiz", %*[chatid, ""])
 
     of findQuizT:
       /-> sFindQuizMain
       uctx.quizQuery = some QuizQuery()
-      asynccheck chatid << (findQuizDialogT, quizFilterReply)
+      asyncCheck chatid << (findQuizDialogT, quizFilterReply)
 
     else:
       asyncCheck chatid << wrongCommandT
 
   route(chatid: int64, input: string) as "add-quiz":
-    case uctx.stage:
-    of sAddQuiz:
-      uctx.quizCreation = some QuizCreate()
-      asyncCheck chatid << enterQuizNameT
-      /-> sAQName
-
-    of sAQName:
-      myqc.quiz.name = input
-      asyncCheck chatid << enterQuizInfoT
-      /-> sAQDesc
-
-    of sAQDesc:
-      myqc.quiz.description = input
-      /-> sAQTime
-      asyncCheck chatid << enterQuizTimeT
-
-    of sAQTime: # TODO parse time rather than giving a number in seconds
-      trySendInvalid:
-        myqc.quiz.time = input.parseInt
-        asyncCheck chatid << enterQuizGradeT
-        /-> sAQgrade
-
-    of sAQgrade:
-      trySendInvalid:
-        myqc.tag.grade = input.parseInt
-        asyncCheck chatid << enterQuizLessonT
-        /-> sAQLesson
-
-    of sAQLesson:
-      myqc.tag.lesson = input
-      asyncCheck chatid << enterQuizChapterT
-      /-> sAQchapter
-
-    of sAQchapter:
-      trySendInvalid:
-        myqc.tag.chapter = input.parseInt
-        /-> sAQQuestion
-        asyncCheck redirect("add-quiestion", %[%chatid, %""])
+    if input == cancelT:
+      uctx.quizCreation = none QuizCreate
+      asyncCheck redirect("enter-menu", %*[chatid])
 
     else:
-      asyncCheck chatid << wrongCommandT
+      case uctx.stage:
+      of sAddQuiz:
+        uctx.quizCreation = some QuizCreate()
+        asyncCheck chatid << (enterQuizNameT, cancelReply)
+        /-> sAQName
+
+      of sAQName:
+        myqc.quiz.name = input
+        asyncCheck chatid << enterQuizInfoT
+        /-> sAQDesc
+
+      of sAQDesc:
+        myqc.quiz.description = input
+        /-> sAQTime
+        asyncCheck chatid << enterQuizTimeT
+
+      of sAQTime: # TODO parse time rather than giving a number in seconds
+        trySendInvalid:
+          myqc.quiz.time = input.parseInt
+          asyncCheck chatid << enterQuizGradeT
+          /-> sAQgrade
+
+      of sAQgrade:
+        trySendInvalid:
+          myqc.tag.grade = input.parseInt
+          asyncCheck chatid << enterQuizLessonT
+          /-> sAQLesson
+
+      of sAQLesson:
+        myqc.tag.lesson = input
+        asyncCheck chatid << enterQuizChapterT
+        /-> sAQchapter
+
+      of sAQchapter:
+        trySendInvalid:
+          myqc.tag.chapter = input.parseInt
+          /-> sAQQuestion
+          asyncCheck redirect("add-quiestion", %[%chatid, %""])
+
+      else:
+        asyncCheck chatid << wrongCommandT
 
   route(chatid: int64, input: string) as "add-question":
     let msg = u.message.get
     template qs: untyped = uctx.quizCreation.get.questions
 
-    if input == endT:
-      # inside a transaction:
-      #   check for tag if dupicated, don't add a new
-      #   insert question
-      #   insert quiz
-      # tell user the quiz got saved
-      asynccheck redirect("enter-menu", %*[chatid, ""])
+    case input
+    of endT:
+      dbworks dbpath:
+        let tg = db.upsertTag(myqc.tag.grade, myqc.tag.lesson, myqc.tag.chapter)
+        discard db.addQuiz(
+          myqc.quiz.name,
+          myqc.quiz.description,
+          myqc.quiz.time,
+          tg.id,
+          myqc.questions)
+
+      asyncCheck chatid << quizAddedDialog(myqc.quiz.name)
+      asyncCheck redirect("enter-menu", %*[chatid])
+      uctx.quizCreation = none QuizCreate
+
+    of cancelT:
+      uctx.quizCreation = none QuizCreate
+      asyncCheck redirect("enter-menu", %*[chatid])
 
     else:
       case uctx.stage:
@@ -193,7 +210,7 @@ newRouter router:
         str = quizList.map(miniQuizInfo).join "\n"
 
       if issome myquery.resultMsgId:
-        asynccheck (chatid, myquery.resultMsgId.get) <^ str
+        asyncCheck (chatid, myquery.resultMsgId.get) <^ str
       else:
         myquery.resultMsgId = some await(chatid << str).messageId
 
@@ -203,7 +220,7 @@ newRouter router:
     of findQuizClearFiltersT: /-> sFindQuizMain
     of cancelT:
       uctx.quizQuery = none QuizQuery
-      asyncCheck redirect("enter-menu", %*[chatid, ""])
+      asyncCheck redirect("enter-menu", %*[chatid])
 
     else:
       case uctx.stage:
@@ -225,15 +242,12 @@ newRouter router:
 
       else: discard
 
-  command(chatid: int64) as "invalid-command":
-    asynccheck chatid << invalidCommandT
-
   command(chatid: int64, param: string) as "show-quiz":
     let
       quizid = parseint param
       qm = dbworksCapture dbpath: db.getQuizInfo(quizid)
 
-    asynccheck:
+    asyncCheck:
       if qm.issome:
         let
           rec = dbworksCapture dbpath: db.getRecordFor(chatid, qm.get.quiz.id)
@@ -247,11 +261,35 @@ newRouter router:
       else:
         chatid << quizNotFoundT
 
-  callbackQuery(chatid: int64) as "delete-quiz":
-    # show confirm message + warning
-    # delete the quiz
-    # probably add a stage
-    discard
+  route(chatid: int64, input: string) as "delete-quiz":
+    if input == cancelT:
+      asyncCheck redirect("enter-menu", %*[chatid])
+
+    else:
+      # FIXME put check for every parseint
+      case uctx.stage:
+      of sDeleteQuiz:
+        asyncCheck chatid << (enterQuizIdT, cancelReply)
+        /-> sDQEnterId
+
+      of sDQEnterId:
+        asyncCheck chatid << (areYouSureT, yesOrNoReply)
+        uctx.quizidToDelete = some parseBiggestInt input
+        /-> sDQConfirm
+
+      of sDQConfirm:
+        asyncCheck:
+          if input == yesT:
+            dbworks dbpath: db.deleteQuiz(uctx.quizidToDelete.get)
+            chatid << quizGotDeletedT
+          else:
+            chatid << operationCancelledT
+
+        uctx.quizidToDelete = none int64
+        asyncCheck redirect("enter-menu", %*[chatid])
+
+      else:
+        discard
 
   callbackQuery(chatid: int64, param: string) as "take-quiz":
     # TODO gaurd for when is taking quiz
@@ -304,7 +342,7 @@ newRouter router:
 
       if myrecord.qi != newQuestionIndex:
         myrecord.qi = newQuestionIndex
-        asynccheck (chatid, myrecord.questionDescMsgId) <^ (
+        asyncCheck (chatid, myrecord.questionDescMsgId) <^ (
           questionSerialize(q, newQuestionIndex), answerKeyboard)
 
         # telegram sucks
@@ -374,7 +412,7 @@ newRouter router:
         r.jumpQuestionMsgId,
         r.answerSheetMsgId,
       ]:
-        asynccheck chatId <! msgid
+        asyncCheck chatId <! msgid
 
       let percent = getPercent(
         r.answerSheet,
@@ -388,7 +426,7 @@ newRouter router:
       asyncCheck chatid << recordResultDialog(r.quiz, percent)
 
       uctx.record = none QuizTaking
-      asyncCheck redirect("enter-menu", %*[chatid, ""])
+      asyncCheck redirect("enter-menu", %*[chatid])
 
   route(chatid: int64, input: string) as "middle-of-quiz":
     case input
@@ -397,10 +435,13 @@ newRouter router:
     of cancelT:
       uctx.record = none QuizTaking
       asyncCheck chatid << quizCancelledT
-      asyncCheck redirect("enter-menu", %*[chatid, ""])
+      asyncCheck redirect("enter-menu", %*[chatid])
 
     else:
       asyncCheck chatid << invalidInputT
+
+  command(chatid: int64) as "invalid-command":
+    asyncCheck chatid << invalidCommandT
 
 # controllers ---
 
@@ -471,6 +512,7 @@ proc dispatcher*(bot: TeleBot, u: Update): Future[bool] {.async.} =
         of sEnterMainMenu: "enter-menu"
         of sMainMenu: "menu"
         of FindQuizStages: "find-quiz"
+        of DeleteQuiz: "delete-quiz"
         of sTakingQuiz: "middle-of-quiz"
         else: "invalid-command"
 

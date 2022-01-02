@@ -22,7 +22,7 @@ template dbworksCapture*(path: string, body): untyped =
     db.close()
     result
 
-template transaction(db, body): untyped =
+template transaction*(db, body): untyped =
     db.exec sql"BEGIN"
     body
     db.exec sql"COMMIT"
@@ -59,19 +59,51 @@ proc addMember*(db; chatId: int64, site_name, tg_name, phone_number: string,
     # add site_name + tg_name
     discard db.insertID(
         sql"INSERT INTO member (chat_id, site_name, tg_name, phone_number, is_admin) VALUES (?, ?, ?, ?, ?)",
-        chatId, site_name.limit(255), tg_name.limit(255), phone_number.limit(15), isAdmin)
+        chatId, site_name.limit(255), tg_name.limit(255), phone_number.limit(
+                15), isAdmin)
 
 # quiz -------------------------------------------
 
+proc totag*(s: seq[string]): TagModel =
+    TagModel(
+        id: s[0].parseint,
+        grade: s[1].parseint,
+        lesson: s[2],
+        chapter: s[3].parseint,
+    )
+
 proc addTag*(db;
-    name: string, grade: int, lesson: string, chapter: int
+    grade: int64, lesson: string, chapter: int64
 ): int64 =
     db.insertID(
-        sql"INSERT INTO tag (name, grade, lesson, chapter) VALUES (?, ?, ?, ?)",
-        name.limit(120), grade, lesson.limit(120), chapter)
+        sql"INSERT INTO tag (grade, lesson, chapter) VALUES (?, ?, ?)",
+        grade, lesson.limit(120), chapter)
+
+const getTagQuery = "SELECT id, grade, lesson, chapter FROM tag "
+
+proc getTag(db; grade: int64, lesson: string, chapter: int64): Option[TagModel] =
+    let row = db.getSingleRow((getTagQuery &
+        "WHERE grade = ? AND lesson = ? AND chapter = ?"
+    ).sql, grade, lesson, chapter)
+
+    if issome row:
+        result = some totag row.get
+
+proc upsertTag*(db; grade: int64, lesson: string, chapter: int64): TagModel =
+    let tag = db.getTag(grade, lesson, chapter)
+
+    if issome tag:
+        tag.get
+    else:
+        TagModel(
+            id: db.addTag(grade, lesson, chapter),
+            grade: grade,
+            lesson: lesson,
+            chapter: chapter)
+
 
 proc addQuiz*(db;
-    name, description: string, time: int, tag_id: int,
+    name, description: string, time, tag_id: int64,
     questions: openArray[QuestionModel]
 ): int64 =
     transaction db:
@@ -91,7 +123,6 @@ const quizInfoQuery = """
         quiz.description,
         quiz.time,
         tag.id as tid,
-        tag.name as tname,
         tag.grade as tgrade,
         tag.lesson as tlesson,
         tag.chapter as tchapter,
@@ -107,8 +138,6 @@ const quizInfoQuery = """
 """
 
 func toQuizInfoModel(row: Row): QuizInfoModel =
-    doAssert row.len == 10
-
     result.quiz = QuizModel(
         id: row[0].parseInt,
         name: row[1],
@@ -118,10 +147,9 @@ func toQuizInfoModel(row: Row): QuizInfoModel =
 
     result.tag = TagModel(
         id: row[4].parseInt,
-        name: row[5],
-        grade: row[6].parseInt,
-        lesson: row[7],
-        chapter: row[8].parseInt)
+        grade: row[5].parseInt,
+        lesson: row[6],
+        chapter: row[7].parseInt)
 
     result.questions_number = parseInt row[^1]
 

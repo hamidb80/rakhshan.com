@@ -77,6 +77,7 @@ const
     nextT* = "بعدی"
     previousT* = "قبلی"
     quizCancelledT* = "آزمون لغو شد"
+    operationCancelledT* = "عملیات لغو شد"
 
     youInTheQuizT* = "شما در آزمون"
     gradeT* = "نمره"
@@ -97,13 +98,31 @@ const
     comparisionT* = "مقایسه"
     quizOfNumberT* = "سوال شماره"
 
+    quizT* = "آزمون"
+    gotSavedُSuccessfullyT* = "با موفقیت ذخیره شد"
+    areYouSureT* = "آیا مطمئن هستید؟"
+    idT* = "شناسه"
+
+    enterQuizIdT* = "شناسه آزمون را وارد کنید"
+    yesT* = "بله"
+    noTx* = "خیر"
+
+    quizGotDeletedT* = "آزمون مورد نظر حذف شد"
+
 let
+    noReply* = newReplyKeyboardRemove(true)
+
     notLoggedInReply* = newReplyKeyboardMarkup @[
         @[loginT],
     ]
 
     cancelReply* = newReplyKeyboardMarkup @[
       @[cancelT]
+    ]
+
+    yesOrNoReply* = newReplyKeyboardMarkup @[
+      @[yesT],
+      @[noTx],
     ]
 
     endReply* = newReplyKeyboardMarkup @[
@@ -114,12 +133,25 @@ let
       @["1", "2", "3", "4"]
     ]
 
+    doingQuizReply* = newReplyKeyboardMarkup @[
+      @[endT],
+      @[cancelT]
+    ]
+    
+    addingQuestion* = doingQuizReply
+
     withoutPhotoReply* = newReplyKeyboardMarkup @[
       @[withoutPhotoT]
     ]
 
     memberReplyRaw = @[
       @[findQuizT]
+    ]
+
+    quizFilterReply* = newReplyKeyboardMarkup @[
+      @[findQuizChangeGradeT, findQuizChangeLessonT],
+      @[findQuizChangeNameT],
+      @[findQuizT, cancelT]
     ]
 
     adminReplyRaw = @[ @[addQuizT, removeQuizT]]
@@ -130,19 +162,6 @@ let
     sendContactReply* = newReplyKeyboardMarkup @[@[
       KeyboardButton(text: sendContactIntoT, requestContact: some true)
     ]]
-
-    quizFilterReply* = newReplyKeyboardMarkup @[
-      @[findQuizChangeGradeT, findQuizChangeLessonT],
-      @[findQuizChangeNameT],
-      @[findQuizT, cancelT]
-    ]
-
-    doingQuizReply* = newReplyKeyboardMarkup @[
-      @[endT],
-      @[cancelT]
-    ]
-
-    noReply* = newReplyKeyboardRemove(true)
 
     answerBtns* = [
       ("1", "/p1"),
@@ -227,6 +246,7 @@ func fullQuizInfo*(qi: QuizInfoModel, rec: Option[RecordModel]): string =
             "\n"
 
     [
+      fmt"{bold $idT} {bold quizT}: {escapeMarkdownV2 $qi.quiz.id}",
       fmt"{bold quizNameT}: {escapeMarkdownV2 qi.quiz.name}",
       fmt"{numberOfQuestionsT}: {qi.questions_number}",
       fmt"{durationT}: {timeFormat qi.quiz.time}",
@@ -274,3 +294,6 @@ func questionAnalyzeDialog*(index: int, q: QuestionModel, yourAnswer: int): stri
       &"{bold questionDescT}:\n{q.description.escapeMarkdownV2}\n",
       &"{bold reasonT}:\n{q.why.escapeMarkdownV2}",
     ].join "\n"
+
+func quizAddedDialog*(qname: string): string=
+  fmt"{quizT} '{qname}' {gotSavedُSuccessfullyT}"

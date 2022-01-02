@@ -7,13 +7,15 @@ import ../database/models
 
 type
   Stages* = enum
-    sMain, sSendContact                    # primary
-    sEnterMainMenu, sMainMenu, sRemoveQuiz # admin
-    sAddQuiz, sAQName, sAQDesc, sAQTime, sAQGrade, sAQLesson, sAQchapter # admin
-    sAQQuestion, sAQQPic, sAQQDesc, sAQQWhy, sAQQAns
+    # basic
+    sMain, sSendContact, sEnterMainMenu, sMainMenu
     sFindQuizMain, sFQname, sFQgrade, sFQlesson
-    sTakingQuiz
-    sFindMyRecords
+    sTakingQuiz, sFindMyRecords
+    
+    # admin stuff
+    sDeleteQuiz, sDQEnterId, sDQConfirm
+    sAddQuiz, sAQName, sAQDesc, sAQTime, sAQGrade, sAQLesson, sAQchapter
+    sAQQuestion, sAQQPic, sAQQDesc, sAQQWhy, sAQQAns
 
 type
   UserCtx* = ref object
@@ -26,6 +28,7 @@ type
     quizCreation*: Option[QuizCreate]
     record*: Option[QuizTaking]
     quizQuery*: Option[QuizQuery]
+    quizidToDelete*: Option[int64]
     firstTime*: bool
 
   QuizQuery* = object
@@ -68,6 +71,7 @@ type
 
 const
   HomeStages* = {sMain, sSendContact} # primary
+  DeleteQuiz* = {sDeleteQuiz, sDQEnterId, sDQConfirm}
   AddQuizStages* = {sAddQuiz, sAQName, sAQTime, sAQGrade, sAQLesson, sAQchapter} # admin
   AddQuestionStages* = {sAQQuestion, sAQQPic, sAQQDesc, sAQQWhy, sAQQAns}
   FindQuizStages* = {sFindQuizMain, sFQname, sFQgrade, sFQlesson}

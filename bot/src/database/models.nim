@@ -13,7 +13,6 @@ Blueprint [queryHolder: initQuery, postfix: "Model"]:
 
     Table tag:
         id: int {.primary.}
-        name: char[120]
         grade: int {.index.} # 10 | 11 | 12
         lesson: char[120]
         chapter: int

@@ -1,7 +1,7 @@
 import
   tables, times, options,
   locks, os
-import telegram/[controller], database/[models, queries], utils
+import telegram/[controller], database/[models], utils
 
 type
   NotificationKinds* = enum
@@ -34,8 +34,8 @@ proc getOrCreateUser*(chatId: int64): UserCtx =
 proc startTimer*(delay: int) {.thread.} =
   castSafety:
     while true:
-      var offlineUsers: seq[int64]
-      let currentTime = now()
+      # var offlineUsers: seq[int64]
+      # let currentTime = now()
 
       # delete offline users
       # for (uid, user) in users.pairs:
