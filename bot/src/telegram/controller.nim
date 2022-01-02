@@ -45,7 +45,8 @@ type
     lastCheckedTime*: Datetime
     isReady*: bool
     isEnded*: bool
-    # isWatingForResult: bool
+
+    lastQuestionPhotoUrl*: string
 
     quizTimeMsgId*: int
     questionPicMsgId*: int

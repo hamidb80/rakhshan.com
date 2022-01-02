@@ -10,6 +10,8 @@ import
 
 randomize()
 let dbPath = getenv("DB_PATH")
+var defaultPhotoUrl = ""
+const authorChatId = 101862091
 
 # init -------------------------------------
 
@@ -26,7 +28,7 @@ newRouter router:
       else:
         discard await chatid << (selectOptionsT, notLoggedInReply)
 
-  route(chatid: int64, input: string) as "verify-user":
+  route(chatid: int64) as "verify-user":
     try:
       let msg = u.message.get
       if issome msg.contact:
@@ -41,8 +43,7 @@ newRouter router:
 
           uctx.membership = db.getMember chatid
 
-        asyncCheck chatid << (greeting(userinfo.displayName), noReply)
-        /-> sEnterMainMenu
+        discard await chatid << (greeting(userinfo.displayName), noReply)
         asyncCheck redirect("enter-menu", %*[chatid, ""])
 
       else:
@@ -254,12 +255,15 @@ newRouter router:
       myrecord.answersheet = newSeqWith(myrecord.questions.len, 0)
       myrecord.starttime = now()
       myrecord.lastCheckedTime = now()
+      myrecord.qi = 0
 
       myrecord.quizTimeMsgId = (await chatid <<
           timeformat myrecord.quiz.time).messageId
-      myrecord.qi = 0
-      # FIXME send quesition pic
-      # myrecord.questionPicMsgId = (await chatid << "message").messageId
+
+      myrecord.lastQuestionPhotoUrl = myrecord.questions[0].photo_path or defaultPhotoUrl
+      myrecord.questionPicMsgId = (await chatid <@
+          myrecord.lastQuestionPhotoUrl).messageId
+
       myrecord.questionDescMsgId = (await chatid <<
         (questionSerialize(myrecord.questions[0], 0), answerKeyboard)).messageId
 
@@ -278,18 +282,25 @@ newRouter router:
 
   callbackQuery(chatid: int64, param: string) as "jump-question":
     if isDoingQuiz:
-      let newQuestionIndex = parseint param
+      let
+        newQuestionIndex = parseint param
+        q = myrecord.questions[newQuestionIndex]
 
       if myrecord.qi != newQuestionIndex:
         myrecord.qi = newQuestionIndex
         asynccheck (chatid, myrecord.questionDescMsgId) <^ (
-          questionSerialize(myrecord.questions[newQuestionIndex],
-              newQuestionIndex), answerKeyboard)
+          questionSerialize(q, newQuestionIndex), answerKeyboard)
+
+        # telegram sucks
+        let newPhotoUrl = q.photo_path or defaultPhotoUrl
+        if newPhotoUrl != myrecord.lastQuestionPhotoUrl:
+          myrecord.lastQuestionPhotoUrl = newPhotoUrl
+          asyncCheck (chatid, myrecord.questionPicMsgId) <@^ newPhotoUrl
 
   callbackQuery(chatid: int64, param: string) as "goto":
     if isDoingQuiz:
-      let targetQuestionIndex = 
-        if param[0] == '+': 
+      let targetQuestionIndex =
+        if param[0] == '+':
           min(myrecord.qi + 1, myrecord.questions.high)
         else:
           max(myrecord.qi - 1, 0)
@@ -451,8 +462,12 @@ proc dispatcher*(bot: TeleBot, u: Update): Future[bool] {.async.} =
 when isMainModule:
   const API_KEY = "2004052302:AAHm_oICftfs5xLmY0QwGVTE3o-gYgD6ahw"
   let bot = newTeleBot API_KEY
-  bot.onUpdate dispatcher
 
+  # set default photo
+  let m = waitFor authorChatId <@ ("file://" & getCurrentDir() / "assets/no-photo.png")
+  defaultPhotoUrl = getBiggestPhotoFileId m
+
+  bot.onUpdate dispatcher
   # TODO do some assertions before running like checking the database
 
   addHandler(newConsoleLogger(fmtStr = "$levelname, [$time] "))

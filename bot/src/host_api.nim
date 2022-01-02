@@ -22,13 +22,13 @@ func toUserApiModel(js: JsonNode): UserApiModel =
     access_level: js["user_level"].getInt,
     is_admin: js["is_admin"].getBool
   )
-  
+
 func removeContryCode(number: string): string =
   if number.startswith("+98"):
     number[3..^1]
   else:
-    number
-  
+    raise newException(ValueError, "not a valid phone number")
+
 proc getUserInfo*(identifier: string): Future[UserApiModel] {.async.} =
   let resp = await newAsyncHttpClient().request(
     fmt"{baseUrl}/getUser/{removeContryCode identifier}",

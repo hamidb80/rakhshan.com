@@ -61,6 +61,3 @@ proc findChatId*(updateFeed: Update): int64 =
     if issome updateFeed.message: updateFeed.findId
     elif issome updateFeed.callbackQuery: updateFeed.callbackQuery.get.findId
     else: raise newException(ValueError, "couldn't find chat_id")
-
-proc fileNameGen*(path: string): string =
-  "file://" & getCurrentDir() / path

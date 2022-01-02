@@ -64,12 +64,15 @@ proc startTimer*(delay: int) {.thread.} =
 
             if dtStart >= quiz.time:
               record.isEnded = true
-              notifier.send Notification(kind: nkEndQuizTime, quizid: quiz.id,
+              notifier.send Notification(
+                  kind: nkEndQuizTime, 
+                  quizid: quiz.id,
                   userchatid: uid)
 
             elif dtLastCheck > minResreshTimeSeconds:
               record.lastCheckedTime = freshNow
-              notifier.send Notification(kind: nkUpdateQuizTime,
+              notifier.send Notification(
+                  kind: nkUpdateQuizTime,
                   quizid: quiz.id, userchatid: uid)
 
       sleep delay

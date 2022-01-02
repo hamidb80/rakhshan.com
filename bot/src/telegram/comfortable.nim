@@ -2,6 +2,9 @@ import asyncdispatch
 import telebot
 import ./controller
 
+type 
+  MsgInfo = tuple[chatid: int64, msgid: int]
+
 template redirect*(alias, params): untyped {.dirty.} =
   trigger(router, alias, bot, uctx, u, params)
 
@@ -13,12 +16,18 @@ template `<<`*(chatid: int64, box: tuple[t: string,
 template `<<`*(chatid: int64, text: string): untyped {.dirty.} =
   bot.sendMessage(chatid, text, parsemode = "MarkdownV2")
 
-template `<^`*(msginfo: tuple[chatid: int64, msgid: int], box: tuple[t: string,
+template `<@`*(chatid: int64, url: string): untyped {.dirty.} =
+  bot.sendPhoto(chatid, url)
+
+template `<@^`*(msginfo:MsgInfo, newurl: string): untyped {.dirty.} =
+  bot.editMessageMedia(newInputMediaPhoto(newurl), $msginfo[0], msgInfo[1])
+
+template `<^`*(msginfo: MsgInfo, box: tuple[t: string,
     k: KeyboardMarkup]): untyped {.dirty.} =
   bot.editMessageText(box[0], $msginfo[0], msginfo[1], replyMarkup = box[1],
       parsemode = "MarkdownV2")
 
-template `<^`*(msginfo: tuple[chatid: int64, msgid: int],
+template `<^`*(msginfo: MsgInfo,
     text: string): untyped {.dirty.} =
   bot.editMessageText(text, $msginfo[0], msginfo[1], parsemode = "MarkdownV2")
 

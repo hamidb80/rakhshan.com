@@ -6,3 +6,8 @@ template castSafety*(body): untyped =
 template tryFor*(body): untyped =
   discard
   
+template `or`*(s1, s2: string): string =
+  if s1 == "":
+    s2
+  else:
+    s1
