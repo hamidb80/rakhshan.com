@@ -13,8 +13,7 @@ bin           = @["main"]
 requires "nim >= 1.6.2"
 requires "telebot >= 2022.01.02"
 requires "macroplus >= 0.1.4"
-# requires "result >= 0.2.0"
-# requires "https://github.com/hamidb80/asyncanything"
+requires "asyncanything >= 0.0.3"
 requires "https://github.com/hamidb80/easydb"
 
 task go, "run app":

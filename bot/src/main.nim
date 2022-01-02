@@ -9,9 +9,12 @@ import
 # prepare ----------------------------------
 
 randomize()
-let dbPath = getenv("DB_PATH")
+
+const 
+  dbPath = getenv("DB_PATH")
+  authorChatId = 101862091
+
 var defaultPhotoUrl = ""
-const authorChatId = 101862091
 
 # init -------------------------------------
 
@@ -480,7 +483,7 @@ proc dispatcher*(bot: TeleBot, u: Update): Future[bool] {.async.} =
 
     uctx.firsttime = false
 
-  # TODO catch if error accured and tell the user
+  # TODO catch if error accured and tell the user and author
 
   if u.message.issome:
     let
