@@ -81,8 +81,8 @@ proc addQuiz*(db;
 
         for q in questions:
             db.exec(
-                sql"INSERT INTO question (quiz_id, photo_path, description, answer) VALUES (?, ?, ?, ?)",
-                result, q.photo_path, q.description, q.answer)
+                sql"INSERT INTO question (quiz_id, photo_path, description, why, answer) VALUES (?, ?, ?, ?, ?)",
+                result, q.photo_path, q.description, q.why, q.answer)
 
 const quizInfoQuery = """
     SELECT 
@@ -171,14 +171,15 @@ proc getQuizItself*(db; quizid: int64): Option[QuizModel] =
 
 proc getQuestions*(db; quizid: int64): seq[QuestionModel] =
     let rows = db.getAllRows(
-        "SELECT photo_path, description, answer FROM question WHERE quiz_id = ?".sql,
+        "SELECT photo_path, description, why, answer FROM question WHERE quiz_id = ?".sql,
         quizid)
 
     rows.mapIt QuestionModel(
         quiz_id: quizid,
         photo_path: it[0],
         description: it[1],
-        answer: parseint it[2])
+        why: it[2],
+        answer: parseint it[3])
 
 proc deleteQuiz*(db; quizid: int64) =
     transaction db:

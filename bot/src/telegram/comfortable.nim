@@ -2,7 +2,7 @@ import asyncdispatch
 import telebot
 import ./controller
 
-type 
+type
   MsgInfo = tuple[chatid: int64, msgid: int]
 
 template redirect*(alias, params): untyped {.dirty.} =
@@ -16,10 +16,14 @@ template `<<`*(chatid: int64, box: tuple[t: string,
 template `<<`*(chatid: int64, text: string): untyped {.dirty.} =
   bot.sendMessage(chatid, text, parsemode = "MarkdownV2")
 
-template `<@`*(chatid: int64, url: string): untyped {.dirty.} =
-  bot.sendPhoto(chatid, url)
+template `<@`*(chatid: int64, box: tuple[url,
+    caption: string]): untyped {.dirty.} =
+  bot.sendPhoto(chatid, box[0], box[1], parsemode = "MarkdownV2")
 
-template `<@^`*(msginfo:MsgInfo, newurl: string): untyped {.dirty.} =
+template `<@`*(chatid: int64, url: string): untyped {.dirty.} =
+  chatid <@ (url, "")
+
+template `<@^`*(msginfo: MsgInfo, newurl: string): untyped {.dirty.} =
   bot.editMessageMedia(newInputMediaPhoto(newurl), $msginfo[0], msgInfo[1])
 
 template `<^`*(msginfo: MsgInfo, box: tuple[t: string,
@@ -52,3 +56,6 @@ template isDoingQuiz*: untyped {.dirty.} =
 template adminRequired*(body): untyped {.dirty.} =
   if issome(uctx.membership) and uctx.membership.get.isAdmin == 1:
     body
+
+template myqc*: untyped {.dirty.} =
+  uctx.quizCreation.get

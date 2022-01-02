@@ -49,9 +49,10 @@ const
 
     enterQuestionInfoT* = "توضیحات سوال را وارد کنید"
     enterQuestionAnswerT* = "جواب سوال را وارد کنید"
+    enterQuestionWhyY* = "درباره دلیل درستی جواب توضیح دهید"
     addQuizQuestionFirstT* = "به ترتیب اطلاعات وارد شده برای هر سوال را وارد کنید"
     addQuizQuestionMoreT* = "با وارد کردن 'انصراف' وارد کردن سوالات را تمام کنید در غیر این صورت اطلاعات سوال بعدی ر وارد کنید"
-    uploadQuizQuestionPicT* = "تصویر سوال را در صورت وجود ارسال کنید در غیر این صورت یک پیام حاوی متن ارسال کنید"
+    uploadQuizQuestionPicT* = "تصویر سوال را در صورت وجود ارسال کنید در غیر این صورت روی دکمه 'بدون عکس' بزنید"
 
     quizWillStartSoonT* = "آزمون انتخابی تا لحظاتی دیگر شروع میشود"
 
@@ -86,6 +87,15 @@ const
 
     pointRightJ* = "👉"
     pointLeftJ* = "👈"
+    wrongJ* = "❌"
+    youHaventAttendInThisQUizT* = "شما در این آزمون شرکت نکرده اید"
+
+    reasonT* = "دلیل"
+    questionDescT* = "متن سوال"
+    yourAnswerT* = "جواب شما"
+    correctAnswerT* = "جواب درست"
+    comparisionT* = "مقایسه"
+    quizOfNumberT* = "سوال شماره"
 
 let
     notLoggedInReply* = newReplyKeyboardMarkup @[
@@ -94,6 +104,18 @@ let
 
     cancelReply* = newReplyKeyboardMarkup @[
       @[cancelT]
+    ]
+
+    endReply* = newReplyKeyboardMarkup @[
+      @[endT]
+    ]
+
+    answersReply* = newReplyKeyboardMarkup @[
+      @["1", "2", "3", "4"]
+    ]
+
+    withoutPhotoReply* = newReplyKeyboardMarkup @[
+      @[withoutPhotoT]
     ]
 
     memberReplyRaw = @[
@@ -234,3 +256,21 @@ func recordResultDialog*(quiz: QuizModel, percent: float): string =
       fmt"{youInTheQuizT} '{quiz.name.escapeMarkdownV2}' {gradeT} {score} {youGotT}",
       fmt"{analyzeYourAnswersT}: /a{quiz.id}",
     ].join("\n\n")
+
+func questionAnswer(n: int): string =
+  if n == 0: emptyT
+  else:    $n
+
+func toEmoji(cond: bool): string =
+  if cond: correctBoxJ
+  else: wrongJ
+
+func questionAnalyzeDialog*(index: int, q: QuestionModel, yourAnswer: int): string =
+    [
+      &"{bold quizOfNumberT}: {(index+1)}\n",
+      &"{bold yourAnswerT}: {questionAnswer yourAnswer}",
+      &"{bold correctAnswerT}: {q.answer}",
+      &"{bold comparisionT}: {toEmoji(q.answer == yourAnswer)}\n",
+      &"{bold questionDescT}:\n{q.description.escapeMarkdownV2}\n",
+      &"{bold reasonT}:\n{q.why.escapeMarkdownV2}",
+    ].join "\n"

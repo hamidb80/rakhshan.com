@@ -4,7 +4,7 @@ import
 import telebot
 import
   telegram/[controller, helper, messages, comfortable],
-  host_api, states, utils, ./mymath, database/[queries]
+  host_api, states, utils, ./mymath, database/[queries, models]
 
 # prepare ----------------------------------
 
@@ -82,44 +82,42 @@ newRouter router:
       asyncCheck chatid << wrongCommandT
 
   route(chatid: int64, input: string) as "add-quiz":
-    template myquiz: untyped = uctx.quizCreation.get
-
     case uctx.stage:
     of sAddQuiz:
-      /-> sAQName
       uctx.quizCreation = some QuizCreate()
       asyncCheck chatid << enterQuizNameT
+      /-> sAQName
 
     of sAQName:
-      myquiz.name = input
-      /-> sAQDesc
+      myqc.quiz.name = input
       asyncCheck chatid << enterQuizInfoT
+      /-> sAQDesc
 
     of sAQDesc:
-      myquiz.description = input
+      myqc.quiz.description = input
       /-> sAQTime
       asyncCheck chatid << enterQuizTimeT
 
     of sAQTime: # TODO parse time rather than giving a number in seconds
       trySendInvalid:
-        myquiz.time = input.parseInt
-        /-> sAQgrade
+        myqc.quiz.time = input.parseInt
         asyncCheck chatid << enterQuizGradeT
+        /-> sAQgrade
 
     of sAQgrade:
       trySendInvalid:
-        myquiz.grade = input.parseInt
-        /-> sAQLesson
+        myqc.tag.grade = input.parseInt
         asyncCheck chatid << enterQuizLessonT
+        /-> sAQLesson
 
     of sAQLesson:
-      myquiz.lesson = input
-      /-> sAQchapter
+      myqc.tag.lesson = input
       asyncCheck chatid << enterQuizChapterT
+      /-> sAQchapter
 
     of sAQchapter:
       trySendInvalid:
-        myquiz.chapter = input.parseInt
+        myqc.tag.chapter = input.parseInt
         /-> sAQQuestion
         asyncCheck redirect("add-quiestion", %[%chatid, %""])
 
@@ -128,44 +126,61 @@ newRouter router:
 
   route(chatid: int64, input: string) as "add-question":
     let msg = u.message.get
-    template allQuestions: untyped = uctx.quizCreation.get.questions
+    template qs: untyped = uctx.quizCreation.get.questions
 
-    if input == cancelT:
-      discard
+    if input == endT:
+      # inside a transaction:
+      #   check for tag if dupicated, don't add a new
+      #   insert question
+      #   insert quiz
+      # tell user the quiz got saved
+      asynccheck redirect("enter-menu", %*[chatid, ""])
 
-    # FIXME delete quiz from user's object after creating in databse
-    case uctx.stage:
+    else:
+      case uctx.stage:
+      of sAQQuestion:
+        if qs.len == 0:
+          asyncCheck chatid << addQuizQuestionFirstT
+        else:
+          asyncCheck chatid << (addQuizQuestionMoreT, endReply)
 
-    of sAQQuestion:
-      if allquestions.len == 0:
-        asyncCheck chatid << addQuizQuestionFirstT
-      else:
-        asyncCheck chatid << (addQuizQuestionMoreT, cancelReply)
+        qs.add QuestionModel()
+        asyncCheck chatid << (uploadQuizQuestionPicT, withoutPhotoReply)
+        /-> sAQQPic
 
-      allquestions.add QuestionCreate()
-      /-> sAQQPic
-      asyncCheck chatid << uploadQuizQuestionPicT
+      of sAQQPic:
+        template goNext: untyped =
+          asyncCheck chatId << enterQuestionInfoT
+          /-> sAQQDesc
 
+        if input == withoutPhotoT:
+          goNext()
 
-    of sAQQPic:
-      if issome msg.photo:
-        let fid = getBiggestPhotoFileId(msg)
+        elif issome msg.photo:
+          qs[^1].photo_path = getBiggestPhotoFileId(msg)
+          goNext()
 
-      /-> sAQQInfo
-      asyncCheck chatId << enterQuestionInfoT
+        else:
+          asyncCheck chatid << uploadQuizQuestionPicT
 
-    of sAQQInfo:
-      allquestions[^1].description = input
-      /-> sAQQAns
-      asyncCheck chatId << enterQuestionAnswerT
+      of sAQQDesc:
+        qs[^1].description = input
+        asyncCheck chatId << (enterQuestionAnswerT, answersReply)
+        /-> sAQQAns
 
-    of sAQQAns:
-      trySendInvalid:
-        allquestions[^1].answer = parseint $input[0]
+      of sAQQAns:
+        trySendInvalid:
+          qs[^1].answer = parseint input[0]
+          asyncCheck chatid << enterQuestionWhyY
+          /-> sAQQWhy
+
+      of sAQQWhy:
+        qs[^1].why = input
         /-> sAQQuestion
         asyncCheck redirect("add-question", %[%chatid, %""])
 
-    else: discard
+      else:
+        discard
 
   route(chatid: int64, input: string) as "find-quiz":
     template myquery: untyped = uctx.quizQuery.get
@@ -210,8 +225,6 @@ newRouter router:
 
       else: discard
 
-  # TODO edit quiz and question
-
   command(chatid: int64) as "invalid-command":
     asynccheck chatid << invalidCommandT
 
@@ -235,6 +248,9 @@ newRouter router:
         chatid << quizNotFoundT
 
   callbackQuery(chatid: int64) as "delete-quiz":
+    # show confirm message + warning
+    # delete the quiz
+    # probably add a stage
     discard
 
   callbackQuery(chatid: int64, param: string) as "take-quiz":
@@ -313,6 +329,29 @@ newRouter router:
 
       asyncCheck (chatid, myrecord.answerSheetMsgId) <^
         answerSheetSerialize(myrecord.answerSheet)
+
+  command(chatid: int64, param: string) as "analyze":
+    let
+      quizid = parseint param
+      quiz = dbworksCapture dbpath: db.getQuizItself(quizid)
+
+    if quiz.issome:
+      let rec = dbworksCapture dbpath: db.getRecordFor(chatid, quizid)
+      if rec.issome:
+        let questions = dbworksCapture dbpath: db.getQuestions(quizid)
+        for (i, q) in questions.pairs:
+          let text = questionAnalyzeDialog(i, q, parseInt rec.get.answer_list[i])
+
+          discard await:
+            if q.hasPhoto:
+              chatid <@ (q.photo_path, text)
+            else:
+              chatid << text
+
+      else:
+        asyncCheck chatid << youHaventAttendInThisQUizT
+    else:
+      asyncCheck chatid << quizNotFoundT
 
   event(chatId: int64) as "update-timer":
     if isDoingQuiz and myrecord.isReady:

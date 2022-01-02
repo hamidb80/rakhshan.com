@@ -30,6 +30,7 @@ Blueprint [queryHolder: initQuery, postfix: "Model"]:
         quiz_id: int[ref quiz.id]
         photo_path: string
         description: string
+        why: string
         answer: int
 
     Table record:
@@ -40,6 +41,9 @@ Blueprint [queryHolder: initQuery, postfix: "Model"]:
         answer_list: char[255] # answer corresponding to 'questions_order'
         percent: float
 
+
+func hasPhoto*(q: QuestionModel): bool=
+    q.photo_path != ""
 
 when isMainModule:
     import strutils

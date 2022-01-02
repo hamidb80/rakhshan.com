@@ -7,10 +7,10 @@ import ../database/models
 
 type
   Stages* = enum
-    sMain, sSendContact # primary
+    sMain, sSendContact                    # primary
     sEnterMainMenu, sMainMenu, sRemoveQuiz # admin
     sAddQuiz, sAQName, sAQDesc, sAQTime, sAQGrade, sAQLesson, sAQchapter # admin
-    sAQQuestion, sAQQPic, sAQQInfo, sAQQAns
+    sAQQuestion, sAQQPic, sAQQDesc, sAQQWhy, sAQQAns
     sFindQuizMain, sFQname, sFQgrade, sFQlesson
     sTakingQuiz
     sFindMyRecords
@@ -54,22 +54,10 @@ type
     jumpQuestionMsgId*: int
     answerSheetMsgId*: int
 
-  QuizCreate* = object
-    name*: string
-    description*: string
-    time*: int
-    # part info
-    grade*: int
-    lesson*: string
-    chapter*: int
-    # ---
-    questions*: seq[QuestionCreate]
-
-  QuestionCreate* = object
-    description*: string
-    photo_path*: string
-    answer*: int
-
+  QuizCreate* = ref object
+    quiz: QuizModel
+    tag: TagModel
+    questions*: seq[QuestionModel]
 
   RouterProc = proc(
         bot: Telebot, uctx: UserCtx,
@@ -81,7 +69,7 @@ type
 const
   HomeStages* = {sMain, sSendContact} # primary
   AddQuizStages* = {sAddQuiz, sAQName, sAQTime, sAQGrade, sAQLesson, sAQchapter} # admin
-  AddQuestionStages* = {sAQQuestion, sAQQPic, sAQQInfo, sAQQAns}
+  AddQuestionStages* = {sAQQuestion, sAQQPic, sAQQDesc, sAQQWhy, sAQQAns}
   FindQuizStages* = {sFindQuizMain, sFQname, sFQgrade, sFQlesson}
   TakingQuizStages* = {sTakingQuiz}
   RecordStages* = {sFindMyRecords}
@@ -151,7 +139,6 @@ macro initRouter(varName: typed, args: varargs[untyped]): untyped =
 
 template newRouter*(varname, body) =
   initRouter(varname, bot: TeleBot, uctx: UserCtx, u: Update, body)
-
 
 proc trigger*(
   router: RouterMap, alias: string,
