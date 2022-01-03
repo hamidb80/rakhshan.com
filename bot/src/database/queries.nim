@@ -1,5 +1,5 @@
 import db_sqlite, sequtils, strutils, options, strformat
-import models, ../telegram/controller
+import models, ../telegram/controller, ../concurrency
 
 type
     QuizInfoModel* = tuple
@@ -42,7 +42,7 @@ template limit(s: string, n: int): untyped =
 
 # member ----------------------------------------
 
-proc getMember*(db; chatId: int64): Option[MemberModel] =
+proc getMember*(db; chatId: int64): Option[MemberModel] {.errorHandler.} =
     let row = db.getSingleRow(
         sql"SELECT chat_id, site_name, tg_name, phone_number, is_admin FROM member WHERE chat_id = ?",
         chatId)
@@ -56,8 +56,9 @@ proc getMember*(db; chatId: int64): Option[MemberModel] =
             isAdmin: row.get[4].parseInt)
 
 proc addMember*(db;
-    chatId: int64, site_name, tg_name, phone_number: string, isAdmin: int
-): int64 =
+    chatId: int64, site_name: string, tg_name: string,
+    phone_number: string, isAdmin: int
+): int64 {.errorHandler.} =
     # add site_name + tg_name
     db.insertID(
         sql"INSERT INTO member (chat_id, site_name, tg_name, phone_number, is_admin) VALUES (?, ?, ?, ?, ?)",
@@ -66,7 +67,7 @@ proc addMember*(db;
 
 # quiz -------------------------------------------
 
-proc totag*(s: seq[string]): TagModel =
+proc totag*(s: seq[string]): TagModel {.errorHandler.} =
     TagModel(
         id: s[0].parseint,
         grade: s[1].parseint,
@@ -76,14 +77,16 @@ proc totag*(s: seq[string]): TagModel =
 
 proc addTag*(db;
     grade: int64, lesson: string, chapter: int64
-): int64 =
+): int64 {.errorHandler.} =
     db.insertID(
         sql"INSERT INTO tag (grade, lesson, chapter) VALUES (?, ?, ?)",
         grade, lesson.limit(120), chapter)
 
 const getTagQuery = "SELECT id, grade, lesson, chapter FROM tag "
 
-proc getTag(db; grade: int64, lesson: string, chapter: int64): Option[TagModel] =
+proc getTag(db;
+grade: int64, lesson: string, chapter: int64
+): Option[TagModel] {.errorHandler.} =
     let row = db.getSingleRow((getTagQuery &
         "WHERE grade = ? AND lesson = ? AND chapter = ?"
     ).sql, grade, lesson, chapter)
@@ -91,7 +94,9 @@ proc getTag(db; grade: int64, lesson: string, chapter: int64): Option[TagModel] 
     if issome row:
         result = some totag row.get
 
-proc upsertTag*(db; grade: int64, lesson: string, chapter: int64): TagModel =
+proc upsertTag*(db;
+    grade: int64, lesson: string, chapter: int64
+): TagModel {.errorHandler.} =
     let tag = db.getTag(grade, lesson, chapter)
 
     if issome tag:
@@ -105,9 +110,9 @@ proc upsertTag*(db; grade: int64, lesson: string, chapter: int64): TagModel =
 
 
 proc addQuiz*(db;
-    name, description: string, time, tag_id: int64,
+    name: string, description: string, time: int64, tag_id: int64,
     questions: openArray[QuestionModel],
-): int64 =
+): int64 {.errorHandler.} =
     transaction db:
         result = db.insertID(
             sql"INSERT INTO quiz (name, description, time, tag_id) VALUES (?, ?, ?, ?)",
@@ -139,7 +144,7 @@ const quizInfoQuery = """
         ON quiz.tag_id = tag.id
 """
 
-func toQuizInfoModel(row: Row): QuizInfoModel =
+func toQuizInfoModel(row: Row): QuizInfoModel {.errorHandler.} =
     result.quiz = QuizModel(
         id: row[0].parseInt,
         name: row[1],
@@ -156,8 +161,8 @@ func toQuizInfoModel(row: Row): QuizInfoModel =
     result.questions_number = parseInt row[^1]
 
 proc findQuizzes*(db;
-    qq: QuizQuery, pageIndex, pageSize: int
-): seq[QuizInfoModel] =
+    qq: QuizQuery, pageIndex: int, pageSize: int
+): seq[QuizInfoModel] {.errorHandler.} =
     var conditions: seq[string]
 
     if issome qq.grade:
@@ -177,14 +182,14 @@ proc findQuizzes*(db;
     # TODO add limit & offset
     db.getAllRows(query.sql).map(toQuizInfoModel)
 
-proc getQuizInfo*(db; quizid: int64): Option[QuizInfoModel] =
+proc getQuizInfo*(db; quizid: int64): Option[QuizInfoModel] {.errorHandler.} =
     let row = db.getSingleRow(
         (quizInfoQuery & "WHERE qid = ?").sql, quizid, quizid)
 
     if issome row:
         result = some row.get.toQuizInfoModel
 
-proc getQuizItself*(db; quizid: int64): Option[QuizModel] =
+proc getQuizItself*(db; quizid: int64): Option[QuizModel] {.errorHandler.} =
     let row = db.getSingleRow("""
         SELECT name, description, time, tag_id
         FROM quiz
@@ -199,7 +204,7 @@ proc getQuizItself*(db; quizid: int64): Option[QuizModel] =
             time: parseint row.get[2],
             tag_id: parseint row.get[3])
 
-proc getQuestions*(db; quizid: int64): seq[QuestionModel] =
+proc getQuestions*(db; quizid: int64): seq[QuestionModel] {.errorHandler.} =
     let rows = db.getAllRows(
         "SELECT photo_path, description, why, answer FROM question WHERE quiz_id = ?".sql,
         quizid)
@@ -211,7 +216,7 @@ proc getQuestions*(db; quizid: int64): seq[QuestionModel] =
         why: it[2],
         answer: parseint it[3])
 
-proc deleteQuiz*(db; quizid: int64): bool =
+proc deleteQuiz*(db; quizid: int64): bool {.errorHandler.} =
     transaction db:
         db.exec("DELETE FROM record WHERE quiz_id = ?".sql, quizid)
         db.exec("DELETE FROM question WHERE quiz_id = ?".sql, quizid)
@@ -220,14 +225,15 @@ proc deleteQuiz*(db; quizid: int64): bool =
 # quiz -------------------------------------------
 
 proc addRecord*(db;
-    quizId, member_chatId: int64,
+    quizId: int64, member_chatId: int64,
     answers: string, precent: float
-): int64 =
+): int64 {.errorHandler.} =
     db.insertID(
         sql"INSERT INTO record (quiz_id, member_chatid, answer_list, percent) VALUES (?, ?, ?, ?)",
         quizId, member_chatId, answers.limit(255), precent)
 
-proc getRecordFor*(db; memberId, quizId: int64): Option[RecordModel] =
+proc getRecordFor*(db; memberId: int64, quizId: int64): Option[
+        RecordModel] {.errorHandler.} =
     let row = db.getSingleRow(sql"""
         SELECT id, answer_list, percent 
         FROM record 
@@ -243,8 +249,8 @@ proc getRecordFor*(db; memberId, quizId: int64): Option[RecordModel] =
             percent: row.get[2].parseFloat)
 
 proc getMyRecords*(db;
-    memberId: int64, pageIndex, pageSize: int
-): seq[tuple[quiz: QuizModel, record: RecordModel]] =
+    memberId: int64, pageIndex: int, pageSize: int
+): seq[tuple[quiz: QuizModel, record: RecordModel]] {.errorHandler.} =
     # TODO add limit and offset
     let rows = db.getAllRows(sql"""
         SELECT  

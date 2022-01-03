@@ -478,7 +478,7 @@ proc dispatcher*(bot: TeleBot, u: Update): Future[bool] {.async.} =
   var args = %*[]
   let uctx = castSafety: getOrCreateUser findChatId u
 
-  # TODO NOT async | do multiplie threads and pass them hits
+  # TODO catch if error accured and tell the user and author
 
   if uctx.firstTime:
     castSafety:
@@ -488,8 +488,6 @@ proc dispatcher*(bot: TeleBot, u: Update): Future[bool] {.async.} =
         uctx.stage = sEnterMainMenu
 
     uctx.firsttime = false
-
-  # TODO catch if error accured and tell the user and author
 
   if u.message.issome:
     let
