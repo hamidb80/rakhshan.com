@@ -561,7 +561,7 @@ when isMainModule:
   bot.onUpdate dispatcher
   # TODO do some assertions before running like checking the database
 
-  # addHandler(newConsoleLogger(fmtStr = "$levelname, [$time] "))
+  addHandler(newConsoleLogger(fmtStr = "$levelname, [$time] "))
 
   spawn startTimer(100)
   asyncCheck checkNofitications(addr notifier, 100, bot)

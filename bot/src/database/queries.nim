@@ -123,7 +123,8 @@ proc addQuiz*(db;
                 sql"INSERT INTO question (quiz_id, photo_path, description, why, answer) VALUES (?, ?, ?, ?, ?)",
                 result, q.photo_path, q.description, q.why, q.answer)
 
-const quizInfoQuery = """
+func quizInfoQueryGen(whereClause: string): string =
+    fmt """
     SELECT 
         quiz.id as qid,
         quiz.name as qname,
@@ -142,7 +143,8 @@ const quizInfoQuery = """
         quiz
     INNER JOIN tag
         ON quiz.tag_id = tag.id
-"""
+    {whereClause} ORDER BY qid DESC 
+    """
 
 func toQuizInfoModel(row: Row): QuizInfoModel {.errorHandler.} =
     result.quiz = QuizModel(
@@ -161,9 +163,9 @@ func toQuizInfoModel(row: Row): QuizInfoModel {.errorHandler.} =
     result.questions_number = parseInt row[^1]
 
 proc findQuizzes*(db;
-    qq: QuizQuery, pageIndex: int, pageSize: int
+    qq: QuizQuery, lastIndex: int, limit: int
 ): seq[QuizInfoModel] {.errorHandler.} =
-    var conditions: seq[string]
+    var conditions = @[fmt"qid > {lastIndex}"]
 
     if issome qq.grade:
         conditions.add fmt"tgrade = {qq.grade.get}"
@@ -174,17 +176,18 @@ proc findQuizzes*(db;
         # TODO security checks
         conditions.add fmt "qname LIKE \"%{qq.name.get}%\""
 
-    let query = quizInfoQuery & (
-        if conditions.len == 0: ""
-        else: "WHERE " & join(conditions, " AND ")
-    )
+
+    let query =
+        quizInfoQueryGen(
+            if conditions.len == 0: ""
+            else: "WHERE " & conditions.join" AND "
+        ) & fmt"LIMIT {limit}"
 
     # TODO add limit & offset
     db.getAllRows(query.sql).map(toQuizInfoModel)
 
 proc getQuizInfo*(db; quizid: int64): Option[QuizInfoModel] {.errorHandler.} =
-    let row = db.getSingleRow(
-        (quizInfoQuery & "WHERE qid = ?").sql, quizid, quizid)
+    let row = db.getSingleRow(quizInfoQueryGen("WHERE qid = ?").sql, quizid, quizid)
 
     if issome row:
         result = some row.get.toQuizInfoModel
@@ -205,8 +208,11 @@ proc getQuizItself*(db; quizid: int64): Option[QuizModel] {.errorHandler.} =
             tag_id: parseint row.get[3])
 
 proc getQuestions*(db; quizid: int64): seq[QuestionModel] {.errorHandler.} =
-    let rows = db.getAllRows(
-        "SELECT photo_path, description, why, answer FROM question WHERE quiz_id = ?".sql,
+    let rows = db.getAllRows("""
+        SELECT photo_path, description, why, answer 
+        FROM question 
+        WHERE quiz_id = ?
+        """.sql,
         quizid)
 
     rows.mapIt QuestionModel(

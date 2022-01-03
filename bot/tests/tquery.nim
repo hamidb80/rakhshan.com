@@ -134,15 +134,15 @@ suite "SELECT":
     # TODO check multi filter or non filter
 
     block by_grade:
-      let qs = db.findQuizzes(QuizQuery(grade: some 11), 0, 0)
+      let qs = db.findQuizzes(QuizQuery(grade: some 11), 0, 5)
       check qs.mapIt(it.quiz.name).sorted == @["Qz1", "Qz2", "Qz3"]
 
     block by_lesson:
-      let qs = db.findQuizzes(QuizQuery(lesson: some "phyz"), 0, 0)
+      let qs = db.findQuizzes(QuizQuery(lesson: some "phyz"), 0, 5)
       check qs.mapIt(it.quiz.name).sorted == @["Qz4", "Qz5"]
 
     block by_name:
-      let qs = db.findQuizzes(QuizQuery(name: some "ah"), 0, 0)
+      let qs = db.findQuizzes(QuizQuery(name: some "ah"), 0, 5)
       check qs.mapIt(it.quiz.name).sorted == @["blah blah"]
 
   test "get questions":
