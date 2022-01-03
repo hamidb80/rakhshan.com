@@ -1,23 +1,29 @@
-import tables, sequtils, strutils, json, options, times
-import macros except params
-import
-  asyncdispatch, telebot,
-  macroplus
+import tables, sequtils, strutils, json, options, times, macros
+import asyncdispatch, telebot, macroplus
 import ../database/models
 
 type
   Stages* = enum
     # basic
     sMain, sSendContact, sEnterMainMenu, sMainMenu
-    sFindQuizMain, sFQname, sFQgrade, sFQlesson
+    sFindQuizMain, sFQname, sFQgrade, sFQlesson, sFQScroll
     sTakingQuiz, sFindMyRecords
-    
+
     # admin stuff
     sDeleteQuiz, sDQEnterId, sDQConfirm
     sAddQuiz, sAQName, sAQDesc, sAQTime, sAQGrade, sAQLesson, sAQchapter
     sAQQuestion, sAQQPic, sAQQDesc, sAQQWhy, sAQQAns
 
 type
+  SearchFor* = enum 
+    sfQuiz, sfmyRecords
+
+  QueryPageInfo*[T] = object
+    msgid*: Option[int]
+    lastIndex*: int64
+    currentPage*: int
+    context*: T
+
   UserCtx* = ref object
     chatId*: int64
     stage*: Stages
@@ -28,17 +34,16 @@ type
     quizCreation*: Option[QuizCreate]
     record*: Option[QuizTaking]
     quizQuery*: Option[QuizQuery]
-    quizidToDelete*: Option[int64]
+    quizIdToDelete*: Option[int64]
+    queryPaging*: Option[QueryPageInfo[SearchFor]]
     firstTime*: bool
 
   QuizQuery* = object
     name*: Option[string]
     grade*: Option[int]
     lesson*: Option[string]
-    resultMsgId*: Option[int]
 
   QuizTaking* = ref object
-    # FIXME this can be improved for ram usage
     quiz*: QuizModel
     questions*: seq[QuestionModel]
     qi*: int # question index
@@ -74,18 +79,22 @@ const
   DeleteQuiz* = {sDeleteQuiz, sDQEnterId, sDQConfirm}
   AddQuizStages* = {sAddQuiz, sAQName, sAQTime, sAQGrade, sAQLesson, sAQchapter} # admin
   AddQuestionStages* = {sAQQuestion, sAQQPic, sAQQDesc, sAQQWhy, sAQQAns}
-  FindQuizStages* = {sFindQuizMain, sFQname, sFQgrade, sFQlesson}
+  FindQuizStages* = {sFindQuizMain, sFQname, sFQgrade, sFQlesson, sFQScroll}
   TakingQuizStages* = {sTakingQuiz}
   RecordStages* = {sFindMyRecords}
 
 
 # helper
+
+func initQueryPageInfo*[T](context: T): QueryPageInfo[T] =
+  result.lastIndex = int.high
+  result.context = context
+
 proc add(father: NimNode; children: openArray[NimNode]): NimNode =
   for node in children:
     father.add node
 
   return father
-
 
 proc extractArgsFromJson(args: openArray[NimNode]): NimNode =
   doassert args.allIt it.kind == nnkExprColonExpr
@@ -135,7 +144,6 @@ macro initRouter(varName: typed, args: varargs[untyped]): untyped =
     else: error "undefined entity"
 
     discard paramList.add commonArgs.mapIt newIdentDefs(it[0], it[1])
-
 
   # echo treeRepr result
   # echo repr result

@@ -59,3 +59,9 @@ template adminRequired*(body): untyped {.dirty.} =
 
 template myqc*: untyped {.dirty.} =
   uctx.quizCreation.get
+
+template qq*: untyped {.dirty.} =
+  uctx.quizQuery.get
+
+template qp*: untyped {.dirty.} =
+  uctx.queryPaging.get

@@ -109,7 +109,11 @@ const
 
     quizGotDeletedT* = "آزمون مورد نظر حذف شد"
     quizStartedT* = "آزمون شروع شد"
+    showResultsT* = "نمایش نتیجه"
+    yourSearchResultT* = "نتیجه جستجوی شما"
 
+    pointLeftTJ* = fmt"{previousT} {pointLeftJ}" 
+    pointRightTJ* = fmt"{pointRightJ} {nextT}"    
 let
     noReply* = newReplyKeyboardRemove(true)
 
@@ -139,9 +143,6 @@ let
       @[cancelT]
     ]
     
-    # addingQuestion* = doingQuizReply
-    # FIXME: report error with ARC/ORC
-    
     addingQuestion* = newReplyKeyboardMarkup @[
       @[endT],
       @[cancelT]
@@ -158,7 +159,7 @@ let
     quizFilterReply* = newReplyKeyboardMarkup @[
       @[findQuizChangeGradeT, findQuizChangeLessonT],
       @[findQuizChangeNameT],
-      @[findQuizT, cancelT]
+      @[showResultsT, cancelT]
     ]
 
     adminReplyRaw = @[ @[addQuizT, removeQuizT]]
@@ -179,11 +180,20 @@ let
     ].toInlineButtons
 
     moveBtns* = @[
-      (fmt"{previousT} {pointLeftJ}", "/g-"),
-      (fmt"{pointRightJ} {nextT}", "/g+"),
+      (pointLeftTJ, "/g-"),
+      (pointRightTJ, "/g+"),
     ].toInlineButtons
 
     answerKeyboard* = newInlineKeyboardMarkup(answerBtns, moveBtns)
+
+
+func genQueryListInlineBtns*(currentPage: int): InlineKeyboardMarkup= 
+  newInlineKeyboardMarkup @[
+    toInlineButtons @[
+      (pointLeftTJ, "/m-"),
+      ($currentPage, ""), # no op
+      (pointRightTJ, "/m+"),
+  ]]
 
 func genTakeQuizInlineBtn*(quizId: int64): InlineKeyboardMarkup =
     result = InlineKeyboardMarkup(`type`: kInlineKeyboardMarkup)

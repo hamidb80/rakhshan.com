@@ -182,7 +182,6 @@ proc findQuizzes*(db;
             else: "WHERE " & conditions.join" AND "
         ) & fmt"LIMIT {limit}"
 
-    # TODO add limit & offset
     db.getAllRows(query.sql).map(toQuizInfoModel)
 
 proc getQuizInfo*(db; quizid: int64): Option[QuizInfoModel] {.errorHandler.} =
@@ -257,7 +256,6 @@ proc getRecordFor*(db;
 proc getMyRecords*(db;
     memberId: int64, lastIndex: int64, pageSize: int
 ): seq[tuple[quiz: QuizModel, record: RecordModel]] {.errorHandler.} =
-    # TODO add limit and offset
     let rows = db.getAllRows(sql"""
         SELECT  
             r.id,

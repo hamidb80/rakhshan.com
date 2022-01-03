@@ -1,3 +1,4 @@
+import options
 import results
 
 template castSafety*(body): untyped =
@@ -12,3 +13,6 @@ template `or`*(s1, s2: string): string =
 
 func parseInt*(n: char): int =
   n.ord - '0'.ord
+
+func forget*[T](opt:var Option[T])=
+  opt = none T

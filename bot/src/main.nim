@@ -13,6 +13,7 @@ randomize()
 const
   dbPath = getenv("DB_PATH")
   authorChatId = 101862091
+  pageSize = 10
 
 var defaultPhotoUrl = ""
 
@@ -80,6 +81,7 @@ newRouter router:
     of findQuizT:
       /-> sFindQuizMain
       uctx.quizQuery = some QuizQuery()
+      uctx.queryPaging = some initQueryPageInfo(sfQuiz)
       asyncCheck chatid << (findQuizDialogT, quizFilterReply)
 
     else:
@@ -87,7 +89,7 @@ newRouter router:
 
   route(chatid: int64, input: string) as "add-quiz":
     if input == cancelT:
-      uctx.quizCreation = none QuizCreate
+      uctx.quizCreation.forget
       asyncCheck redirect("enter-menu", %*[chatid])
 
     else:
@@ -151,10 +153,10 @@ newRouter router:
 
       asyncCheck chatid << quizAddedDialog(myqc.quiz.name)
       asyncCheck redirect("enter-menu", %*[chatid])
-      uctx.quizCreation = none QuizCreate
+      uctx.quizCreation.forget
 
     of cancelT:
-      uctx.quizCreation = none QuizCreate
+      uctx.quizCreation.forget
       asyncCheck redirect("enter-menu", %*[chatid])
 
     else:
@@ -204,26 +206,40 @@ newRouter router:
         discard
 
   route(chatid: int64, input: string) as "find-quiz":
-    template myquery: untyped = uctx.quizQuery.get
     template goBack: untyped = /-> sFindQuizMain
 
     case input:
-    of findQuizT:
+    # FIXME say something
+    of findQuizChangeNameT:
+      /-> sFQname
+
+    of findQuizChangeGradeT:
+      /-> sFQgrade
+
+    of findQuizChangeLessonT:
+      /-> sFQlesson
+
+    of findQuizClearFiltersT:
+      /-> sFindQuizMain
+
+    of showResultsT:
       let
-        quizList = dbworksCapture dbpath: |> findQuizzesHandler(db, myquery, 0, 0).tryGet
-        str = quizList.map(miniQuizInfo).join "\n"
+        quizList = dbworksCapture dbpath: |> db.findQuizzesHandler(qq, 0,
+            pageSize).tryGet
+        text = quizList.map(miniQuizInfo).join "\n"
 
-      if issome myquery.resultMsgId:
-        asyncCheck (chatid, myquery.resultMsgId.get) <^ str
-      else:
-        myquery.resultMsgId = some await(chatid << str).messageId
+      asyncCheck chatid << (yourSearchResultT, cancelReply)
 
-    of findQuizChangeNameT: /-> sFQname
-    of findQuizChangeGradeT: /-> sFQgrade
-    of findQuizChangeLessonT: /-> sFQlesson
-    of findQuizClearFiltersT: /-> sFindQuizMain
+      qp.msgid = some (await chatid << (
+        text,
+        genQueryListInlineBtns(0)
+      )).messageid
+
+      /-> sFQScroll
+
     of cancelT:
-      uctx.quizQuery = none QuizQuery
+      uctx.quizQuery.forget
+      uctx.queryPaging.forget
       asyncCheck redirect("enter-menu", %*[chatid])
 
     else:
@@ -232,19 +248,25 @@ newRouter router:
         asyncCheck chatid << findQuizDialogT
 
       of sFQname:
-        myquery.name = some input
+        qq.name = some input
         goBack()
 
       of sFQgrade:
         trySendInvalid:
-          myquery.grade = some parseint input
+          qq.grade = some parseint input
           goBack()
 
       of sFQlesson:
-        myquery.lesson = some input
+        qq.lesson = some input
         goBack()
 
       else: discard
+
+  callbackQuery(chatid: int64, msgId: int64, param: string) as "scroll":
+    if issome uctx.queryPaging:
+      discard
+    else:
+      asyncCheck chatid << invalidCommandT
 
   command(chatid: int64, param: string) as "show-quiz":
     let
@@ -292,13 +314,13 @@ newRouter router:
           else:
             chatid << operationCancelledT
 
-        uctx.quizidToDelete = none int64
+        uctx.quizidToDelete.forget
         asyncCheck redirect("enter-menu", %*[chatid])
 
       else:
         discard
 
-  callbackQuery(chatid: int64, param: string) as "take-quiz":
+  callbackQuery(chatid: int64, _: int64, param: string) as "take-quiz":
     # TODO gaurd for when is taking quiz
     let
       quizid = parseint param
@@ -343,7 +365,7 @@ newRouter router:
       asyncCheck chatid << quizNotFoundT
       # TODO forward to another route
 
-  callbackQuery(chatid: int64, param: string) as "jump-question":
+  callbackQuery(chatid: int64, _: int64, param: string) as "jump-question":
     if isDoingQuiz:
       let
         newQuestionIndex = parseint param
@@ -360,7 +382,7 @@ newRouter router:
           myrecord.lastQuestionPhotoUrl = newPhotoUrl
           asyncCheck (chatid, myrecord.questionPicMsgId) <@^ newPhotoUrl
 
-  callbackQuery(chatid: int64, param: string) as "goto":
+  callbackQuery(chatid: int64, _: int64, param: string) as "goto":
     if isDoingQuiz:
       let targetQuestionIndex =
         if param[0] == '+':
@@ -370,7 +392,7 @@ newRouter router:
 
       asyncCheck redirect("jump-question", %*[chatid, $targetQuestionIndex])
 
-  callbackQuery(chatid: int64, param: string) as "select-answer":
+  callbackQuery(chatid: int64, _: int64, param: string) as "select-answer":
     if isDoingQuiz:
       myrecord.answerSheet[myrecord.qi] = parseint param
 
@@ -435,7 +457,7 @@ newRouter router:
       # show complete result
       asyncCheck chatid << recordResultDialog(r.quiz, percent)
 
-      uctx.record = none QuizTaking
+      uctx.record.forget
       asyncCheck redirect("enter-menu", %*[chatid])
 
   route(chatid: int64, input: string) as "middle-of-quiz":
@@ -443,7 +465,7 @@ newRouter router:
     of endT:
       asyncCheck redirect("end-quiz", %*[chatid, ""])
     of cancelT:
-      uctx.record = none QuizTaking
+      uctx.record.forget
       asyncCheck chatid << quizCancelledT
       asyncCheck redirect("enter-menu", %*[chatid])
 
@@ -540,13 +562,14 @@ proc dispatcher*(bot: TeleBot, u: Update): Future[bool] {.async.} =
         of 'j': "jump-question"
         of 'p': "select-answer"
         of 'g': "goto"
+        of 'm': "scroll"
         else: "invalid-command"
 
     castSafety:
       let res = await trigger(
         router, route,
         bot, uctx, u,
-        %*[cq.message.get.chat.id, parameter])
+        %*[cq.message.get.chat.id, cq.message.get.messageId, parameter])
 
       asyncCheck bot.answerCallbackQuery($cq.id, res)
 

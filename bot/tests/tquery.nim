@@ -198,7 +198,6 @@ suite "DELETE":
     check:
       isNone db.getQuizInfo(1) # delete quiz
       db.getQuestions(1).len == 0 # delete question
-      
+
       db.getMyRecords(membersRaw[1].id, int64.high, 10)
         .mapIt(it.quiz.id).sorted == @[2'i64, 3] # delete records
-      
