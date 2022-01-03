@@ -163,9 +163,9 @@ func toQuizInfoModel(row: Row): QuizInfoModel {.errorHandler.} =
     result.questions_number = parseInt row[^1]
 
 proc findQuizzes*(db;
-    qq: QuizQuery, lastIndex: int, limit: int
+    qq: QuizQuery, lastIndex: int64, limit: int
 ): seq[QuizInfoModel] {.errorHandler.} =
-    var conditions = @[fmt"qid > {lastIndex}"]
+    var conditions = @[fmt"qid < {lastIndex}"]
 
     if issome qq.grade:
         conditions.add fmt"tgrade = {qq.grade.get}"
@@ -175,7 +175,6 @@ proc findQuizzes*(db;
     if issome qq.name:
         # TODO security checks
         conditions.add fmt "qname LIKE \"%{qq.name.get}%\""
-
 
     let query =
         quizInfoQueryGen(
@@ -238,8 +237,9 @@ proc addRecord*(db;
         sql"INSERT INTO record (quiz_id, member_chatid, answer_list, percent) VALUES (?, ?, ?, ?)",
         quizId, member_chatId, answers.limit(255), precent)
 
-proc getRecordFor*(db; memberId: int64, quizId: int64): Option[
-        RecordModel] {.errorHandler.} =
+proc getRecordFor*(db;
+    memberId: int64, quizId: int64
+): Option[RecordModel] {.errorHandler.} =
     let row = db.getSingleRow(sql"""
         SELECT id, answer_list, percent 
         FROM record 
@@ -255,7 +255,7 @@ proc getRecordFor*(db; memberId: int64, quizId: int64): Option[
             percent: row.get[2].parseFloat)
 
 proc getMyRecords*(db;
-    memberId: int64, pageIndex: int, pageSize: int
+    memberId: int64, lastIndex: int64, pageSize: int
 ): seq[tuple[quiz: QuizModel, record: RecordModel]] {.errorHandler.} =
     # TODO add limit and offset
     let rows = db.getAllRows(sql"""
@@ -268,8 +268,11 @@ proc getMyRecords*(db;
         FROM  record r
         INNER JOIN quiz q 
             ON q.id = r.quiz_id
-        WHERE r.member_chatid = ?
-    """, memberid)
+        WHERE 
+            r.member_chatid = ? AND r.id < ? 
+        ORDER BY r.id DESC
+        LIMIT ?
+    """, memberid, lastIndex, pageSize)
 
     rows.mapIt (
         QuizModel(
