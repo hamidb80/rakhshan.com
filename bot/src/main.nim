@@ -1,7 +1,7 @@
 import
   sequtils, tables, strutils, options, json, times, random, logging,
   asyncdispatch, threadpool, db_sqlite, os
-import telebot, asyncanything
+import telebot, asyncanything, results
 import
   telegram/[controller, helper, comfortable], messages,
   host_api, states, utils, ./mymath, database/[queries, models]
@@ -40,11 +40,11 @@ newRouter router:
           userInfo = await ct.phoneNumber.getUserInfo # number
 
         dbworks dbPath:
-          discard |>db.addMember(chatid, userinfo.display_name,
+          discard |>db.addMemberHandler(chatid, userinfo.display_name,
             (ct.firstname & " " & ct.lastname.get("")),
-            ct.phoneNumber, userInfo.is_admin.int)
+            ct.phoneNumber, userInfo.is_admin.int).tryget
 
-          uctx.membership = db.getMember chatid
+          uctx.membership = db.getMemberHandler(chatid).tryGet
 
         discard await chatid << (greeting(userinfo.displayName), noReply)
         asyncCheck redirect("enter-menu", %*[chatid])
@@ -210,7 +210,7 @@ newRouter router:
     case input:
     of findQuizT:
       let
-        quizList = dbworksCapture dbpath: |> findQuizzes(db, myquery, 0, 0)
+        quizList = dbworksCapture dbpath: |> findQuizzesHandler(db, myquery, 0, 0).tryGet
         str = quizList.map(miniQuizInfo).join "\n"
 
       if issome myquery.resultMsgId:
@@ -249,13 +249,13 @@ newRouter router:
   command(chatid: int64, param: string) as "show-quiz":
     let
       quizid = parseint param
-      qm = dbworksCapture dbpath: |> db.getQuizInfo(quizid)
+      qm = dbworksCapture dbpath: |> db.getQuizInfoHandler(quizid).tryGet
 
     asyncCheck:
       if qm.issome:
         let
-          rec = dbworksCapture dbpath: |> db.getRecordFor(chatid,
-              qm.get.quiz.id)
+          rec = dbworksCapture dbpath: |> db.getRecordForHandler(chatid,
+              qm.get.quiz.id).tryGet
           text = fullQuizInfo(qm.get, rec)
 
         if rec.issome:
@@ -286,7 +286,7 @@ newRouter router:
         asyncCheck:
           if input == yesT:
             dbworks dbpath:
-              discard |>db.deleteQuiz(uctx.quizidToDelete.get)
+              discard |>db.deleteQuizHandler(uctx.quizidToDelete.get).tryGet
 
             chatid << quizGotDeletedT
           else:
@@ -302,14 +302,14 @@ newRouter router:
     # TODO gaurd for when is taking quiz
     let
       quizid = parseint param
-      quiz = dbworksCapture dbpath: |> db.getQuizItself(quizid)
+      quiz = dbworksCapture dbpath: |> db.getQuizItselfHandler(quizid).tryGet
 
     if issome quiz:
-      asyncCheck chatid << (quizWillStartSoonT, doingQuizReply)
+      asyncCheck chatid << quizWillStartSoonT
 
       uctx.record = some QuizTaking()
       myrecord.quiz = quiz.get
-      myrecord.questions = dbworksCapture dbpath: |> db.getQuestions(quizid)
+      myrecord.questions = dbworksCapture dbpath: |> db.getQuestionsHandler(quizid).tryGet
 
       # TODO shuffle myrecord.questions
 
@@ -333,6 +333,8 @@ newRouter router:
 
       myrecord.jumpQuestionMsgId = (await chatid <<
         (gotoQuestionT, genQuestionJumpBtns(myrecord.questions.len))).messageId
+
+      asyncCheck chatid << (quizStartedT, doingQuizReply)
 
       myrecord.isReady = true
       /-> sTakingQuiz
@@ -378,12 +380,12 @@ newRouter router:
   command(chatid: int64, param: string) as "analyze":
     let
       quizid = parseint param
-      quiz = dbworksCapture dbpath: |> db.getQuizItself(quizid)
+      quiz = dbworksCapture dbpath: |> db.getQuizItselfHandler(quizid).tryGet
 
     if quiz.issome:
-      let rec = dbworksCapture dbpath: |> db.getRecordFor(chatid, quizid)
+      let rec = dbworksCapture dbpath: |> db.getRecordForHandler(chatid, quizid).tryGet
       if rec.issome:
-        let questions = dbworksCapture dbpath: |> db.getQuestions(quizid)
+        let questions = dbworksCapture dbpath: |> db.getQuestionsHandler(quizid).tryGet
         for (i, q) in questions.pairs:
           let text = questionAnalyzeDialog(i, q, parseInt rec.get.answer_list[i])
 
@@ -427,7 +429,8 @@ newRouter router:
 
       # save record
       dbworks dbpath:
-        discard |>db.addRecord(r.quiz.id, chatid, r.answerSheet.join, percent)
+        discard |>db.addRecordHandler(r.quiz.id, chatid, r.answerSheet.join,
+            percent).tryGet
 
       # show complete result
       asyncCheck chatid << recordResultDialog(r.quiz, percent)
@@ -482,7 +485,7 @@ proc dispatcher*(bot: TeleBot, u: Update): Future[bool] {.async.} =
 
   if uctx.firstTime:
     castSafety:
-      let m = dbworksCapture dbPath: |> getMember(db, u.getchatid)
+      let m = dbworksCapture dbPath: |> getMemberHandler(db, u.getchatid).tryGet
       if issome m:
         uctx.membership = m
         uctx.stage = sEnterMainMenu
@@ -545,7 +548,7 @@ proc dispatcher*(bot: TeleBot, u: Update): Future[bool] {.async.} =
         bot, uctx, u,
         %*[cq.message.get.chat.id, parameter])
 
-      discard await bot.answerCallbackQuery($cq.id, res)
+      asyncCheck bot.answerCallbackQuery($cq.id, res)
 
 when isMainModule:
   const API_KEY = "2004052302:AAHm_oICftfs5xLmY0QwGVTE3o-gYgD6ahw"
@@ -558,7 +561,7 @@ when isMainModule:
   bot.onUpdate dispatcher
   # TODO do some assertions before running like checking the database
 
-  addHandler(newConsoleLogger(fmtStr = "$levelname, [$time] "))
+  # addHandler(newConsoleLogger(fmtStr = "$levelname, [$time] "))
 
   spawn startTimer(100)
   asyncCheck checkNofitications(addr notifier, 100, bot)

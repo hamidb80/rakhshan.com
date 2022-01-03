@@ -108,6 +108,7 @@ const
     noTx* = "خیر"
 
     quizGotDeletedT* = "آزمون مورد نظر حذف شد"
+    quizStartedT* = "آزمون شروع شد"
 
 let
     noReply* = newReplyKeyboardRemove(true)
@@ -138,7 +139,13 @@ let
       @[cancelT]
     ]
     
-    addingQuestion* = doingQuizReply
+    # addingQuestion* = doingQuizReply
+    # FIXME: report error with ARC/ORC
+    
+    addingQuestion* = newReplyKeyboardMarkup @[
+      @[endT],
+      @[cancelT]
+    ]
 
     withoutPhotoReply* = newReplyKeyboardMarkup @[
       @[withoutPhotoT]

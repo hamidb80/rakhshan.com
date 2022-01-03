@@ -1,4 +1,4 @@
-import result, macroplus, macros
+import results, macroplus, macros
 
 func getName(n: NimNode): string =
   case n.kind:
