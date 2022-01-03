@@ -250,7 +250,7 @@ func timeFormat*[T: SomeInteger](t: T): string =
 func miniQuizInfo*(qi: QuizInfo): string =
     [
       fmt"{quizNameT}: {qi.quiz.name}",
-      fmt"{numberOfQuestionsT}: {qi.questions_number}",
+      fmt"{numberOfQuestionsT}: {qi.questions_count}",
       fmt"{detailsT}: /q{qi.quiz.id}",
       "\n",
     ].join "\n"
@@ -280,7 +280,7 @@ func fullQuizInfo*(qi: QuizInfo, rec: Option[RecordModel]): string =
     [
       fmt"{bold $idT} {bold quizT}: {escapeMarkdownV2 $qi.quiz.id}",
       fmt"{bold quizNameT}: {escapeMarkdownV2 qi.quiz.name}",
-      fmt"{numberOfQuestionsT}: {qi.questions_number}",
+      fmt"{numberOfQuestionsT}: {qi.questions_count}",
       fmt"{durationT}: {timeFormat qi.quiz.time}",
       recSection,
     ].join "\n"

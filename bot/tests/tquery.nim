@@ -124,6 +124,7 @@ suite "SELECT":
       r.quiz.name == "Qz1"
       r.quiz.time == 100
       r.quiz.tagid == 1
+      r.quiz.questions_count == 3
 
   test "get quiz itself with no join":
     let q = db.getQuizItself(4)

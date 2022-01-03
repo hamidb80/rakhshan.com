@@ -5,7 +5,6 @@ type
     QuizInfo* = tuple
         quiz: QuizModel
         tag: TagModel
-        questions_number: int
 
     RecordInfo* = tuple
         quiz: QuizModel
@@ -74,9 +73,11 @@ func `~`*(dir: SearchDirection): SearchDirection =
 # member ----------------------------------------
 
 proc getMember*(db; chatId: int64): Option[MemberModel] {.errorHandler.} =
-    let row = db.getSingleRow(
-        sql"SELECT chat_id, site_name, tg_name, phone_number, is_admin FROM member WHERE chat_id = ?",
-        chatId)
+    let row = db.getSingleRow(sql"""
+        SELECT chat_id, site_name, tg_name, phone_number, is_admin 
+        FROM member 
+        WHERE chat_id = ?
+        """, chatId)
 
     if row.issome:
         result = some MemberModel(
@@ -145,8 +146,8 @@ proc addQuiz*(db;
 ): int64 {.errorHandler.} =
     transaction db:
         result = db.insertID(
-            sql"INSERT INTO quiz (name, description, time, tag_id) VALUES (?, ?, ?, ?)",
-            name.limit(255), description, time, tagid)
+            sql"INSERT INTO quiz (name, description, time, tag_id, questions_count) VALUES (?, ?, ?, ?, ?)",
+            name.limit(255), description, time, tagid, questions.len)
 
         for q in questions:
             db.exec(
@@ -164,11 +165,7 @@ func quizInfoQueryGen(whereClause: string, dir = saMore): string =
         tag.grade as tgrade,
         tag.lesson as tlesson,
         tag.chapter as tchapter,
-        (
-            SELECT COUNT(*) 
-            FROM question
-            WHERE quiz_id = quiz.id
-        ) AS qscount
+        quiz.questions_count
     FROM 
         quiz
     INNER JOIN tag
@@ -182,15 +179,14 @@ func toQuizInfo(row: Row): QuizInfo {.errorHandler.} =
         name: row[1],
         description: row[2],
         time: row[3].parseInt,
-        tag_id: row[4].parseInt)
+        tag_id: row[4].parseInt,
+        questions_count: parseInt row[^1])
 
     result.tag = TagModel(
         id: row[4].parseInt,
         grade: row[5].parseInt,
         lesson: row[6],
         chapter: row[7].parseInt)
-
-    result.questions_number = parseInt row[^1]
 
 proc findQuizzes*(db;
     qq: QuizQuery, pinnedIndex: int64, limit: int,
