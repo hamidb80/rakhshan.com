@@ -13,7 +13,7 @@ randomize()
 const
   dbPath = getenv("DB_PATH")
   authorChatId = 101862091
-  pageSize = 10
+  pageSize = 3
 
 var defaultPhotoUrl = ""
 
@@ -43,7 +43,7 @@ newRouter router:
         dbworks dbPath:
           discard |>db.addMemberHandler(chatid, userinfo.display_name,
             (ct.firstname & " " & ct.lastname.get("")),
-            ct.phoneNumber, userInfo.is_admin.int).tryget
+            ct.phoneNumber, userInfo.is_admin.int).tryGet
 
           uctx.membership = db.getMemberHandler(chatid).tryGet
 
@@ -81,8 +81,27 @@ newRouter router:
     of findQuizT:
       /-> sFindQuizMain
       uctx.quizQuery = some QuizQuery()
-      uctx.queryPaging = some initQueryPageInfo(sfQuiz)
       asyncCheck chatid << (findQuizDialogT, quizFilterReply)
+
+    of myRecordsT:
+      /-> sMyRecords
+      # FIXME think about empty | when no records
+      uctx.queryPaging = some initQueryPageInfo(sfQuiz)
+      asyncCheck chatid << (yourRecordsT, cancelReply)
+
+      let recs = dbworksCapture dbpath:
+        |> db.getMyRecordsHandler(chatid, int64.high, pageSize, saLess).tryGet
+
+      qp.msgid = some (await chatid << (
+        recs.map(miniRecordInfo).join "\n\n",
+        genQueryPageInlineBtns(0)
+      )).messageid
+
+      let minmaxId = [0, recs.high].mapIt(recs[it].record.id)
+      qp.indexrange = min(minmaxId) .. max(minmaxId)
+
+      qp.context = sfmyRecords
+      /-> sScroll
 
     else:
       asyncCheck chatid << wrongCommandT
@@ -223,17 +242,21 @@ newRouter router:
       /-> sFindQuizMain
 
     of showResultsT:
-      let quizList = dbworksCapture dbpath:
-        |> db.findQuizzesHandler(qq, int.high, pageSize, saLess).tryGet
+      let quizzes = dbworksCapture dbpath:
+        |> db.findQuizzesHandler(qq, int64.high, pageSize, saLess).tryGet
 
       asyncCheck chatid << (yourSearchResultT, cancelReply)
+      uctx.queryPaging = some initQueryPageInfo(sfQuiz)
 
       qp.msgid = some (await chatid << (
-        quizList.map(miniQuizInfo).join "\n",
+        quizzes.map(miniQuizInfo).join "\n",
         genQueryPageInlineBtns(0)
       )).messageid
 
-      /-> sFQScroll
+      let minmaxId = [0, quizzes.high].mapIt(quizzes[it].quiz.id)
+      qp.indexrange = min(minmaxId) .. max(minmaxId)
+      qp.context = sfQuiz
+      /-> sScroll
 
     of cancelT:
       uctx.quizQuery.forget
@@ -263,29 +286,60 @@ newRouter router:
   callbackQuery(chatid: int64, msgId: int, param: string) as "scroll":
     if issome uctx.queryPaging:
       if qp.msgid.get == msgid:
-        # FIXME get new page number
+        let 
+          btnDir =
+            if param == "+": saMore
+            else: saLess
+          dir = ~btnDir
 
-        case qp.context:
-        of sfQuiz:
-          assert issome uctx.quizQuery
-          let quizzes = dbworksCapture dbpath:
-            |> db.findQuizzesHandler(qq, qp.lastIndex, pageSize, saLess).tryget
+        if not (qp.page == 0 and btnDir == saLess):
 
-          if quizzes.len != 0:
-            qp.lastIndex = quizzes[^1].quiz.id
-            # FIXME set new page number
+          case qp.context:
+          of sfQuiz:
+            let quizzes = dbworksCapture dbpath:
+              |> db.findQuizzesHandler(qq, qp.indexRange[dir], pageSize, dir).tryGet
 
-            asyncCheck (chatid, msgid) <^ (
-              quizzes.map(miniQuizInfo).join "\n",
-              genQueryPageInlineBtns(qp.currentPage))
+            if quizzes.len != 0:
+              let qi = [quizzes[0].quiz.id, quizzes[^1].quiz.id]
+              qp.indexRange = min(qi) .. max(qi)
+              qp.page.inc btnDir.toInt
 
-        of sfmyRecords:
-          discard
+              asyncCheck (chatid, msgid) <^ (
+                quizzes.map(miniQuizInfo).join "\n",
+                genQueryPageInlineBtns(qp.page))
+
+            else:
+              result = itsTheEndT
+
+          of sfmyRecords:
+            let recs = dbworksCapture dbpath:
+              |> db.getMyRecordsHandler(chatid, qp.indexRange[dir],
+                  pageSize, dir).tryGet
+
+            if recs.len != 0:
+              let ri = [recs[0].record.id, recs[^1].record.id]
+              qp.indexRange = min(ri) .. max(ri)
+              qp.page.inc btnDir.toInt
+
+              asyncCheck (chatid, msgid) <^ (
+                recs.map(miniRecordInfo).join "\n\n",
+                genQueryPageInlineBtns(qp.page))
+
+            else:
+              result = itsTheEndT
+        else:
+          result = itsTheStartT
 
       else:
         asyncCheck chatid << messageExpiredT
     else:
       asyncCheck chatid << invalidCommandT
+
+  route(chatid: int64, input: string) as "middle-of-scroll":
+    if input == cancelT:
+      asyncCheck redirect("enter-menu", %*[chatid])
+    else:
+      asynccheck chatid << invalidCommandT
 
   command(chatid: int64, param: string) as "show-quiz":
     let
@@ -565,6 +619,7 @@ proc dispatcher*(bot: TeleBot, u: Update): Future[bool] {.async.} =
         of FindQuizStages: "find-quiz"
         of DeleteQuiz: "delete-quiz"
         of sTakingQuiz: "middle-of-quiz"
+        of sScroll: "middle-of-scroll"
         else: "invalid-command"
 
       castSafety:
@@ -601,9 +656,8 @@ when isMainModule:
   defaultPhotoUrl = getBiggestPhotoFileId m
 
   bot.onUpdate dispatcher
-  # TODO do some assertions before running like checking the database
 
-  addHandler(newConsoleLogger(fmtStr = "$levelname, [$time] "))
+  # addHandler(newConsoleLogger(fmtStr = "$levelname, [$time] "))
 
   spawn startTimer(100)
   asyncCheck checkNofitications(addr notifier, 100, bot)

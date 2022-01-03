@@ -106,6 +106,7 @@ const
     enterQuizIdT* = "شناسه آزمون را وارد کنید"
     yesT* = "بله"
     noTx* = "خیر"
+    resultT* = "نتیجه"
 
     quizGotDeletedT* = "آزمون مورد نظر حذف شد"
     quizStartedT* = "آزمون شروع شد"
@@ -115,6 +116,11 @@ const
     pointLeftTJ* = fmt"{previousT} {pointLeftJ}" 
     pointRightTJ* = fmt"{pointRightJ} {nextT}"    
     messageExpiredT* = "پیام منقضی شده است"
+
+    myRecordsT* = "سابقه آزمون ها"
+    yourRecordsT* = "سابقه آزمون های شما"
+    itsTheEndT* = "آخرشه"
+    itsTheStartT* = "اولشه"
 
 let
     noReply* = newReplyKeyboardRemove(true)
@@ -155,7 +161,7 @@ let
     ]
 
     memberReplyRaw = @[
-      @[findQuizT]
+      @[findQuizT, myRecordsT]
     ]
 
     quizFilterReply* = newReplyKeyboardMarkup @[
@@ -189,11 +195,11 @@ let
     answerKeyboard* = newInlineKeyboardMarkup(answerBtns, moveBtns)
 
 
-func genQueryPageInlineBtns*(currentPage: int): InlineKeyboardMarkup= 
+func genQueryPageInlineBtns*(pageIndex: int): InlineKeyboardMarkup= 
   newInlineKeyboardMarkup @[
     toInlineButtons @[
       (pointLeftTJ, "/m-"),
-      ($currentPage, ""), # no op
+      ($(pageIndex + 1), "="), # no op
       (pointRightTJ, "/m+"),
   ]]
 
@@ -241,7 +247,7 @@ func timeFormat*[T: SomeInteger](t: T): string =
     let d = initDuration(seconds = t).toParts
     fmt"{d[Hours]:02}:{d[Minutes]:02}:{d[Seconds]:02}"
 
-func miniQuizInfo*(qi: QuizInfoModel): string =
+func miniQuizInfo*(qi: QuizInfo): string =
     [
       fmt"{quizNameT}: {qi.quiz.name}",
       fmt"{numberOfQuestionsT}: {qi.questions_number}",
@@ -252,7 +258,14 @@ func miniQuizInfo*(qi: QuizInfoModel): string =
 func percentSerialize*(n: SomeFloat): string =
     escapeMarkdownV2 fmt"{n:.2f}%"
 
-func fullQuizInfo*(qi: QuizInfoModel, rec: Option[RecordModel]): string =
+func miniRecordInfo*(ri: RecordInfo): string =
+  [
+    fmt"{bold quizNameT}: {ri.quiz.name.escapeMarkdownV2}",
+    fmt"{bold resultT}: {ri.record.percent.percentSerialize}",
+    fmt"{bold analyzeYourAnswersT}: /a{ri.quiz.id}"
+  ].join "\n"
+
+func fullQuizInfo*(qi: QuizInfo, rec: Option[RecordModel]): string =
     let recSection =
         if issome rec:
             [

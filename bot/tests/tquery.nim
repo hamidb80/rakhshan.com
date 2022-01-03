@@ -153,11 +153,11 @@ suite "SELECT":
       qs5.len == 7
 
   test "get my records":
-    let rs1 = db.getMyRecords(membersRaw[1].id, int64.high, 10, saLess)
-    check rs1.mapIt(it.record.percent) == [100.0, 12.4, 48.5]
+    let rs1 = db.getMyRecords(membersRaw[1].id, 4, 2, saLess)
+    check rs1.mapIt(it.record.percent) == [12.4, 48.5]
 
-    let rs2 = db.getMyRecords(membersRaw[1].id, 4, 1, saLess)
-    check rs2.mapIt(it.record.percent) == [12.4]
+    let rs2 = db.getMyRecords(membersRaw[1].id, 3, 1, saMore)
+    check rs2.mapIt(it.record.percent) == [100.0]
 
   test "get record for":
     let res = db.getRecordFor(membersRaw[2].id, 4)

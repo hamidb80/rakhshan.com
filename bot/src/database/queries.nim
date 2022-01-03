@@ -2,10 +2,14 @@ import db_sqlite, sequtils, strutils, options, strformat
 import models, ../telegram/controller, ../concurrency
 
 type
-    QuizInfoModel* = tuple
+    QuizInfo* = tuple
         quiz: QuizModel
         tag: TagModel
         questions_number: int
+
+    RecordInfo* = tuple
+        quiz: QuizModel
+        record: RecordModel
 
     SearchDirection* = enum
         saMore, saLess
@@ -38,8 +42,9 @@ template transaction*(db, body): untyped =
     body
     db.exec sql"COMMIT"
 
-proc getSingleRow*(db: DbConn, query: SqlQuery, args: varargs[string,
-        `$`]): Option[Row] =
+proc getSingleRow*(db;
+    query: SqlQuery, args: varargs[string, `$`]
+): Option[Row] =
     for r in getAllRows(db, (query.string & " LIMIT 1").sql, args):
         return some r
 
@@ -49,6 +54,22 @@ proc getAllTables*(db; ): seq[string] =
 
 template limit(s: string, n: int): untyped =
     s.substr(0, n)
+
+func toInt*(dir: SearchDirection): int =
+    case dir:
+    of saMore: +1
+    of saLess: -1
+
+func `[]`*[T](h: HSlice[T, T], dir: SearchDirection): T =
+    case dir:
+    of saLess: h.a
+    of saMore: h.b
+
+
+func `~`*(dir: SearchDirection): SearchDirection =
+    case dir:
+    of saLess: saMore
+    of saMore: saLess
 
 # member ----------------------------------------
 
@@ -132,7 +153,7 @@ proc addQuiz*(db;
                 sql"INSERT INTO question (quiz_id, photo_path, description, why, answer) VALUES (?, ?, ?, ?, ?)",
                 result, q.photo_path, q.description, q.why, q.answer)
 
-func quizInfoQueryGen(whereClause: string, dir= saMore): string =
+func quizInfoQueryGen(whereClause: string, dir = saMore): string =
     fmt """
     SELECT 
         quiz.id as qid,
@@ -155,7 +176,7 @@ func quizInfoQueryGen(whereClause: string, dir= saMore): string =
     {whereClause} ORDER BY qid {ortsd[dir]}
     """
 
-func toQuizInfoModel(row: Row): QuizInfoModel {.errorHandler.} =
+func toQuizInfo(row: Row): QuizInfo {.errorHandler.} =
     result.quiz = QuizModel(
         id: row[0].parseInt,
         name: row[1],
@@ -174,7 +195,7 @@ func toQuizInfoModel(row: Row): QuizInfoModel {.errorHandler.} =
 proc findQuizzes*(db;
     qq: QuizQuery, pinnedIndex: int64, limit: int,
     dir: SearchDirection,
-): seq[QuizInfoModel] {.errorHandler.} =
+): seq[QuizInfo] {.errorHandler.} =
     var conditions = @[fmt"qid {dop[dir]} {pinnedIndex}"]
 
     if issome qq.grade:
@@ -193,13 +214,13 @@ proc findQuizzes*(db;
             , dir
         ) & fmt"LIMIT {limit}"
 
-    db.getAllRows(query.sql).map(toQuizInfoModel)
+    db.getAllRows(query.sql).map(toQuizInfo)
 
-proc getQuizInfo*(db; quizid: int64): Option[QuizInfoModel] {.errorHandler.} =
+proc getQuizInfo*(db; quizid: int64): Option[QuizInfo] {.errorHandler.} =
     let row = db.getSingleRow(quizInfoQueryGen("WHERE qid = ?").sql, quizid, quizid)
 
     if issome row:
-        result = some row.get.toQuizInfoModel
+        result = some row.get.toQuizInfo
 
 proc getQuizItself*(db; quizid: int64): Option[QuizModel] {.errorHandler.} =
     let row = db.getSingleRow("""
@@ -267,7 +288,7 @@ proc getRecordFor*(db;
 proc getMyRecords*(db;
     memberId: int64, pinnedIndex: int64, limit: int,
     dir: SearchDirection
-): seq[tuple[quiz: QuizModel, record: RecordModel]] {.errorHandler.} =
+): seq[RecordInfo] {.errorHandler.} =
     let rows = db.getAllRows(sql fmt"""
         SELECT  
             r.id,

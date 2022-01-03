@@ -6,7 +6,7 @@ type
   Stages* = enum
     # basic
     sMain, sSendContact, sEnterMainMenu, sMainMenu
-    sFindQuizMain, sFQname, sFQgrade, sFQlesson, sFQScroll
+    sFindQuizMain, sFQname, sFQgrade, sFQlesson, sMyRecords, sScroll
     sTakingQuiz, sFindMyRecords
 
     # admin stuff
@@ -15,13 +15,13 @@ type
     sAQQuestion, sAQQPic, sAQQDesc, sAQQWhy, sAQQAns
 
 type
-  SearchFor* = enum 
+  SearchFor* = enum
     sfQuiz, sfmyRecords
 
   QueryPageInfo*[T] = object
     msgid*: Option[int]
-    lastIndex*: int64
-    currentPage*: int
+    indexRange*: HSlice[int64, int64]
+    page*: int
     context*: T
 
   UserCtx* = ref object
@@ -79,7 +79,7 @@ const
   DeleteQuiz* = {sDeleteQuiz, sDQEnterId, sDQConfirm}
   AddQuizStages* = {sAddQuiz, sAQName, sAQTime, sAQGrade, sAQLesson, sAQchapter} # admin
   AddQuestionStages* = {sAQQuestion, sAQQPic, sAQQDesc, sAQQWhy, sAQQAns}
-  FindQuizStages* = {sFindQuizMain, sFQname, sFQgrade, sFQlesson, sFQScroll}
+  FindQuizStages* = {sFindQuizMain, sFQname, sFQgrade, sFQlesson}
   TakingQuizStages* = {sTakingQuiz}
   RecordStages* = {sFindMyRecords}
 
@@ -87,7 +87,7 @@ const
 # helper
 
 func initQueryPageInfo*[T](context: T): QueryPageInfo[T] =
-  result.lastIndex = int.high
+  result.indexRange = 0'i64 .. int64.high
   result.context = context
 
 proc add(father: NimNode; children: openArray[NimNode]): NimNode =
