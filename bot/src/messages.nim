@@ -1,6 +1,6 @@
 import options, strutils, strformat, times
 import telebot
-import ./helper, ../database/queries, ../database/models
+import ./telegram/helper, ./database/[queries, models]
 
 # texts: texts that are recieved from the client
 const

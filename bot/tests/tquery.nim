@@ -97,7 +97,7 @@ suite "INIT":
 suite "INSERT":
   test "add member":
     for m in membersRaw:
-      db.addMember(m[0], m[1], m[2], m[3], m[4])
+      discard db.addMember(m[0], m[1], m[2], m[3], m[4])
 
   test "add tag":
     for t in tagsRaw:
@@ -189,7 +189,7 @@ suite "UPSERT":
 
 suite "DELETE":
   test "quiz":
-    db.deleteQuiz(1)
+    discard db.deleteQuiz(1)
     check:
       isNone db.getQuizInfo(1) # delete quiz
 

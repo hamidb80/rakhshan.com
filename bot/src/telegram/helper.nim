@@ -1,4 +1,4 @@
-import os, sequtils, options
+import sequtils, options
 import telebot
 
 # ------------------------------------------

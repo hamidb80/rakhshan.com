@@ -1,16 +1,16 @@
 import
   sequtils, tables, strutils, options, json, times, random, logging,
   asyncdispatch, threadpool, db_sqlite, os
-import telebot
+import telebot, asyncanything
 import
-  telegram/[controller, helper, messages, comfortable],
+  telegram/[controller, helper, comfortable], messages,
   host_api, states, utils, ./mymath, database/[queries, models]
 
 # prepare ----------------------------------
 
 randomize()
 
-const 
+const
   dbPath = getenv("DB_PATH")
   authorChatId = 101862091
 
@@ -40,7 +40,7 @@ newRouter router:
           userInfo = await ct.phoneNumber.getUserInfo # number
 
         dbworks dbPath:
-          db.addMember(chatid, userinfo.display_name,
+          discard |>db.addMember(chatid, userinfo.display_name,
             (ct.firstname & " " & ct.lastname.get("")),
             ct.phoneNumber, userInfo.is_admin.int)
 
@@ -140,8 +140,9 @@ newRouter router:
     case input
     of endT:
       dbworks dbpath:
-        let tg = db.upsertTag(myqc.tag.grade, myqc.tag.lesson, myqc.tag.chapter)
-        discard db.addQuiz(
+        let tg = |> db.upsertTag(
+          myqc.tag.grade, myqc.tag.lesson, myqc.tag.chapter)
+        discard |>db.addQuiz(
           myqc.quiz.name,
           myqc.quiz.description,
           myqc.quiz.time,
@@ -209,7 +210,7 @@ newRouter router:
     case input:
     of findQuizT:
       let
-        quizList = dbworksCapture dbpath: findQuizzes(db, myquery, 0, 0)
+        quizList = dbworksCapture dbpath: |> findQuizzes(db, myquery, 0, 0)
         str = quizList.map(miniQuizInfo).join "\n"
 
       if issome myquery.resultMsgId:
@@ -248,12 +249,13 @@ newRouter router:
   command(chatid: int64, param: string) as "show-quiz":
     let
       quizid = parseint param
-      qm = dbworksCapture dbpath: db.getQuizInfo(quizid)
+      qm = dbworksCapture dbpath: |> db.getQuizInfo(quizid)
 
     asyncCheck:
       if qm.issome:
         let
-          rec = dbworksCapture dbpath: db.getRecordFor(chatid, qm.get.quiz.id)
+          rec = dbworksCapture dbpath: |> db.getRecordFor(chatid,
+              qm.get.quiz.id)
           text = fullQuizInfo(qm.get, rec)
 
         if rec.issome:
@@ -283,7 +285,9 @@ newRouter router:
       of sDQConfirm:
         asyncCheck:
           if input == yesT:
-            dbworks dbpath: db.deleteQuiz(uctx.quizidToDelete.get)
+            dbworks dbpath:
+              discard |>db.deleteQuiz(uctx.quizidToDelete.get)
+
             chatid << quizGotDeletedT
           else:
             chatid << operationCancelledT
@@ -298,14 +302,14 @@ newRouter router:
     # TODO gaurd for when is taking quiz
     let
       quizid = parseint param
-      quiz = dbworksCapture dbpath: db.getQuizItself(quizid)
+      quiz = dbworksCapture dbpath: |> db.getQuizItself(quizid)
 
     if issome quiz:
       asyncCheck chatid << (quizWillStartSoonT, doingQuizReply)
 
       uctx.record = some QuizTaking()
       myrecord.quiz = quiz.get
-      myrecord.questions = dbworksCapture dbpath: db.getQuestions(quizid)
+      myrecord.questions = dbworksCapture dbpath: |> db.getQuestions(quizid)
 
       # TODO shuffle myrecord.questions
 
@@ -374,12 +378,12 @@ newRouter router:
   command(chatid: int64, param: string) as "analyze":
     let
       quizid = parseint param
-      quiz = dbworksCapture dbpath: db.getQuizItself(quizid)
+      quiz = dbworksCapture dbpath: |> db.getQuizItself(quizid)
 
     if quiz.issome:
-      let rec = dbworksCapture dbpath: db.getRecordFor(chatid, quizid)
+      let rec = dbworksCapture dbpath: |> db.getRecordFor(chatid, quizid)
       if rec.issome:
-        let questions = dbworksCapture dbpath: db.getQuestions(quizid)
+        let questions = dbworksCapture dbpath: |> db.getQuestions(quizid)
         for (i, q) in questions.pairs:
           let text = questionAnalyzeDialog(i, q, parseInt rec.get.answer_list[i])
 
@@ -423,7 +427,7 @@ newRouter router:
 
       # save record
       dbworks dbpath:
-        discard db.addRecord(r.quiz.id, chatid, r.answerSheet.join, percent)
+        discard |>db.addRecord(r.quiz.id, chatid, r.answerSheet.join, percent)
 
       # show complete result
       asyncCheck chatid << recordResultDialog(r.quiz, percent)
@@ -478,7 +482,7 @@ proc dispatcher*(bot: TeleBot, u: Update): Future[bool] {.async.} =
 
   if uctx.firstTime:
     castSafety:
-      let m = dbworksCapture dbPath: getMember(db, u.getchatid)
+      let m = dbworksCapture dbPath: |> getMember(db, u.getchatid)
       if issome m:
         uctx.membership = m
         uctx.stage = sEnterMainMenu

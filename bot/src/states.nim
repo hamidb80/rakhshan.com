@@ -1,7 +1,5 @@
-import
-  tables, times, options,
-  locks, os
-import telegram/[controller], database/[models], utils
+import tables, times, options, locks, os
+import telegram/controller, database/models, utils
 
 type
   NotificationKinds* = enum

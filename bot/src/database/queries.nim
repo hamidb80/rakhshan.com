@@ -15,12 +15,13 @@ template dbworks*(path: string, body): untyped =
     db.close()
 
 template dbworksCapture*(path: string, body): untyped =
-    let
-        db {.inject.} = open(path, "", "", "")
-        result = body
+    block:
+        let
+            db {.inject.} = open(path, "", "", "")
+            result = body
 
-    db.close()
-    result
+        db.close()
+        result
 
 template transaction*(db, body): untyped =
     db.exec sql"BEGIN"
@@ -54,10 +55,11 @@ proc getMember*(db; chatId: int64): Option[MemberModel] =
             phone_number: row.get[3],
             isAdmin: row.get[4].parseInt)
 
-proc addMember*(db; chatId: int64, site_name, tg_name, phone_number: string,
-        isAdmin: int) =
+proc addMember*(db;
+    chatId: int64, site_name, tg_name, phone_number: string, isAdmin: int
+): int64 =
     # add site_name + tg_name
-    discard db.insertID(
+    db.insertID(
         sql"INSERT INTO member (chat_id, site_name, tg_name, phone_number, is_admin) VALUES (?, ?, ?, ?, ?)",
         chatId, site_name.limit(255), tg_name.limit(255), phone_number.limit(
                 15), isAdmin)
@@ -104,7 +106,7 @@ proc upsertTag*(db; grade: int64, lesson: string, chapter: int64): TagModel =
 
 proc addQuiz*(db;
     name, description: string, time, tag_id: int64,
-    questions: openArray[QuestionModel]
+    questions: openArray[QuestionModel],
 ): int64 =
     transaction db:
         result = db.insertID(
@@ -209,13 +211,11 @@ proc getQuestions*(db; quizid: int64): seq[QuestionModel] =
         why: it[2],
         answer: parseint it[3])
 
-proc deleteQuiz*(db; quizid: int64) =
+proc deleteQuiz*(db; quizid: int64): bool =
     transaction db:
         db.exec("DELETE FROM record WHERE quiz_id = ?".sql, quizid)
         db.exec("DELETE FROM question WHERE quiz_id = ?".sql, quizid)
         db.exec("DELETE FROM quiz WHERE id = ?".sql, quizid)
-
-# TODO get quiz by id
 
 # quiz -------------------------------------------
 
