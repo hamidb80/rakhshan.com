@@ -131,23 +131,21 @@ suite "SELECT":
     check q.get.name == "Qz4"
 
   test "find quizzes":
-    # TODO check multi filter or non filter
-
     block by_grade:
-      let qs = db.findQuizzes(QuizQuery(grade: some 11), int64.high, 5)
-      check qs.mapIt(it.quiz.name).sorted == @["Qz1", "Qz2", "Qz3"]
+      let qs = db.findQuizzes(QuizQuery(grade: some 11), 0, 5, saMore)
+      check qs.mapIt(it.quiz.name) == @["Qz1", "Qz2", "Qz3"]
 
     block by_lesson:
-      let qs = db.findQuizzes(QuizQuery(lesson: some "phyz"), int64.high, 5)
-      check qs.mapIt(it.quiz.name).sorted == @["Qz4", "Qz5"]
+      let qs = db.findQuizzes(QuizQuery(lesson: some "phyz"), 0, 10, saMore)
+      check qs.mapIt(it.quiz.name) == @["Qz4", "Qz5"]
 
     block by_name:
-      let qs = db.findQuizzes(QuizQuery(name: some "ah"), int64.high, 5)
-      check qs.mapIt(it.quiz.name).sorted == @["blah blah"]
+      let qs = db.findQuizzes(QuizQuery(name: some "ah"), int64.high, 10, saLess)
+      check qs.mapIt(it.quiz.name) == @["blah blah"]
 
     block paging:
-      let qs = db.findQuizzes(QuizQuery(), 5, 2)
-      check qs.mapIt(it.quiz.id).sorted == @[3'i64, 4]
+      let qs = db.findQuizzes(QuizQuery(), 5, 2, saLess)
+      check qs.mapIt(it.quiz.id) == @[4'i64, 3]
 
   test "get questions":
     let qs5 = db.getQuestions(5)
@@ -155,11 +153,11 @@ suite "SELECT":
       qs5.len == 7
 
   test "get my records":
-    let rs1 = db.getMyRecords(membersRaw[1].id, int64.high, 10)
-    check rs1.mapIt(it.record.percent).sorted == [12.4, 48.5, 100.0]
+    let rs1 = db.getMyRecords(membersRaw[1].id, int64.high, 10, saLess)
+    check rs1.mapIt(it.record.percent) == [100.0, 12.4, 48.5]
 
-    let rs2 = db.getMyRecords(membersRaw[1].id, 4, 10)
-    check rs2.mapIt(it.record.percent).sorted == [12.4, 48.5]
+    let rs2 = db.getMyRecords(membersRaw[1].id, 4, 1, saLess)
+    check rs2.mapIt(it.record.percent) == [12.4]
 
   test "get record for":
     let res = db.getRecordFor(membersRaw[2].id, 4)
@@ -199,5 +197,5 @@ suite "DELETE":
       isNone db.getQuizInfo(1) # delete quiz
       db.getQuestions(1).len == 0 # delete question
 
-      db.getMyRecords(membersRaw[1].id, int64.high, 10)
-        .mapIt(it.quiz.id).sorted == @[2'i64, 3] # delete records
+      db.getMyRecords(membersRaw[1].id, 0, 10, saMore)
+        .mapIt(it.quiz.id) == @[2'i64, 3] # delete records

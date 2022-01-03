@@ -114,6 +114,8 @@ const
 
     pointLeftTJ* = fmt"{previousT} {pointLeftJ}" 
     pointRightTJ* = fmt"{pointRightJ} {nextT}"    
+    messageExpiredT* = "پیام منقضی شده است"
+
 let
     noReply* = newReplyKeyboardRemove(true)
 
@@ -187,7 +189,7 @@ let
     answerKeyboard* = newInlineKeyboardMarkup(answerBtns, moveBtns)
 
 
-func genQueryListInlineBtns*(currentPage: int): InlineKeyboardMarkup= 
+func genQueryPageInlineBtns*(currentPage: int): InlineKeyboardMarkup= 
   newInlineKeyboardMarkup @[
     toInlineButtons @[
       (pointLeftTJ, "/m-"),

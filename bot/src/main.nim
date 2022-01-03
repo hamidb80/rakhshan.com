@@ -223,16 +223,14 @@ newRouter router:
       /-> sFindQuizMain
 
     of showResultsT:
-      let
-        quizList = dbworksCapture dbpath: |> db.findQuizzesHandler(qq, 0,
-            pageSize).tryGet
-        text = quizList.map(miniQuizInfo).join "\n"
+      let quizList = dbworksCapture dbpath:
+        |> db.findQuizzesHandler(qq, int.high, pageSize, saLess).tryGet
 
       asyncCheck chatid << (yourSearchResultT, cancelReply)
 
       qp.msgid = some (await chatid << (
-        text,
-        genQueryListInlineBtns(0)
+        quizList.map(miniQuizInfo).join "\n",
+        genQueryPageInlineBtns(0)
       )).messageid
 
       /-> sFQScroll
@@ -262,9 +260,30 @@ newRouter router:
 
       else: discard
 
-  callbackQuery(chatid: int64, msgId: int64, param: string) as "scroll":
+  callbackQuery(chatid: int64, msgId: int, param: string) as "scroll":
     if issome uctx.queryPaging:
-      discard
+      if qp.msgid.get == msgid:
+        # FIXME get new page number
+
+        case qp.context:
+        of sfQuiz:
+          assert issome uctx.quizQuery
+          let quizzes = dbworksCapture dbpath:
+            |> db.findQuizzesHandler(qq, qp.lastIndex, pageSize, saLess).tryget
+
+          if quizzes.len != 0:
+            qp.lastIndex = quizzes[^1].quiz.id
+            # FIXME set new page number
+
+            asyncCheck (chatid, msgid) <^ (
+              quizzes.map(miniQuizInfo).join "\n",
+              genQueryPageInlineBtns(qp.currentPage))
+
+        of sfmyRecords:
+          discard
+
+      else:
+        asyncCheck chatid << messageExpiredT
     else:
       asyncCheck chatid << invalidCommandT
 

@@ -7,6 +7,16 @@ type
         tag: TagModel
         questions_number: int
 
+    SearchDirection* = enum
+        saMore, saLess
+
+const
+    # direction operator
+    dop: array[SearchDirection, char] = ['>', '<']
+    # Order Respected To Search Direction
+    ortsd: array[SearchDirection, string] = ["ASC", "DESC"]
+
+
 using db: DbConn
 
 template dbworks*(path: string, body): untyped =
@@ -108,7 +118,6 @@ proc upsertTag*(db;
             lesson: lesson,
             chapter: chapter)
 
-
 proc addQuiz*(db;
     name: string, description: string, time: int64, tag_id: int64,
     questions: openArray[QuestionModel],
@@ -123,7 +132,7 @@ proc addQuiz*(db;
                 sql"INSERT INTO question (quiz_id, photo_path, description, why, answer) VALUES (?, ?, ?, ?, ?)",
                 result, q.photo_path, q.description, q.why, q.answer)
 
-func quizInfoQueryGen(whereClause: string): string =
+func quizInfoQueryGen(whereClause: string, dir= saMore): string =
     fmt """
     SELECT 
         quiz.id as qid,
@@ -143,7 +152,7 @@ func quizInfoQueryGen(whereClause: string): string =
         quiz
     INNER JOIN tag
         ON quiz.tag_id = tag.id
-    {whereClause} ORDER BY qid DESC 
+    {whereClause} ORDER BY qid {ortsd[dir]}
     """
 
 func toQuizInfoModel(row: Row): QuizInfoModel {.errorHandler.} =
@@ -163,9 +172,10 @@ func toQuizInfoModel(row: Row): QuizInfoModel {.errorHandler.} =
     result.questions_number = parseInt row[^1]
 
 proc findQuizzes*(db;
-    qq: QuizQuery, lastIndex: int64, limit: int
+    qq: QuizQuery, pinnedIndex: int64, limit: int,
+    dir: SearchDirection,
 ): seq[QuizInfoModel] {.errorHandler.} =
-    var conditions = @[fmt"qid < {lastIndex}"]
+    var conditions = @[fmt"qid {dop[dir]} {pinnedIndex}"]
 
     if issome qq.grade:
         conditions.add fmt"tgrade = {qq.grade.get}"
@@ -180,6 +190,7 @@ proc findQuizzes*(db;
         quizInfoQueryGen(
             if conditions.len == 0: ""
             else: "WHERE " & conditions.join" AND "
+            , dir
         ) & fmt"LIMIT {limit}"
 
     db.getAllRows(query.sql).map(toQuizInfoModel)
@@ -254,9 +265,10 @@ proc getRecordFor*(db;
             percent: row.get[2].parseFloat)
 
 proc getMyRecords*(db;
-    memberId: int64, lastIndex: int64, pageSize: int
+    memberId: int64, pinnedIndex: int64, limit: int,
+    dir: SearchDirection
 ): seq[tuple[quiz: QuizModel, record: RecordModel]] {.errorHandler.} =
-    let rows = db.getAllRows(sql"""
+    let rows = db.getAllRows(sql fmt"""
         SELECT  
             r.id,
             r.percent,
@@ -267,10 +279,10 @@ proc getMyRecords*(db;
         INNER JOIN quiz q 
             ON q.id = r.quiz_id
         WHERE 
-            r.member_chatid = ? AND r.id < ? 
-        ORDER BY r.id DESC
+            r.member_chatid = ? AND r.id {dop[dir]} ? 
+        ORDER BY r.id {ortsd[dir]}
         LIMIT ?
-    """, memberid, lastIndex, pageSize)
+    """, memberid, pinnedIndex, limit)
 
     rows.mapIt (
         QuizModel(
