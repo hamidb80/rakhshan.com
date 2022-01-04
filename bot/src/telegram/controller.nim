@@ -54,6 +54,7 @@ type
     isReady*: bool
     isEnded*: bool
 
+    questionsOrder: seq[int]
     lastQuestionPhotoUrl*: string
 
     quizTimeMsgId*: int

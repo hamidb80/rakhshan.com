@@ -239,18 +239,19 @@ proc getQuizItself*(db; quizid: int64): Option[QuizModel] {.errorHandler.} =
 
 proc getQuestions*(db; quizid: int64): seq[QuestionModel] {.errorHandler.} =
     let rows = db.getAllRows("""
-        SELECT photo_path, description, why, answer 
+        SELECT id, photo_path, description, why, answer 
         FROM question 
         WHERE quiz_id = ?
-        """.sql,
-        quizid)
+        ORDER by id ASC
+    """.sql, quizid)
 
     rows.mapIt QuestionModel(
+        id: it[0].parseInt,
         quiz_id: quizid,
-        photo_path: it[0],
-        description: it[1],
-        why: it[2],
-        answer: parseint it[3])
+        photo_path: it[1],
+        description: it[2],
+        why: it[3],
+        answer: parseint it[4])
 
 proc deleteQuiz*(db; quizid: int64): bool {.errorHandler.} =
     transaction db:
@@ -262,18 +263,26 @@ proc deleteQuiz*(db; quizid: int64): bool {.errorHandler.} =
 
 proc addRecord*(db;
     quizId: int64, member_chatId: int64, answers: string,
-    precent: float, created_at: int64
+    questions_order: string, precent: float, created_at: int64,
 ): int64 {.errorHandler.} =
     db.insertID(sql"""
-        INSERT INTO record (quiz_id, member_chatid, answer_list, percent, created_at) 
-        VALUES (?, ?, ?, ?, ?)
-    """, quizId, member_chatId, answers.limit(255), precent, created_at)
+        INSERT INTO record (quiz_id, member_chatid, answer_list, percent, created_at, questions_order) 
+        VALUES (?, ?, ?, ?, ?, ?)
+    """, quizId, member_chatId, answers.limit(255), precent, created_at, questions_order)
+
+proc isRecordExistsFor*(db;
+    memberId: int64, quizId: int64
+): bool {.errorHandler.} =
+    isSome db.getSingleRow(
+        sql"SELECT 1 FROM record WHERE member_chatid = ? AND quiz_id = ?",
+        memberid, quizid)
+
 
 proc getRecordFor*(db;
     memberId: int64, quizId: int64
 ): Option[RecordModel] {.errorHandler.} =
     let row = db.getSingleRow(sql"""
-        SELECT id, answer_list, percent, created_at 
+        SELECT id, answer_list, percent, created_at, questions_order
         FROM record
         WHERE member_chatid = ? AND quiz_id = ? 
     """, memberid, quizid)
@@ -285,7 +294,8 @@ proc getRecordFor*(db;
             member_chatid: memberId,
             answerlist: row.get[1],
             percent: row.get[2].parseFloat,
-            createdAt: row.get[3].parseInt)
+            createdAt: row.get[3].parseInt,
+            questions_order: row.get[4])
 
 proc getMyRecords*(db;
     memberId: int64, pinnedIndex: int64, limit: int,
@@ -315,11 +325,13 @@ proc getMyRecords*(db;
             description: it[5]),
         RecordModel(
             id: it[0].parseint,
-            quiz_id: it[2].parseint,
             percent: it[1].parseFloat,
-            createdAt: it[3].parseInt))
+            createdAt: it[2].parseInt,
+            quiz_id: it[3].parseint))
 
-proc getRank*(db; member_id: int64, quizid: int64): Option[int] {.errorHandler.} =
+proc getRank*(db;
+    member_id: int64, quizid: int64
+): Option[int] {.errorHandler.} =
     let rec = db.getSingleRow(sql"""
         SELECT percent
         FROM record r
@@ -328,7 +340,7 @@ proc getRank*(db; member_id: int64, quizid: int64): Option[int] {.errorHandler.}
 
     if issome rec:
         let myPercent = rec.get[0].parseFloat
-        
+
         result = some db.getSingleRow(sql"""
             SELECT COUNT(*)
             FROM record r

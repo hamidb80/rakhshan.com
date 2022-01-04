@@ -1,6 +1,6 @@
 import
   sequtils, tables, strutils, options, json, times, random, logging,
-  asyncdispatch, threadpool, db_sqlite, os, strformat
+  asyncdispatch, threadpool, db_sqlite, os, strformat, sugar
 import telebot, asyncanything, results
 import
   telegram/[controller, helper, comfortable], messages,
@@ -13,24 +13,30 @@ randomize()
 const
   dbPath = getenv("DB_PATH")
   authorChatId = 101862091
-  pageSize = 3
+  pageSize = 3 #FIXME
 
 var defaultPhotoUrl = ""
 
 # init -------------------------------------
 
 # router ---
-
 var router = new RouterMap
 newRouter router:
+  route(chatid: int64, msgtext: string) as "start":
+    discard
+
   route(chatid: int64, msgtext: string) as "home":
-    case msgtext:
+    if isSome uctx.membership:
+      asyncCheck redirect("enter-menu", %*[chatid])
+
+    else:
+      case msgtext:
       of loginT:
         asyncCheck chatid << (enterPhoneNumberT, sendContactReply)
         /-> sSendContact
 
       else:
-        discard await chatid << (selectOptionsT, notLoggedInReply)
+        asyncCheck chatid << (selectOptionsT, notLoggedInReply)
 
   route(chatid: int64) as "verify-user":
     try:
@@ -58,10 +64,8 @@ newRouter router:
 
   route(chatid: int64) as "enter-menu":
     let keyboardReply =
-      if uctx.membership.get.isAdmin == 1:
-        adminMenuReply
-      else:
-        memberMenuReply
+      if uctx.membership.get.isAdmin == 1: adminMenuReply
+      else: memberMenuReply
 
     asyncCheck chatid << (chooseOneT, keyboardReply)
     /-> sMainMenu
@@ -84,31 +88,34 @@ newRouter router:
       asyncCheck chatid << (findQuizDialogT, quizFilterReply)
 
     of myRecordsT:
-      uctx.queryPaging = some initQueryPageInfo(sfQuiz)
-
-      let recs = dbworksCapture dbpath:
-        |> db.getMyRecordsHandler(chatid, int64.high, pageSize, saLess).tryGet
-
-      if recs.len == 0:
-        asyncCheck chatid << noRecordsAvailableT
-
-      else:
-        /-> sMyRecords
-        asyncCheck chatid << (yourRecordsT, cancelReply)
-
-        qp.msgid = some (await chatid << (
-          recs.map(miniRecordInfo).join "\n\n",
-          genQueryPageInlineBtns(0)
-        )).messageid
-
-        let minmaxId = [0, recs.high].mapIt(recs[it].record.id)
-        qp.indexrange = min(minmaxId) .. max(minmaxId)
-
-        qp.context = sfmyRecords
-        /-> sScroll
+      /-> sMyRecords
+      asyncCheck redirect("my-records", %*[chatid])
 
     else:
       asyncCheck chatid << wrongCommandT
+
+  route(chatid: int64) as "my-records":
+    let recs = dbworksCapture dbpath:
+      |> db.getMyRecordsHandler(chatid, int64.high, pageSize, saLess).tryGet
+
+    if recs.len == 0:
+      asyncCheck chatid << noRecordsAvailableT
+      /-> sMainMenu
+
+    else:
+      uctx.queryPaging = some initQueryPageInfo(sfQuiz)
+      asyncCheck chatid << (yourRecordsT, cancelReply)
+
+      qp.msgid = some (await chatid << (
+        recs.map(miniRecordInfo).join "\n\n",
+        genQueryPageInlineBtns(0)
+      )).messageid
+
+      let minmaxId = [0, recs.high].mapIt(recs[it].record.id)
+      qp.indexrange = min(minmaxId) .. max(minmaxId)
+
+      qp.context = sfmyRecords
+      /-> sScroll
 
   route(chatid: int64, input: string) as "add-quiz":
     let msgid = u.message.get.messageId
@@ -136,19 +143,17 @@ newRouter router:
         asyncCheck chatid << enterQuizTimeT
         /-> sAQTime
 
-      of sAQTime: # TODO parse time rather than giving a number in seconds
-        trySendInvalid:
-          qc.quiz.time = parseInt input
-          qc.msgids.quiz[qzfTime] = msgid
-          asyncCheck chatid << enterQuizGradeT
-          /-> sAQgrade
+      of sAQTime:
+        qc.quiz.time = parseInt input
+        qc.msgids.quiz[qzfTime] = msgid
+        asyncCheck chatid << enterQuizGradeT
+        /-> sAQgrade
 
       of sAQgrade:
-        trySendInvalid:
-          qc.tag.grade = parseInt input
-          qc.msgids.tag[tfGrade] = msgid
-          asyncCheck chatid << enterQuizLessonT
-          /-> sAQLesson
+        qc.tag.grade = parseInt input
+        qc.msgids.tag[tfGrade] = msgid
+        asyncCheck chatid << enterQuizLessonT
+        /-> sAQLesson
 
       of sAQLesson:
         qc.tag.lesson = input
@@ -157,11 +162,10 @@ newRouter router:
         /-> sAQchapter
 
       of sAQchapter:
-        trySendInvalid:
-          qc.tag.chapter = parseInt input
-          qc.msgids.tag[tfChapter] = msgid
-          /-> sAQQuestion
-          asyncCheck redirect("add-question", %*[chatid, ""])
+        qc.tag.chapter = parseInt input
+        qc.msgids.tag[tfChapter] = msgid
+        /-> sAQQuestion
+        asyncCheck redirect("add-question", %*[chatid, ""])
 
       else:
         asyncCheck chatid << wrongCommandT
@@ -194,25 +198,28 @@ newRouter router:
       case uctx.stage:
       of sAQQuestion:
         if qs.len == 0:
-          asyncCheck chatid << addQuizQuestionT
-          asyncCheck chatid << (uploadQuizQuestionPicT, withoutPhotoReply)
+          asyncCheck chatid << (addFirstQuizQuestionT, withoutPhotoReply)
         else:
           asyncCheck chatid << (addQuizQuestionMoreT, addingMoreQuestionsReply)
 
+        asyncCheck chatid << uploadQuizQuestionPicT
         /-> sAQQPic
 
       of sAQQPic:
-        template goNext: untyped =
+        template init: untyped =
           qs.add QuestionModel()
           qc.msgids.questions.add [msgid, 0, 0, 0].QuestionTracker
 
-          asyncCheck chatId << enterQuestionInfoT
+        template goNext: untyped =
+          asyncCheck chatId << (enterQuestionInfoT, noReply)
           /-> sAQQDesc
 
         if input == withoutPhotoT:
+          init()
           goNext()
 
         elif issome msg.photo:
+          init()
           qs[^1].photo_path = getBiggestPhotoFileId(msg)
           goNext()
 
@@ -226,11 +233,10 @@ newRouter router:
         /-> sAQQAns
 
       of sAQQAns:
-        trySendInvalid:
-          qs[^1].answer = parseint input[0]
-          lqi[qfAnswer] = msgid
-          asyncCheck chatid << enterQuestionWhyY
-          /-> sAQQWhy
+        qs[^1].answer = parseint input[0]
+        lqi[qfAnswer] = msgid
+        asyncCheck chatid << (enterQuestionWhyY, noReply)
+        /-> sAQQWhy
 
       of sAQQWhy:
         qs[^1].why = input
@@ -258,22 +264,27 @@ newRouter router:
       /-> sFindQuizMain
 
     of showResultsT:
-      # TODO send his quiz query to himself
+      asyncCheck chatid << $qq
+
       let quizzes = dbworksCapture dbpath:
         |> db.findQuizzesHandler(qq, int64.high, pageSize, saLess).tryGet
 
-      asyncCheck chatid << (yourSearchResultT, cancelReply)
-      uctx.queryPaging = some initQueryPageInfo(sfQuiz)
+      if quizzes.len == 0:
+        asyncCheck chatid << noResultFoundT
 
-      qp.msgid = some (await chatid << (
-        quizzes.map(miniQuizInfo).join "\n",
-        genQueryPageInlineBtns(0)
-      )).messageid
+      else:
+        asyncCheck chatid << (yourSearchResultT, cancelReply)
+        uctx.queryPaging = some initQueryPageInfo(sfQuiz)
 
-      let minmaxId = [0, quizzes.high].mapIt(quizzes[it].quiz.id)
-      qp.indexrange = min(minmaxId) .. max(minmaxId)
-      qp.context = sfQuiz
-      /-> sScroll
+        qp.msgid = some (await chatid << (
+          quizzes.map(miniQuizInfo).join "\n",
+          genQueryPageInlineBtns(0)
+        )).messageid
+
+        let minmaxId = [0, quizzes.high].mapIt(quizzes[it].quiz.id)
+        qp.indexrange = min(minmaxId) .. max(minmaxId)
+        qp.context = sfQuiz
+        /-> sScroll
 
     of cancelT:
       uctx.quizQuery.forget
@@ -290,9 +301,8 @@ newRouter router:
         goBack()
 
       of sFQgrade:
-        trySendInvalid:
-          qq.grade = some parseint input
-          goBack()
+        qq.grade = some parseint input
+        goBack()
 
       of sFQlesson:
         qq.lesson = some input
@@ -384,13 +394,11 @@ newRouter router:
       else:
         asyncCheck chatid << messageExpiredT
     else:
-      asyncCheck chatid << invalidCommandT
+      asyncCheck chatid << wrongCommandT
 
   route(chatid: int64, input: string) as "middle-of-scroll":
     if input == cancelT:
       asyncCheck redirect("enter-menu", %*[chatid])
-    else:
-      asynccheck chatid << invalidCommandT
 
   command(chatid: int64, param: string) as "show-quiz":
     let
@@ -418,8 +426,8 @@ newRouter router:
       rank = dbworksCapture dbpath: |> db.getRankHandler(chatid, quizid).tryGet
 
     asyncCheck chatid << (
-      if isSome rank: fmt"{yourRankInThisQuizT}: {rank.get}" 
-      else: youDidntAttendInThisQuizT)
+      if isSome rank: fmt"{yourRankInThisQuizT}: {rank.get}"
+      else: youHaventAttendInThisQUizT)
 
   route(chatid: int64, input: string) as "delete-quiz":
     if input == cancelT:
@@ -455,56 +463,67 @@ newRouter router:
 
   callbackQuery(chatid: int64, _: int64, param: string) as "take-quiz":
     # TODO gaurd for when is taking quiz
-    let
-      quizid = parseint param
-      quiz = dbworksCapture dbpath: |> db.getQuizItselfHandler(quizid).tryGet
+    if not isDoingQuiz:
+      let
+        quizid = parseint param
+        quiz = dbworksCapture dbpath: |> db.getQuizItselfHandler(quizid).tryGet
 
-    if issome quiz:
-      asyncCheck chatid << quizWillStartSoonT
+      if issome quiz:
+        if not dbpath.dbworksCapture( |> db.isRecordExistsForHandler(chatid,
+            quizid).tryGet):
+          asyncCheck chatid << quizWillStartSoonT
 
-      uctx.record = some QuizTaking()
-      myrecord.quiz = quiz.get
-      myrecord.questions = dbworksCapture dbpath: |> db.getQuestionsHandler(quizid).tryGet
+          uctx.record = some QuizTaking()
+          myrecord.quiz = quiz.get
+          myrecord.questions = dbworksCapture dbpath: |> db.getQuestionsHandler(quizid).tryGet
 
-      # TODO shuffle myrecord.questions
+          myrecord.questionsOrder = toseq(0 .. myrecord.questions.high).dup(shuffle)
+          let fqi = myrecord.questionsOrder[0] # first question index
 
-      myrecord.answersheet = newSeqWith(myrecord.questions.len, 0)
-      myrecord.starttime = now()
-      myrecord.lastCheckedTime = now()
-      myrecord.qi = 0
+          myrecord.answersheet = newSeqWith(myrecord.questions.len, 0)
+          myrecord.starttime = now()
+          myrecord.lastCheckedTime = now()
+          myrecord.qi = 0
 
-      myrecord.quizTimeMsgId = (await chatid <<
-          timeformat myrecord.quiz.time).messageId
+          myrecord.quizTimeMsgId = (await chatid <<
+              timeformat myrecord.quiz.time).messageId
 
-      asyncCheck bot.pinChatMessage($chatid, myrecord.quizTimeMsgId)
+          asyncCheck bot.pinChatMessage($chatid, myrecord.quizTimeMsgId)
 
-      myrecord.lastQuestionPhotoUrl = myrecord.questions[0].photo_path or defaultPhotoUrl
-      myrecord.questionPicMsgId = (await chatid <@
-          myrecord.lastQuestionPhotoUrl).messageId
+          myrecord.lastQuestionPhotoUrl = myrecord.questions[fqi].photo_path or defaultPhotoUrl
+          myrecord.questionPicMsgId = (await chatid <@
+              myrecord.lastQuestionPhotoUrl).messageId
 
-      myrecord.questionDescMsgId = (await chatid <<
-        (questionSerialize(myrecord.questions[0], 0), answerKeyboard)).messageId
+          myrecord.questionDescMsgId = (await chatid <<
+            (questionSerialize(myrecord.questions[fqi], 0),
+                answerKeyboard)).messageId
 
-      myrecord.answerSheetMsgId = (await chatid <<
-        answerSheetSerialize(myrecord.answerSheet)).messageId
+          myrecord.answerSheetMsgId = (await chatid <<
+            answerSheetSerialize(myrecord.answerSheet)).messageId
 
-      myrecord.jumpQuestionMsgId = (await chatid <<
-        (gotoQuestionT, genQuestionJumpBtns(myrecord.questions.len))).messageId
+          myrecord.jumpQuestionMsgId = (await chatid <<
+            (gotoQuestionT, genQuestionJumpBtns(
+                myrecord.questions.len))).messageId
 
-      asyncCheck chatid << (quizStartedT, doingQuizReply)
+          asyncCheck chatid << (quizStartedT, doingQuizReply)
 
-      myrecord.isReady = true
-      /-> sTakingQuiz
+          myrecord.isReady = true
+          /-> sTakingQuiz
+
+        else:
+          asyncCheck chatid << youHaveTakenTheQuizBeforeT
+
+      else:
+        asyncCheck chatid << quizNotFoundT
 
     else:
-      asyncCheck chatid << quizNotFoundT
-      # TODO forward to another route
+      result = youAreTakingQuizT
 
   callbackQuery(chatid: int64, _: int64, param: string) as "jump-question":
     if isDoingQuiz:
       let
         newQuestionIndex = parseint param
-        q = myrecord.questions[newQuestionIndex]
+        q = myrecord.questions[myrecord.questionsOrder[newQuestionIndex]]
 
       if myrecord.qi != newQuestionIndex:
         myrecord.qi = newQuestionIndex
@@ -543,15 +562,19 @@ newRouter router:
     if quiz.issome:
       let rec = dbworksCapture dbpath: |> db.getRecordForHandler(chatid, quizid).tryGet
       if rec.issome:
-        let questions = dbworksCapture dbpath: |> db.getQuestionsHandler(quizid).tryGet
-        for (i, q) in questions.pairs:
-          let text = questionAnalyzeDialog(i, q, parseInt rec.get.answer_list[i])
+        let
+          questions = dbworksCapture dbpath: |> db.getQuestionsHandler(quizid).tryGet
+          qoi = rec.get.questionsOrder.parseJson.to(seq[int]) # question order index
+
+        for i in 0 .. questions.high:
+          let
+            yourIndex = qoi[i]
+            q = questions[yourIndex]
+            text = questionAnalyzeDialog(i, q, parseInt rec.get.answer_list[i])
 
           discard await:
-            if q.hasPhoto:
-              chatid <@ (q.photo_path, text)
-            else:
-              chatid << text
+            if q.hasPhoto: chatid <@ (q.photo_path, text)
+            else: chatid << text
 
       else:
         asyncCheck chatid << youHaventAttendInThisQUizT
@@ -582,13 +605,12 @@ newRouter router:
         asyncCheck chatId <! msgid
 
       let percent = getPercent(
-        r.answerSheet,
-        r.questions.mapIt it.answer.int)
+        r.answerSheet, r.questionsOrder.mapIt(r.questions[it].answer.int))
 
       # save record
       dbworks dbpath:
         discard |>db.addRecordHandler(r.quiz.id, chatid, r.answerSheet.join,
-            percent, unixNow()).tryGet
+            ($r.questionsOrder).substr(1), percent, unixNow()).tryGet
 
       # show complete result
       asyncCheck chatid << recordResultDialog(r.quiz, percent)
@@ -609,10 +631,11 @@ newRouter router:
       asyncCheck chatid << invalidInputT
 
   command(chatid: int64) as "invalid-command":
-    asyncCheck chatid << invalidCommandT
+    asyncCheck chatid << wrongCommandT
+
+  callbackQuery(_: int64) as "dont-care": discard
 
 # controllers ---
-
 proc checkNofitications(
   pch: ptr Channel[Notification], delay: int,
   bot: TeleBot
@@ -649,7 +672,6 @@ proc dispatcher*(bot: TeleBot, u: Update): Future[bool] {.async.} =
       let m = dbworksCapture dbPath: |> getMemberHandler(db, u.getchatid).tryGet
       if issome m:
         uctx.membership = m
-        uctx.stage = sEnterMainMenu
 
     uctx.firsttime = false
 
@@ -663,12 +685,12 @@ proc dispatcher*(bot: TeleBot, u: Update): Future[bool] {.async.} =
     if text.startsWith("/") and text.len > 2:
       let
         parameter = text[2..^1]
-        route =
-          case text[1]:
-            of 'q': "show-quiz"
-            of 'a': "analyze"
-            of 'r': "get-rank"
-            else: "invalid-command"
+        route = case text[1]:
+          of 's': "start"
+          of 'q': "show-quiz"
+          of 'a': "analyze"
+          of 'r': "get-rank"
+          else: "invalid-command"
 
       args.add %parameter
       castSafety:
@@ -708,15 +730,15 @@ proc dispatcher*(bot: TeleBot, u: Update): Future[bool] {.async.} =
   elif u.callbackQuery.issome:
     let
       cq = u.callbackQuery.get
-      cmd = cq.data.get("/n0")
+      cmd = cq.data.get("/d")
       parameter = cmd[2..^1]
-      route =
-        case cmd[1]:
+      route = case cmd[1]:
         of 't': "take-quiz"
         of 'j': "jump-question"
         of 'p': "select-answer"
         of 'g': "goto"
         of 'm': "scroll"
+        of 'd': "dont-care"
         else: "invalid-command"
 
     castSafety:

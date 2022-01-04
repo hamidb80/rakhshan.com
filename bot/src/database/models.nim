@@ -2,7 +2,6 @@ import easydb
 
 var initQuery*: seq[string]
 
-# TODO add timestamp
 Blueprint [queryHolder: initQuery, postfix: "Model"]:
     Table member:
         chat_id: int {.primary.}
@@ -39,7 +38,7 @@ Blueprint [queryHolder: initQuery, postfix: "Model"]:
         id: int {.primary.}
         quiz_id: int[ref quiz.id]
         member_chatid: int[ref members.chat_id] {.index.}
-        # TODO questions_order: string # a json array containing ids of questions
+        questions_order: string # a json array containing ids of questions
         answer_list: char[255] # answer corresponding to 'questions_order'
         percent: float
         created_at: int

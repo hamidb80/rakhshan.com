@@ -44,8 +44,8 @@ const
     enterQuizLessonT* = "نام درس آزمون را انتخاب کنید"
     enterQuizChapterT* = "شماره فصل درس آزمون را وارد کنید"
 
-    invalidCommandT* = "دستور اشتباه"
     quizNotFoundT* = "آزمون مورد نظر پیدا نشد"
+    noResultFoundT* = "نتیجه ایی یافت نشد"
 
     findQuizDialogT* = "میتوانید به طور اختیاری فیلتر هایی اعمال کنید و سپس روی دکمه جستجوی آزمون بزنید"
     findQuizT* = "جستجوی آزمون"
@@ -59,7 +59,7 @@ const
     enterQuestionInfoT* = "توضیحات سوال را وارد کنید"
     enterQuestionAnswerT* = "جواب سوال را وارد کنید"
     enterQuestionWhyY* = "درباره دلیل درستی جواب توضیح دهید"
-    addQuizQuestionT* = "به ترتیب اطلاعات وارد شده برای هر سوال را وارد کنید"
+    addFirstQuizQuestionT* = "به ترتیب اطلاعات وارد شده برای هر سوال را وارد کنید"
     addQuizQuestionMoreT* = "یابا دکمه 'خاتمه' آزمون را ثبت کنید یا اطلاعات سوال جدید را وارد کنید"
     uploadQuizQuestionPicT* = "تصویر سوال را در صورت وجود ارسال کنید در غیر این صورت روی دکمه 'بدون عکس' بزنید"
 
@@ -142,14 +142,20 @@ const
 
     noRecordsAvailableT* = "سابقه ای وجود ندارد"
     createdAtT* = "تاریخ ایجاد"
-    persianNumbers = ["۰","۱","۲","۳","۴","۵","۶","۷","۸","۹"]
+    persianNumbers = ["۰", "۱", "۲", "۳", "۴", "۵", "۶", "۷", "۸", "۹"]
     dateT* = "تاریخ"
     hourT* = "ساعت"
 
     calcRank* = "محاسبه رتبه"
 
     yourRankInThisQuizT* = "رتبه شما در این آزمون"
-    youDidntAttendInThisQuizT* = "شما در این آزمون شرکت نکرده اید"
+    appliedFiltersT* = "فیلتر های اعمالی"
+    separatorLine* = escapeMarkdownV2 "-----------------------"
+    minesT* = escapeMarkdownV2 "-"
+    nameT* = "نام"
+
+    youAreTakingQuizT* = "شما در حال انجام آزمون هستید"
+    youHaveTakenTheQuizBeforeT* = "شما قبلا در این آزمون شرکت کرده اید"
 
 let
     noReply* = newReplyKeyboardRemove(true)
@@ -228,12 +234,11 @@ let
 
     answerKeyboard* = newInlineKeyboardMarkup(answerBtns, moveBtns)
 
-
 func genQueryPageInlineBtns*(pageIndex: int): InlineKeyboardMarkup =
     newInlineKeyboardMarkup @[
       toInlineButtons @[
         (pointLeftTJ, "/m-"),
-        ($(pageIndex + 1), "="), # no op
+        ($(pageIndex + 1), "/d"), # no op
         (pointRightTJ, "/m+"),
     ]]
 
@@ -267,11 +272,11 @@ func spoiler*(s: string): string = fmt"||{s}||"
 func link*(url, hover: string): string = fmt"[{url}]({hover})"
 
 func toPersianNumbers*(str: string): string =
-  for c in str:
-    if c in '0' .. '9':
-      result &= persianNumbers[c.parseint]
-    else:
-      result.add c
+    for c in str:
+        if c in '0' .. '9':
+            result &= persianNumbers[c.parseint]
+        else:
+            result.add c
 
 func greeting*(uname: string): string =
     fmt"'{uname.escapeMarkdownV2}' {dearT} {welcomeT}"
@@ -280,18 +285,18 @@ func timeFormat*[T: SomeInteger](t: T): string =
     let d = initDuration(seconds = t).toParts
     fmt"{d[Hours]:02}:{d[Minutes]:02}:{d[Seconds]:02}"
 
-proc unixDatetimeFormat*(dt: int64): string=
-  let s = dt.fromUnix.format "yyyy/MM/dd '|' HH:mm:ss"
-  escapeMarkdownV2(s.toPersianNumbers)
+proc unixDatetimeFormat*(dt: int64): string =
+    let s = dt.fromUnix.format "yyyy/MM/dd '|' HH:mm:ss"
+    escapeMarkdownV2 s.toPersianNumbers
 
 func percentSerialize*(n: SomeFloat): string =
     escapeMarkdownV2 fmt"{n:.2f}%"
 
 proc miniRecordInfo*(ri: RecordInfo): string =
     [
-      fmt"{bold quizNameT}: {ri.quiz.name.escapeMarkdownV2}",
-      fmt"{bold resultT}: {ri.record.percent.percentSerialize}",
-      fmt"{bold dateT}: {{unixDatetimeFormat ri.record.created_at}}",
+      fmt"{bold quizNameT}: {escapeMarkdownV2 ri.quiz.name}",
+      fmt"{bold resultT}: {percentSerialize ri.record.percent}",
+      fmt"{bold dateT}: {unixDatetimeFormat ri.record.created_at}",
       fmt"{bold calcRank}: /r{ri.quiz.id}",
       fmt"{bold analyzeYourAnswersT}: /a{ri.quiz.id}"
     ].join "\n"
@@ -313,6 +318,7 @@ proc fullQuizInfo*(qi: QuizInfo, rec: Option[RecordModel]): string =
             [
               youWereAttendedBeforeT,
               fmt"{bold yourLastResultIsT}: {percentSerialize rec.get.percent}",
+              fmt"{bold calcRank}: /r{qi.quiz.id}",
               fmt"{bold analyzeYourAnswersT}: /a{qi.quiz.id}",
             ].join "\n"
 
@@ -353,6 +359,7 @@ func recordResultDialog*(quiz: QuizModel, percent: float): string =
     [
       fmt"{youInTheQuizT} '{quiz.name.escapeMarkdownV2}' {scoreT} {score} {youGotT}",
       fmt"{analyzeYourAnswersT}: /a{quiz.id}",
+      fmt"{bold calcRank}: /r{quiz.id}",
     ].join("\n\n")
 
 func questionAnswer(n: int): string =
@@ -390,3 +397,16 @@ func `$`*(f: QuizCreateFields): string =
     of qfWhy: "دلیل درستی سوال"
     of qfAnswer: "جواب سوال"
     of qzNoField: "قیلد اشتباه"
+
+func getStr[T](o: Option[T], alternative: string): string =
+    if issome o: $o.get
+    else: alternative
+
+func `$`*(qq: QuizQuery): string =
+    [
+      bold appliedFiltersT,
+      separatorLine,
+      fmt"{bold nameT}: {qq.name.get(minesT)}",
+      fmt"{bold gradeT}: {qq.grade.getStr(minesT)}",
+      fmt"{bold lessonT}: {qq.lesson.getStr(minesT)}",
+    ].join "\n"
