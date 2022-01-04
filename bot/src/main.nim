@@ -412,6 +412,15 @@ newRouter router:
       else:
         chatid << quizNotFoundT
 
+  command(chatid: int64, param: string) as "get-rank":
+    let
+      quizid = parseint param
+      rank = dbworksCapture dbpath: |> db.getRankHandler(chatid, quizid).tryGet
+
+    asyncCheck chatid << (
+      if isSome rank: fmt"{yourRankInThisQuizT}: {rank.get}" 
+      else: youDidntAttendInThisQuizT)
+
   route(chatid: int64, input: string) as "delete-quiz":
     if input == cancelT:
       asyncCheck redirect("enter-menu", %*[chatid])
@@ -466,6 +475,8 @@ newRouter router:
 
       myrecord.quizTimeMsgId = (await chatid <<
           timeformat myrecord.quiz.time).messageId
+
+      asyncCheck bot.pinChatMessage($chatid, myrecord.quizTimeMsgId)
 
       myrecord.lastQuestionPhotoUrl = myrecord.questions[0].photo_path or defaultPhotoUrl
       myrecord.questionPicMsgId = (await chatid <@
@@ -656,6 +667,7 @@ proc dispatcher*(bot: TeleBot, u: Update): Future[bool] {.async.} =
           case text[1]:
             of 'q': "show-quiz"
             of 'a': "analyze"
+            of 'r': "get-rank"
             else: "invalid-command"
 
       args.add %parameter

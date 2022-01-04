@@ -24,6 +24,7 @@ let
     (81321257, "mahdi site", "mahdi tg", "0913", 1,  pt("2021/01/05T14:27:43")),
     (98312873, "hamid site", "hamid tg", "0914", 1,  pt("2022/01/02T15:03:11")),
     (53622231, "maher site", "maher tg", "0915", 0,  pt("2020/07/22T23:43:28")),
+    (96820231, "Hadi sit", "Emami tg", "0917", 0,  pt("2019/04/20T06:51:41")),
   ]
 
   tagsRaw = [
@@ -75,10 +76,13 @@ let
   recordsRaw = [
     (1, 1, membersRaw[0].id, "012", 25.6, pt("2021/06/05T08:07:54")),
     (2, 1, membersRaw[1].id, "132", 48.5, pt("2021/06/05T08:07:54")),
-    (3, 2, membersRaw[1].id, "00", 12.4, pt("2021/06/05T08:07:54")),
-    (4, 3, membersRaw[1].id, "21334", 100.0, pt("2021/06/05T08:07:54")),
-    (5, 4, membersRaw[2].id, "22", 10.4, pt("2021/06/05T08:07:54")),
-    (6, 3, membersRaw[3].id, "22021", 7.8, pt("2021/06/05T08:07:54")),
+    (3, 1, membersRaw[2].id, "132", 78.2, pt("2021/06/05T08:07:54")),
+    (4, 1, membersRaw[3].id, "132", 12.3, pt("2021/06/05T08:07:54")),
+    (5, 1, membersRaw[4].id, "132", 48.5, pt("2021/06/05T08:07:54")),
+    (6, 2, membersRaw[1].id, "00", 15.7, pt("2021/06/05T08:07:54")),
+    (7, 3, membersRaw[1].id, "21334", 100.0, pt("2021/06/05T08:07:54")),
+    (8, 4, membersRaw[2].id, "22", 10.4, pt("2021/06/05T08:07:54")),
+    (9, 3, membersRaw[3].id, "22021", 7.8, pt("2021/06/05T08:07:54")),
   ]
 
 
@@ -159,10 +163,10 @@ suite "SELECT":
       qs5.len == 7
 
   test "get my records":
-    let rs1 = db.getMyRecords(membersRaw[1].id, 4, 2, saLess)
-    check rs1.mapIt(it.record.percent) == [12.4, 48.5]
+    let rs1 = db.getMyRecords(membersRaw[1].id, 7, 2, saLess)
+    check rs1.mapIt(it.record.percent) == [15.7, 48.5]
 
-    let rs2 = db.getMyRecords(membersRaw[1].id, 3, 1, saMore)
+    let rs2 = db.getMyRecords(membersRaw[1].id, 6, 1, saMore)
     check rs2.mapIt(it.record.percent) == [100.0]
 
   test "get record for":
@@ -170,6 +174,13 @@ suite "SELECT":
     check:
       res.get.percent == 10.4
       res.get.created_at == recordsRaw[4][5]
+
+  test "get rank":
+    let rnk1 = db.getrank(membersRaw[1].id, 1).get
+    check rnk1 == 2
+
+    let rnk2 = db.getrank(membersRaw[2].id, 1).get
+    check rnk2 == 1
 
 suite "UPSERT":
   test "new tag":

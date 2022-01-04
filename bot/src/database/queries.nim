@@ -318,3 +318,19 @@ proc getMyRecords*(db;
             quiz_id: it[2].parseint,
             percent: it[1].parseFloat,
             createdAt: it[3].parseInt))
+
+proc getRank*(db; member_id: int64, quizid: int64): Option[int] {.errorHandler.} =
+    let rec = db.getSingleRow(sql"""
+        SELECT percent
+        FROM record r
+        WHERE r.quiz_id = ? AND r.member_chatid = ?
+    """, quizid, member_id)
+
+    if issome rec:
+        let myPercent = rec.get[0].parseFloat
+        
+        result = some db.getSingleRow(sql"""
+            SELECT COUNT(*)
+            FROM record r
+            WHERE r.quiz_id = ? AND r.percent > ?
+        """, quizid, myPercent).get[0].parseint + 1

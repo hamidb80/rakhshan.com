@@ -146,6 +146,11 @@ const
     dateT* = "تاریخ"
     hourT* = "ساعت"
 
+    calcRank* = "محاسبه رتبه"
+
+    yourRankInThisQuizT* = "رتبه شما در این آزمون"
+    youDidntAttendInThisQuizT* = "شما در این آزمون شرکت نکرده اید"
+
 let
     noReply* = newReplyKeyboardRemove(true)
 
@@ -287,6 +292,7 @@ proc miniRecordInfo*(ri: RecordInfo): string =
       fmt"{bold quizNameT}: {ri.quiz.name.escapeMarkdownV2}",
       fmt"{bold resultT}: {ri.record.percent.percentSerialize}",
       fmt"{bold dateT}: {{unixDatetimeFormat ri.record.created_at}}",
+      fmt"{bold calcRank}: /r{ri.quiz.id}",
       fmt"{bold analyzeYourAnswersT}: /a{ri.quiz.id}"
     ].join "\n"
 
