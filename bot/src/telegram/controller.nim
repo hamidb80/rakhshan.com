@@ -1,6 +1,6 @@
 import tables, sequtils, strutils, json, options, times, macros
 import asyncdispatch, telebot, macroplus
-import ../database/models
+import ../database/models, ../utils
 
 type
   Stages* = enum
@@ -62,10 +62,25 @@ type
     jumpQuestionMsgId*: int
     answerSheetMsgId*: int
 
+  QuizCreateFields* = enum
+    qzNoField = -1
+    qzfName, qzfTime, qzfDescription
+    tfGrade, tfLesson, tfChapter
+    qfPhotoPath, qfDescription, qfWhy, qfAnswer
+
+  MessageIdTracker* = object
+    quiz*: array[qzfName .. qzfDescription, int]
+    tag*: array[tfGrade .. tfChapter, int]
+    questions*: seq[array[qfPhotoPath .. qfAnswer, int]]
+
   QuizCreate* = ref object
-    quiz: QuizModel
-    tag: TagModel
+    quiz*: QuizModel
+    tag*: TagModel
     questions*: seq[QuestionModel]
+    msgIds*: MessageIdTracker
+
+  QCMsgIdSearch* = enum
+    qcmsNothing, qcmsQuiz, qcmsTag, qcmsQuestions
 
   RouterProc = proc(
         bot: Telebot, uctx: UserCtx,
@@ -77,12 +92,51 @@ type
 const
   HomeStages* = {sMain, sSendContact} # primary
   DeleteQuiz* = {sDeleteQuiz, sDQEnterId, sDQConfirm}
-  AddQuizStages* = {sAddQuiz, sAQName, sAQTime, sAQGrade, sAQLesson, sAQchapter} # admin
+  AddQuizStages* = {sAddQuiz, sAQName, sAQDesc, sAQTime, sAQGrade, sAQLesson, sAQchapter} # admin
   AddQuestionStages* = {sAQQuestion, sAQQPic, sAQQDesc, sAQQWhy, sAQQAns}
   FindQuizStages* = {sFindQuizMain, sFQname, sFQgrade, sFQlesson}
   TakingQuizStages* = {sTakingQuiz}
   RecordStages* = {sFindMyRecords}
 
+
+func findInEnum[Idx: range](wrapper: array[Idx, int], lookingFor: int): Option[Idx] =
+  for i in Idx.low .. Idx.high:
+    if wrapper[i] == lookingFor:
+      return some i
+
+func findEditedMessageIdContext*(
+  qc: QuizCreate, msgid: int
+): tuple[context: QCMsgIdSearch, index: int, field: QuizCreateFields] =
+
+  if (
+    let iqz = qc.msgids.quiz.findInEnum(msgid)
+    isSome iqz
+  ):
+    (qcmsQuiz, 0, iqz.get.ord.QuizCreateFields)
+
+  elif (
+    let itg = qc.msgids.tag.findInEnum(msgid)
+    isSome itg
+  ):
+    (qcmsTag, 0, itg.get.ord.QuizCreateFields)
+
+  elif (
+    var
+      index = NotFound
+      field = none range[qfPhotoPath .. qfAnswer]
+
+    for i, q in qc.msgids.questions.pairs:
+      field = q.findInEnum(msgid)
+      if issome field:
+        index = i
+        break
+
+    index != NotFound
+  ):
+    (qcmsQuestions, index, field.get.ord.QuizCreateFields)
+
+  else:
+    (qcmsNothing, 0, qzNoField)
 
 # helper
 

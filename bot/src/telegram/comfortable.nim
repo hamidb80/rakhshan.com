@@ -57,7 +57,7 @@ template adminRequired*(body): untyped {.dirty.} =
   if issome(uctx.membership) and uctx.membership.get.isAdmin == 1:
     body
 
-template myqc*: untyped {.dirty.} =
+template qc*: untyped {.dirty.} =
   uctx.quizCreation.get
 
 template qq*: untyped {.dirty.} =

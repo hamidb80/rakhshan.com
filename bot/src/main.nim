@@ -1,6 +1,6 @@
 import
   sequtils, tables, strutils, options, json, times, random, logging,
-  asyncdispatch, threadpool, db_sqlite, os
+  asyncdispatch, threadpool, db_sqlite, os, strformat
 import telebot, asyncanything, results
 import
   telegram/[controller, helper, comfortable], messages,
@@ -84,24 +84,28 @@ newRouter router:
       asyncCheck chatid << (findQuizDialogT, quizFilterReply)
 
     of myRecordsT:
-      /-> sMyRecords
-      # FIXME think about empty | when no records
       uctx.queryPaging = some initQueryPageInfo(sfQuiz)
-      asyncCheck chatid << (yourRecordsT, cancelReply)
 
       let recs = dbworksCapture dbpath:
         |> db.getMyRecordsHandler(chatid, int64.high, pageSize, saLess).tryGet
 
-      qp.msgid = some (await chatid << (
-        recs.map(miniRecordInfo).join "\n\n",
-        genQueryPageInlineBtns(0)
-      )).messageid
+      if recs.len == 0:
+        asyncCheck chatid << noRecordsAvailableT
 
-      let minmaxId = [0, recs.high].mapIt(recs[it].record.id)
-      qp.indexrange = min(minmaxId) .. max(minmaxId)
+      else:
+        /-> sMyRecords
+        asyncCheck chatid << (yourRecordsT, cancelReply)
 
-      qp.context = sfmyRecords
-      /-> sScroll
+        qp.msgid = some (await chatid << (
+          recs.map(miniRecordInfo).join "\n\n",
+          genQueryPageInlineBtns(0)
+        )).messageid
+
+        let minmaxId = [0, recs.high].mapIt(recs[it].record.id)
+        qp.indexrange = min(minmaxId) .. max(minmaxId)
+
+        qp.context = sfmyRecords
+        /-> sScroll
 
     else:
       asyncCheck chatid << wrongCommandT
@@ -119,37 +123,37 @@ newRouter router:
         /-> sAQName
 
       of sAQName:
-        myqc.quiz.name = input
+        qc.quiz.name = input
         asyncCheck chatid << enterQuizInfoT
         /-> sAQDesc
 
       of sAQDesc:
-        myqc.quiz.description = input
+        qc.quiz.description = input
         /-> sAQTime
         asyncCheck chatid << enterQuizTimeT
 
       of sAQTime: # TODO parse time rather than giving a number in seconds
         trySendInvalid:
-          myqc.quiz.time = input.parseInt
+          qc.quiz.time = input.parseInt
           asyncCheck chatid << enterQuizGradeT
           /-> sAQgrade
 
       of sAQgrade:
         trySendInvalid:
-          myqc.tag.grade = input.parseInt
+          qc.tag.grade = input.parseInt
           asyncCheck chatid << enterQuizLessonT
           /-> sAQLesson
 
       of sAQLesson:
-        myqc.tag.lesson = input
+        qc.tag.lesson = input
         asyncCheck chatid << enterQuizChapterT
         /-> sAQchapter
 
       of sAQchapter:
         trySendInvalid:
-          myqc.tag.chapter = input.parseInt
+          qc.tag.chapter = input.parseInt
           /-> sAQQuestion
-          asyncCheck redirect("add-quiestion", %[%chatid, %""])
+          asyncCheck redirect("add-question", %*[chatid, ""])
 
       else:
         asyncCheck chatid << wrongCommandT
@@ -158,42 +162,38 @@ newRouter router:
     let msg = u.message.get
     template qs: untyped = uctx.quizCreation.get.questions
 
-    case input
-    of endT:
+    if input == endT and uctx.stage == sAQQPic:
       dbworks dbpath:
-        let tg = |> db.upsertTag(
-          myqc.tag.grade, myqc.tag.lesson, myqc.tag.chapter)
-        discard |>db.addQuiz(
-          myqc.quiz.name,
-          myqc.quiz.description,
-          myqc.quiz.time,
+        let tg = |> db.upsertTagHandler(
+          qc.tag.grade, qc.tag.lesson, qc.tag.chapter).tryGet
+        discard |>db.addQuizHandler(
+          qc.quiz.name,
+          qc.quiz.description,
+          qc.quiz.time,
           tg.id,
-          myqc.questions)
+          qc.questions).tryGet
 
-      asyncCheck chatid << quizAddedDialog(myqc.quiz.name)
+      asyncCheck chatid << quizAddedDialog(qc.quiz.name)
       asyncCheck redirect("enter-menu", %*[chatid])
       uctx.quizCreation.forget
-
-    of cancelT:
-      uctx.quizCreation.forget
-      asyncCheck redirect("enter-menu", %*[chatid])
 
     else:
       case uctx.stage:
       of sAQQuestion:
         if qs.len == 0:
-          asyncCheck chatid << addQuizQuestionFirstT
+          asyncCheck chatid << addQuizQuestionT
+          asyncCheck chatid << (uploadQuizQuestionPicT, withoutPhotoReply)
         else:
-          asyncCheck chatid << (addQuizQuestionMoreT, endReply)
+          asyncCheck chatid << (addQuizQuestionMoreT, addingMoreQuestion)
 
-        qs.add QuestionModel()
-        asyncCheck chatid << (uploadQuizQuestionPicT, withoutPhotoReply)
         /-> sAQQPic
 
       of sAQQPic:
         template goNext: untyped =
           asyncCheck chatId << enterQuestionInfoT
           /-> sAQQDesc
+
+        qs.add QuestionModel()
 
         if input == withoutPhotoT:
           goNext()
@@ -219,10 +219,9 @@ newRouter router:
       of sAQQWhy:
         qs[^1].why = input
         /-> sAQQuestion
-        asyncCheck redirect("add-question", %[%chatid, %""])
+        asyncCheck redirect("add-question", %*[chatid, ""])
 
-      else:
-        discard
+      else: discard
 
   route(chatid: int64, input: string) as "find-quiz":
     template goBack: untyped = /-> sFindQuizMain
@@ -284,10 +283,44 @@ newRouter router:
 
       else: discard
 
+  route(chatid: int64, msgid: int) as "edit-quiz-creation":
+    template msg: untyped = u.editedmessage.get
+    template input: untyped = msg.text.get("")
+    template qi: untyped = qc.questions[index]
+
+    let (ctx, index, field) = findEditedMessageIdContext(qc, msgid)
+    case ctx:
+    of qcmsQuiz, qcmsTag:
+      case field:
+      of qzfName: qc.quiz.name = input
+      of qzfTime: qc.quiz.time = parseint input
+      of qzfDescription: qc.quiz.description = input
+      of tfGrade: qc.tag.grade = parseint input
+      of tfLesson: qc.tag.lesson = input
+      of tfChapter: qc.tag.chapter = parseint input
+      else: discard
+      asyncCheck chatid << fmt"{fieldT} '{field}' {changedT}"
+
+    of qcmsQuestions:
+      case field:
+      of qfPhotoPath:
+        qi.photo_path =
+          if issome msg.photo: getBiggestPhotoFileId msg
+          else: ""
+
+      of qfDescription: qi.description = input
+      of qfWhy: qi.why = input
+      of qfAnswer: qi.answer = parseint input
+      else: discard
+      asyncCheck chatid << fmt"{fieldT} '{field}' {fromQuestionNumberT} {(index+1)} {changedT}"
+
+    of qcmsNothing:
+      asyncCheck chatid << nothingHasChangedT
+
   callbackQuery(chatid: int64, msgId: int, param: string) as "scroll":
     if issome uctx.queryPaging:
       if qp.msgid.get == msgid:
-        let 
+        let
           btnDir =
             if param == "+": saMore
             else: saLess
@@ -456,7 +489,7 @@ newRouter router:
           myrecord.lastQuestionPhotoUrl = newPhotoUrl
           asyncCheck (chatid, myrecord.questionPicMsgId) <@^ newPhotoUrl
 
-  callbackQuery(chatid: int64, _: int64, param: string) as "goto":
+  callbackQuery(chatid: int64, msgid: int64, param: string) as "goto":
     if isDoingQuiz:
       let targetQuestionIndex =
         if param[0] == '+':
@@ -464,7 +497,7 @@ newRouter router:
         else:
           max(myrecord.qi - 1, 0)
 
-      asyncCheck redirect("jump-question", %*[chatid, $targetQuestionIndex])
+      asyncCheck redirect("jump-question", %*[chatid, msgid, $targetQuestionIndex])
 
   callbackQuery(chatid: int64, _: int64, param: string) as "select-answer":
     if isDoingQuiz:
@@ -574,10 +607,13 @@ proc checkNofitications(
         Update(), args)
 
 proc dispatcher*(bot: TeleBot, u: Update): Future[bool] {.async.} =
-  var args = %*[]
-  let uctx = castSafety: getOrCreateUser findChatId u
+  let
+    chatid = findChatId u
+    uctx = castSafety: getOrCreateUser chatid
 
+  var args = %*[chatid]
   # TODO catch if error accured and tell the user and author
+
 
   if uctx.firstTime:
     castSafety:
@@ -587,6 +623,8 @@ proc dispatcher*(bot: TeleBot, u: Update): Future[bool] {.async.} =
         uctx.stage = sEnterMainMenu
 
     uctx.firsttime = false
+
+  debugEcho ">> ", uctx.stage
 
   if u.message.issome:
     let
@@ -602,19 +640,19 @@ proc dispatcher*(bot: TeleBot, u: Update): Future[bool] {.async.} =
             of 'a': "analyze"
             else: "invalid-command"
 
+      args.add %parameter
       castSafety:
-        discard await trigger(router, route, bot, uctx, u, %*[msg.chat.id, parameter])
+        discard await trigger(router, route, bot, uctx, u, args)
 
     # it's a text message
     else:
-      args.add %msg.chat.id
       args.add %text
 
       let route = case uctx.stage:
         of sMain: "home"
         of sSendContact: "verify-user"
-        of sAddQuiz: "add-quiz"
-        of sAQQuestion: "add-question"
+        of AddQuizStages: "add-quiz"
+        of AddQuestionStages: "add-question"
         of sEnterMainMenu: "enter-menu"
         of sMainMenu: "menu"
         of FindQuizStages: "find-quiz"
@@ -625,6 +663,17 @@ proc dispatcher*(bot: TeleBot, u: Update): Future[bool] {.async.} =
 
       castSafety:
         discard await trigger(router, route, bot, uctx, u, args)
+
+  elif u.editedMessage.issome:
+    args.add %u.editedMessage.get.messageId
+
+    let route =
+      case uctx.stage:
+      of AddQuizStages, AddQuestionStages: "edit-quiz-creation"
+      else: raise newException(ValueError, "cant edit message when stage is: " & $uctx.stage)
+
+    castSafety:
+      asyncCheck trigger(router, route, bot, uctx, u, args)
 
   elif u.callbackQuery.issome:
     let
@@ -648,6 +697,7 @@ proc dispatcher*(bot: TeleBot, u: Update): Future[bool] {.async.} =
 
       asyncCheck bot.answerCallbackQuery($cq.id, res)
 
+# FIXME add secret.key
 when isMainModule:
   const API_KEY = "2004052302:AAHm_oICftfs5xLmY0QwGVTE3o-gYgD6ahw"
   let bot = newTeleBot API_KEY

@@ -53,11 +53,12 @@ func getBiggestPhotoFileId*(msg: Message): string =
   # - you can pick smallest one or biggest one, or save them all
   msg.photo.get[^1].fileId
 
-proc findChatId*(updateFeed: Update): int64 =
-  template findId(msgWrapper): untyped =
-    msgWrapper.message.get.chat.id
+proc findChatId*(u: Update): int64 =
+  template findMsgChatId(msgWrapper, msgAlias): untyped =
+    msgWrapper.msgAlias.get.chat.id
 
   return
-    if issome updateFeed.message: updateFeed.findId
-    elif issome updateFeed.callbackQuery: updateFeed.callbackQuery.get.findId
+    if issome u.message: u.findMsgChatId(message)
+    elif issome u.editedMessage: u.findMsgChatId(editedMessage)
+    elif issome u.callbackQuery: u.callbackQuery.get.findMsgChatId(message)
     else: raise newException(ValueError, "couldn't find chat_id")

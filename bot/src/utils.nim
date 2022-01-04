@@ -1,6 +1,8 @@
 import options
 import results
 
+const NotFound* = -1
+
 template castSafety*(body): untyped =
   {.cast(gcsafe).}:
     body

@@ -1,6 +1,15 @@
 import options, strutils, strformat, times
 import telebot
-import ./telegram/helper, ./database/[queries, models]
+import ./telegram/[helper, controller], ./database/[queries, models]
+
+
+func escapeMarkdownV2*(s: string): string =
+    result = newStringOfCap(s.len * 2)
+    for c in s:
+        if c in "_*[]()~`>#+-=|{}.!":
+            result.add '\\'
+
+        result.add c
 
 # texts: texts that are recieved from the client
 const
@@ -30,7 +39,7 @@ const
     addQuizT* = "اضافه کردن آزمون"
     enterQuizNameT* = "نام آزمون را وارد کنید"
     enterQuizInfoT* = "توضیحات آزمون را وارد کنید"
-    enterQuizTimeT* = "زمان آزمون را وارد کنید"
+    enterQuizTimeT* = escapeMarkdownV2 "زمان آزمون را به ثانیه وارد کنید (عدد صحیح)"
     enterQuizGradeT* = "پایه تحصیلی آزمون را وارد کنید"
     enterQuizLessonT* = "نام درس آزمون را انتخاب کنید"
     enterQuizChapterT* = "شماره فصل درس آزمون را وارد کنید"
@@ -50,8 +59,8 @@ const
     enterQuestionInfoT* = "توضیحات سوال را وارد کنید"
     enterQuestionAnswerT* = "جواب سوال را وارد کنید"
     enterQuestionWhyY* = "درباره دلیل درستی جواب توضیح دهید"
-    addQuizQuestionFirstT* = "به ترتیب اطلاعات وارد شده برای هر سوال را وارد کنید"
-    addQuizQuestionMoreT* = "با وارد کردن 'انصراف' وارد کردن سوالات را تمام کنید در غیر این صورت اطلاعات سوال بعدی ر وارد کنید"
+    addQuizQuestionT* = "به ترتیب اطلاعات وارد شده برای هر سوال را وارد کنید"
+    addQuizQuestionMoreT* = "یابا دکمه 'خاتمه' آزمون را ثبت کنید یا اطلاعات سوال جدید را وارد کنید"
     uploadQuizQuestionPicT* = "تصویر سوال را در صورت وجود ارسال کنید در غیر این صورت روی دکمه 'بدون عکس' بزنید"
 
     quizWillStartSoonT* = "آزمون انتخابی تا لحظاتی دیگر شروع میشود"
@@ -113,8 +122,8 @@ const
     showResultsT* = "نمایش نتیجه"
     yourSearchResultT* = "نتیجه جستجوی شما"
 
-    pointLeftTJ* = fmt"{previousT} {pointLeftJ}" 
-    pointRightTJ* = fmt"{pointRightJ} {nextT}"    
+    pointLeftTJ* = fmt"{previousT} {pointLeftJ}"
+    pointRightTJ* = fmt"{pointRightJ} {nextT}"
     messageExpiredT* = "پیام منقضی شده است"
 
     myRecordsT* = "سابقه آزمون ها"
@@ -122,11 +131,19 @@ const
     itsTheEndT* = "آخرشه"
     itsTheStartT* = "اولشه"
 
+    nothingHasChangedT* = "چیزی تغییر نکرده"
+
+    fieldT* = "مشخصه"
+    changedT* = "تغییر کرد"
+    fromQuestionNumberT* = "از سوال شماره"
+
+    noRecordsAvailableT* = "سابقه ای وجود ندارد"
+
 let
     noReply* = newReplyKeyboardRemove(true)
 
     notLoggedInReply* = newReplyKeyboardMarkup @[
-        @[loginT],
+      @[loginT],
     ]
 
     cancelReply* = newReplyKeyboardMarkup @[
@@ -150,10 +167,10 @@ let
       @[endT],
       @[cancelT]
     ]
-    
-    addingQuestion* = newReplyKeyboardMarkup @[
+
+    addingMoreQuestion* = newReplyKeyboardMarkup @[
       @[endT],
-      @[cancelT]
+      @[withoutPhotoT]
     ]
 
     withoutPhotoReply* = newReplyKeyboardMarkup @[
@@ -171,6 +188,11 @@ let
     ]
 
     adminReplyRaw = @[ @[addQuizT, removeQuizT]]
+
+    addQuestionMoreThanOne* = newReplyKeyboardMarkup @[
+      @[endT, cancelT],
+    ]
+
 
     memberMenuReply* = newReplyKeyboardMarkup memberReplyRaw
     adminMenuReply* = newReplyKeyboardMarkup adminReplyRaw & memberReplyRaw
@@ -195,13 +217,13 @@ let
     answerKeyboard* = newInlineKeyboardMarkup(answerBtns, moveBtns)
 
 
-func genQueryPageInlineBtns*(pageIndex: int): InlineKeyboardMarkup= 
-  newInlineKeyboardMarkup @[
-    toInlineButtons @[
-      (pointLeftTJ, "/m-"),
-      ($(pageIndex + 1), "="), # no op
-      (pointRightTJ, "/m+"),
-  ]]
+func genQueryPageInlineBtns*(pageIndex: int): InlineKeyboardMarkup =
+    newInlineKeyboardMarkup @[
+      toInlineButtons @[
+        (pointLeftTJ, "/m-"),
+        ($(pageIndex + 1), "="), # no op
+        (pointRightTJ, "/m+"),
+    ]]
 
 func genTakeQuizInlineBtn*(quizId: int64): InlineKeyboardMarkup =
     result = InlineKeyboardMarkup(`type`: kInlineKeyboardMarkup)
@@ -226,14 +248,6 @@ func genQuestionJumpBtns*(number: int): InlineKeyboardMarkup =
     result = newInlineKeyboardMarkup()
     result.inlineKeyboard = btnRows
 
-func escapeMarkdownV2*(s: sink string): string =
-    result = newStringOfCap(s.len * 2)
-    for c in s:
-        if c in "_*[]()~`>#+-=|{}.!":
-            result.add '\\'
-
-        result.add c
-
 func bold*(s: string): string = fmt"*{s}*"
 func italic*(s: string): string = fmt"_{s}_"
 func underline*(s: string): string = fmt"__{s}__"
@@ -250,7 +264,7 @@ func timeFormat*[T: SomeInteger](t: T): string =
 func miniQuizInfo*(qi: QuizInfo): string =
     [
       fmt"{quizNameT}: {qi.quiz.name}",
-      fmt"{numberOfQuestionsT}: {qi.questions_count}",
+      fmt"{numberOfQuestionsT}: {qi.quiz.questions_count}",
       fmt"{detailsT}: /q{qi.quiz.id}",
       "\n",
     ].join "\n"
@@ -259,11 +273,11 @@ func percentSerialize*(n: SomeFloat): string =
     escapeMarkdownV2 fmt"{n:.2f}%"
 
 func miniRecordInfo*(ri: RecordInfo): string =
-  [
-    fmt"{bold quizNameT}: {ri.quiz.name.escapeMarkdownV2}",
-    fmt"{bold resultT}: {ri.record.percent.percentSerialize}",
-    fmt"{bold analyzeYourAnswersT}: /a{ri.quiz.id}"
-  ].join "\n"
+    [
+      fmt"{bold quizNameT}: {ri.quiz.name.escapeMarkdownV2}",
+      fmt"{bold resultT}: {ri.record.percent.percentSerialize}",
+      fmt"{bold analyzeYourAnswersT}: /a{ri.quiz.id}"
+    ].join "\n"
 
 func fullQuizInfo*(qi: QuizInfo, rec: Option[RecordModel]): string =
     let recSection =
@@ -280,7 +294,7 @@ func fullQuizInfo*(qi: QuizInfo, rec: Option[RecordModel]): string =
     [
       fmt"{bold $idT} {bold quizT}: {escapeMarkdownV2 $qi.quiz.id}",
       fmt"{bold quizNameT}: {escapeMarkdownV2 qi.quiz.name}",
-      fmt"{numberOfQuestionsT}: {qi.questions_count}",
+      fmt"{numberOfQuestionsT}: {qi.quiz.questions_count}",
       fmt"{durationT}: {timeFormat qi.quiz.time}",
       recSection,
     ].join "\n"
@@ -310,14 +324,15 @@ func recordResultDialog*(quiz: QuizModel, percent: float): string =
     ].join("\n\n")
 
 func questionAnswer(n: int): string =
-  if n == 0: emptyT
-  else:    $n
+    if n == 0: emptyT
+    else: $n
 
 func toEmoji(cond: bool): string =
-  if cond: correctBoxJ
-  else: wrongJ
+    if cond: correctBoxJ
+    else: wrongJ
 
-func questionAnalyzeDialog*(index: int, q: QuestionModel, yourAnswer: int): string =
+func questionAnalyzeDialog*(index: int, q: QuestionModel,
+        yourAnswer: int): string =
     [
       &"{bold quizOfNumberT}: {(index+1)}\n",
       &"{bold yourAnswerT}: {questionAnswer yourAnswer}",
@@ -327,5 +342,19 @@ func questionAnalyzeDialog*(index: int, q: QuestionModel, yourAnswer: int): stri
       &"{bold reasonT}:\n{q.why.escapeMarkdownV2}",
     ].join "\n"
 
-func quizAddedDialog*(qname: string): string=
-  fmt"{quizT} '{qname}' {gotSavedُSuccessfullyT}"
+func quizAddedDialog*(qname: string): string =
+    fmt"{quizT} '{qname}' {gotSavedُSuccessfullyT}"
+
+func `$`*(f: QuizCreateFields): string =
+    case f:
+    of qzfName: "نام آزمون"
+    of qzfTime: "زمان آزمون"
+    of qzfDescription: "توضیحات آزمون"
+    of tfGrade: "پایه آزمون"
+    of tfLesson: "درس آزمون"
+    of tfChapter: "فصل آزمون"
+    of qfPhotoPath: "عکس سوال"
+    of qfDescription: "متن سوال"
+    of qfWhy: "دلیل درستی سوال"
+    of qfAnswer: "جواب سوال"
+    of qzNoField: "قیلد اشتباه"
