@@ -144,6 +144,15 @@ func findEditedMessageIdContext*(
 
 # helper
 
+func savedMsgIds*(qt: QuizTaking): auto =
+  [
+    qt.quizTimeMsgId,
+    qt.questionPicMsgId,
+    qt.questionDescMsgId,
+    qt.jumpQuestionMsgId,
+    qt.answerSheetMsgId,
+  ]
+
 func initQueryPageInfo*[T](context: T): QueryPageInfo[T] =
   result.indexRange = 0'i64 .. int64.high
   result.context = context

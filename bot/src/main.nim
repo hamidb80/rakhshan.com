@@ -1,5 +1,5 @@
 import
-  sequtils, tables, strutils, options, json, times, random, logging,
+  sequtils, tables, strutils, options, json, times, random,
   asyncdispatch, threadpool, db_sqlite, os, strformat, sugar
 import telebot, asyncanything, results
 import
@@ -22,8 +22,13 @@ var defaultPhotoUrl = ""
 # router ---
 var router = new RouterMap
 newRouter router:
-  route(chatid: int64, msgtext: string) as "start":
-    discard
+  route(chatid: int64, _: string) as "start":
+    if isSome uctx.membership:
+      asyncCheck chatid << fmt"{loggedInAsT} '{uctx.membership.get.site_name}'"
+
+    else:
+      asyncCheck chatid << firstTimeStartMsgT
+      asyncCheck redirect("home", %*[chatid, ""])
 
   route(chatid: int64, msgtext: string) as "home":
     if isSome uctx.membership:
@@ -391,10 +396,8 @@ newRouter router:
         else:
           result = itsTheStartT
 
-      else:
-        asyncCheck chatid << messageExpiredT
-    else:
-      asyncCheck chatid << wrongCommandT
+      else: result = messageExpiredT
+    else: result = wrongCommandT
 
   route(chatid: int64, input: string) as "middle-of-scroll":
     if input == cancelT:
@@ -434,7 +437,6 @@ newRouter router:
       asyncCheck redirect("enter-menu", %*[chatid])
 
     else:
-      # FIXME put check for every parseint
       case uctx.stage:
       of sDeleteQuiz:
         asyncCheck chatid << (enterQuizIdT, cancelReply)
@@ -461,7 +463,7 @@ newRouter router:
       else:
         discard
 
-  callbackQuery(chatid: int64, _: int64, param: string) as "take-quiz":
+  callbackQuery(chatid: int64, _: int, param: string) as "take-quiz":
     # TODO gaurd for when is taking quiz
     if not isDoingQuiz:
       let
@@ -519,8 +521,8 @@ newRouter router:
     else:
       result = youAreTakingQuizT
 
-  callbackQuery(chatid: int64, _: int64, param: string) as "jump-question":
-    if isDoingQuiz:
+  callbackQuery(chatid: int64, msgid: int, param: string) as "jump-question":
+    if isDoingQuiz and (msgid in myrecord.savedMsgIds):
       let
         newQuestionIndex = parseint param
         q = myrecord.questions[myrecord.questionsOrder[newQuestionIndex]]
@@ -536,7 +538,10 @@ newRouter router:
           myrecord.lastQuestionPhotoUrl = newPhotoUrl
           asyncCheck (chatid, myrecord.questionPicMsgId) <@^ newPhotoUrl
 
-  callbackQuery(chatid: int64, msgid: int64, param: string) as "goto":
+    else:
+      result = messageExpiredT
+
+  callbackQuery(chatid: int64, msgid: int, param: string) as "goto":
     if isDoingQuiz:
       let targetQuestionIndex =
         if param[0] == '+':
@@ -544,15 +549,19 @@ newRouter router:
         else:
           max(myrecord.qi - 1, 0)
 
-      asyncCheck redirect("jump-question", %*[chatid, msgid,
-          $targetQuestionIndex])
+      result = await redirect(
+        "jump-question", %*[chatid, msgid, $targetQuestionIndex])
 
-  callbackQuery(chatid: int64, _: int64, param: string) as "select-answer":
+  callbackQuery(chatid: int64, msgid: int, param: string) as "select-answer":
     if isDoingQuiz:
-      myrecord.answerSheet[myrecord.qi] = parseint param
+      if msgid in myrecord.savedMsgIds:
+        myrecord.answerSheet[myrecord.qi] = parseint param
 
-      asyncCheck (chatid, myrecord.answerSheetMsgId) <^
-        answerSheetSerialize(myrecord.answerSheet)
+        asyncCheck (chatid, myrecord.answerSheetMsgId) <^
+          answerSheetSerialize(myrecord.answerSheet)
+
+      else: result = messageExpiredT
+    else: result = messageExpiredT
 
   command(chatid: int64, param: string) as "analyze":
     let
@@ -595,13 +604,7 @@ newRouter router:
 
       # delete quiz messages
       let r = myrecord
-      for msgId in [
-        r.quizTimeMsgId,
-        r.questionPicMsgId,
-        r.questionDescMsgId,
-        r.jumpQuestionMsgId,
-        r.answerSheetMsgId,
-      ]:
+      for msgId in r.savedMsgIds:
         asyncCheck chatId <! msgid
 
       let percent = getPercent(
@@ -633,7 +636,7 @@ newRouter router:
   command(chatid: int64) as "invalid-command":
     asyncCheck chatid << wrongCommandT
 
-  callbackQuery(_: int64) as "dont-care": discard
+  callbackQuery(_: int) as "dont-care": discard
 
 # controllers ---
 proc checkNofitications(
@@ -658,14 +661,13 @@ proc checkNofitications(
         bot, getOrCreateUser(notif.user_chatid),
         Update(), args)
 
+# TODO catch if error accured and tell the user and author
 proc dispatcher*(bot: TeleBot, u: Update): Future[bool] {.async.} =
   let
     chatid = findChatId u
     uctx = castSafety: getOrCreateUser chatid
 
   var args = %*[chatid]
-  # TODO catch if error accured and tell the user and author
-
 
   if uctx.firstTime:
     castSafety:
@@ -759,8 +761,6 @@ when isMainModule:
   defaultPhotoUrl = getBiggestPhotoFileId m
 
   bot.onUpdate dispatcher
-
-  # addHandler(newConsoleLogger(fmtStr = "$levelname, [$time] "))
 
   spawn startTimer(100)
   asyncCheck checkNofitications(addr notifier, 100, bot)

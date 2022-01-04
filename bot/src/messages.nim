@@ -157,6 +157,13 @@ const
     youAreTakingQuizT* = "شما در حال انجام آزمون هستید"
     youHaveTakenTheQuizBeforeT* = "شما قبلا در این آزمون شرکت کرده اید"
 
+    firstTimeStartMsgT* = escapeMarkdownV2 [
+      "سلام! به ربات سایت رخشان خوش اومدی",
+      "برای استفاده از ربات اول باید شماره ات رو وارد کنی تا بشناسیمت"
+    ].join "\n\n"
+
+    loggedInAsT* = "وارد شده به عنوان"
+
 let
     noReply* = newReplyKeyboardRemove(true)
 

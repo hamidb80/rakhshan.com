@@ -106,6 +106,8 @@ if fileExists dbPath:
 
 let db = open(dbPath, "", "", "")
 
+# TODO add test to make sure suffeling works fine
+
 suite "INIT":
   for q in initQuery:
     db.exec q.sql
