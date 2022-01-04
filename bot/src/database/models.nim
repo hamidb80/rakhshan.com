@@ -10,6 +10,7 @@ Blueprint [queryHolder: initQuery, postfix: "Model"]:
         tg_name: char[255]
         phone_number: char[15]
         is_admin: int # fake bool
+        joined_at: int
 
     Table tag:
         id: int {.primary.}
@@ -24,6 +25,7 @@ Blueprint [queryHolder: initQuery, postfix: "Model"]:
         description: string
         time: int
         questions_count: int
+        created_at: int
 
     Table question:
         id: int {.primary.}
@@ -40,6 +42,7 @@ Blueprint [queryHolder: initQuery, postfix: "Model"]:
         # TODO questions_order: string # a json array containing ids of questions
         answer_list: char[255] # answer corresponding to 'questions_order'
         percent: float
+        created_at: int
 
 
 func hasPhoto*(q: QuestionModel): bool=

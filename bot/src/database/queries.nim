@@ -74,28 +74,30 @@ func `~`*(dir: SearchDirection): SearchDirection =
 
 proc getMember*(db; chatId: int64): Option[MemberModel] {.errorHandler.} =
     let row = db.getSingleRow(sql"""
-        SELECT chat_id, site_name, tg_name, phone_number, is_admin 
+        SELECT chat_id, site_name, tg_name, phone_number, is_admin, joined_at 
         FROM member 
         WHERE chat_id = ?
         """, chatId)
 
     if row.issome:
         result = some MemberModel(
-            chatid: row.get[0].parseBiggestInt,
+            chatid: row.get[0].parseint,
             site_name: row.get[1],
             tg_name: row.get[2],
             phone_number: row.get[3],
-            isAdmin: row.get[4].parseInt)
+            isAdmin: row.get[4].parseInt,
+            joinedAt: row.get[5].parseint)
 
 proc addMember*(db;
     chatId: int64, site_name: string, tg_name: string,
-    phone_number: string, isAdmin: int
+    phone_number: string, isAdmin: int, joined_at: int64
 ): int64 {.errorHandler.} =
     # add site_name + tg_name
-    db.insertID(
-        sql"INSERT INTO member (chat_id, site_name, tg_name, phone_number, is_admin) VALUES (?, ?, ?, ?, ?)",
-        chatId, site_name.limit(255), tg_name.limit(255), phone_number.limit(
-                15), isAdmin)
+    db.insertID(sql"""
+        INSERT INTO member (chat_id, site_name, tg_name, phone_number, is_admin, joined_at) 
+        VALUES (?, ?, ?, ?, ?, ?)
+    """, chatId, site_name.limit(255), tg_name.limit(255),
+        phone_number.limit(15), isAdmin, joined_at)
 
 # quiz -------------------------------------------
 
@@ -141,12 +143,13 @@ proc upsertTag*(db;
 
 proc addQuiz*(db;
     name: string, description: string, time: int64, tag_id: int64,
-    questions: openArray[QuestionModel],
+    created_at: int64, questions: openArray[QuestionModel],
 ): int64 {.errorHandler.} =
     transaction db:
-        result = db.insertID(
-            sql"INSERT INTO quiz (name, description, time, tag_id, questions_count) VALUES (?, ?, ?, ?, ?)",
-            name.limit(255), description, time, tagid, questions.len)
+        result = db.insertID(sql"""
+            INSERT INTO quiz (name, description, time, tag_id, questions_count, created_at) 
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, name.limit(255), description, time, tagid, questions.len, created_at)
 
         for q in questions:
             db.exec(
@@ -159,6 +162,7 @@ func quizInfoQueryGen(whereClause: string, dir = saMore): string =
         quiz.id as qid,
         quiz.name as qname,
         quiz.description,
+        quiz.created_at,
         quiz.time,
         tag.id as tid,
         tag.grade as tgrade,
@@ -177,15 +181,16 @@ func toQuizInfo(row: Row): QuizInfo {.errorHandler.} =
         id: row[0].parseInt,
         name: row[1],
         description: row[2],
-        time: row[3].parseInt,
-        tag_id: row[4].parseInt,
+        time: row[4].parseInt,
+        tag_id: row[5].parseInt,
+        created_at: row[3].parseInt,
         questions_count: parseInt row[^1])
 
     result.tag = TagModel(
-        id: row[4].parseInt,
-        grade: row[5].parseInt,
-        lesson: row[6],
-        chapter: row[7].parseInt)
+        id: row[5].parseInt,
+        grade: row[6].parseInt,
+        lesson: row[7],
+        chapter: row[8].parseInt)
 
 proc findQuizzes*(db;
     qq: QuizQuery, pinnedIndex: int64, limit: int,
@@ -256,19 +261,20 @@ proc deleteQuiz*(db; quizid: int64): bool {.errorHandler.} =
 # quiz -------------------------------------------
 
 proc addRecord*(db;
-    quizId: int64, member_chatId: int64,
-    answers: string, precent: float
+    quizId: int64, member_chatId: int64, answers: string,
+    precent: float, created_at: int64
 ): int64 {.errorHandler.} =
-    db.insertID(
-        sql"INSERT INTO record (quiz_id, member_chatid, answer_list, percent) VALUES (?, ?, ?, ?)",
-        quizId, member_chatId, answers.limit(255), precent)
+    db.insertID(sql"""
+        INSERT INTO record (quiz_id, member_chatid, answer_list, percent, created_at) 
+        VALUES (?, ?, ?, ?, ?)
+    """, quizId, member_chatId, answers.limit(255), precent, created_at)
 
 proc getRecordFor*(db;
     memberId: int64, quizId: int64
 ): Option[RecordModel] {.errorHandler.} =
     let row = db.getSingleRow(sql"""
-        SELECT id, answer_list, percent 
-        FROM record 
+        SELECT id, answer_list, percent, created_at 
+        FROM record
         WHERE member_chatid = ? AND quiz_id = ? 
     """, memberid, quizid)
 
@@ -278,7 +284,8 @@ proc getRecordFor*(db;
             quiz_id: quizid,
             member_chatid: memberId,
             answerlist: row.get[1],
-            percent: row.get[2].parseFloat)
+            percent: row.get[2].parseFloat,
+            createdAt: row.get[3].parseInt)
 
 proc getMyRecords*(db;
     memberId: int64, pinnedIndex: int64, limit: int,
@@ -288,6 +295,7 @@ proc getMyRecords*(db;
         SELECT  
             r.id,
             r.percent,
+            r.created_at,
             q.id as qid,
             q.name as qname,
             q.description as qinfo
@@ -302,10 +310,11 @@ proc getMyRecords*(db;
 
     rows.mapIt (
         QuizModel(
-            id: it[2].parseInt,
-            name: it[3],
-            description: it[4]),
+            id: it[3].parseInt,
+            name: it[4],
+            description: it[5]),
         RecordModel(
             id: it[0].parseint,
             quiz_id: it[2].parseint,
-            percent: it[1].parseFloat))
+            percent: it[1].parseFloat,
+            createdAt: it[3].parseInt))

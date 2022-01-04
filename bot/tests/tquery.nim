@@ -1,4 +1,4 @@
-import db_sqlite, strutils, sequtils, unittest, options, os, algorithm
+import db_sqlite, strutils, sequtils, unittest, options, os, times
 import database/[models, queries], telegram/controller
 
 # init
@@ -15,12 +15,15 @@ func toQuestion(t: tuple[quizId: int, description, why: string,
 
 template id(rawRow): untyped = rawRow[0]
 
+proc pt(s: string): int64 =
+  parseTime(s, "yyyy/MM/dd'T'HH:mm:ss", local()).toUnix
+
 let
   membersRaw = [
-    (118721, "ali site", "ali tg", "0912", 0),
-    (81321257, "mahdi site", "mahdi tg", "0913", 1),
-    (98312873, "hamid site", "hamid tg", "0914", 1),
-    (53622231, "maher site", "maher tg", "0915", 0),
+    (118721, "ali site", "ali tg", "0912",       0,  pt("2021/06/05T08:07:54")),
+    (81321257, "mahdi site", "mahdi tg", "0913", 1,  pt("2021/01/05T14:27:43")),
+    (98312873, "hamid site", "hamid tg", "0914", 1,  pt("2022/01/02T15:03:11")),
+    (53622231, "maher site", "maher tg", "0915", 0,  pt("2020/07/22T23:43:28")),
   ]
 
   tagsRaw = [
@@ -33,29 +36,29 @@ let
   ]
 
   quizzesRaw = [
-    (1, "Qz1", "math q for g-11 ch-1", 100, tagsRaw[0].id, @[
+    (1, "Qz1", "math q for g-11 ch-1", 100, tagsRaw[0].id, pt("2021/06/05T08:07:54"),@[
       (1, "q1 for Qz1", "cuz it's q1 for Qz1", 1),
       (1, "q2 for Qz1", "cuz it's q2 for Qz1", 3),
       (1, "q3 for Qz1", "cuz it's q3 for Qz1", 2),
     ].map toQuestion),
-    (2, "Qz2", "math q for g-11 ch-2", 50, tagsRaw[1].id, @[
+    (2, "Qz2", "math q for g-11 ch-2", 50, tagsRaw[1].id, pt("2021/06/05T08:07:54"), @[
       (2, "q1 for Qz2", "cuz it's q1 for Qz2", 4),
       (2, "q2 for Qz2", "cuz it's q2 for Qz2", 4),
     ].map toQuestion),
-    (3, "Qz3", "math q for g-11 ch-4", 20, tagsRaw[2].id, @[
+    (3, "Qz3", "math q for g-11 ch-4", 20, tagsRaw[2].id, pt("2021/06/05T08:07:54"), @[
       (3, "q1 for Qz3", "cuz it's q1 for Qz3", 3),
       (3, "q2 for Qz3", "cuz it's q2 for Qz3", 2),
       (3, "q3 for Qz3", "cuz it's q3 for Qz3", 1),
       (3, "q4 for Qz3", "cuz it's q4 for Qz3", 4),
       (3, "q5 for Qz3", "cuz it's q5 for Qz3", 1),
     ].map toQuestion),
-    (4, "Qz4", "PHYZ q for g-11 ch-1", 80, tagsRaw[3].id, @[
+    (4, "Qz4", "PHYZ q for g-11 ch-1", 80, tagsRaw[3].id, pt("2021/06/05T08:07:54"), @[
       (4, "q1 for Qz4", "cuz it's q1 for Qz4", 3),
       (4, "q2 for Qz4", "cuz it's q2 for Qz4", 2),
       (4, "q3 for Qz4", "cuz it's q3 for Qz4", 1),
       (4, "q4 for Qz4", "cuz it's q4 for Qz4", 4),
     ].map toQuestion),
-    (5, "Qz5", "PHYZ q for g-11 ch-1", 30, tagsRaw[4].id, @[
+    (5, "Qz5", "PHYZ q for g-11 ch-1", 30, tagsRaw[4].id, pt("2021/06/05T08:07:54"), @[
       (5, "q1 for Qz5", "cuz it's q1 for Qz5", 1),
       (5, "q2 for Qz5", "cuz it's q2 for Qz5", 1),
       (5, "q3 for Qz5", "cuz it's q3 for Qz5", 2),
@@ -64,18 +67,18 @@ let
       (5, "q6 for Qz5", "cuz it's q6 for Qz5", 2),
       (5, "q7 for Qz5", "cuz it's q7 for Qz5", 4),
     ].map toQuestion),
-    (6, "blah blah", "stupid quiz", 120, tagsRaw[5].id, @[
+    (6, "blah blah", "stupid quiz", 120, tagsRaw[5].id, pt("2021/06/05T08:07:54"), @[
       (6, "q1 for Qz6", "cuz it's q1 for Qz", 1),
     ].map toQuestion),
   ]
 
   recordsRaw = [
-    (1, 1, membersRaw[0].id, "012", 25.6),
-    (2, 1, membersRaw[1].id, "132", 48.5),
-    (3, 2, membersRaw[1].id, "00", 12.4),
-    (4, 3, membersRaw[1].id, "21334", 100.0),
-    (5, 4, membersRaw[2].id, "22", 10.4),
-    (6, 3, membersRaw[3].id, "22021", 7.8),
+    (1, 1, membersRaw[0].id, "012", 25.6, pt("2021/06/05T08:07:54")),
+    (2, 1, membersRaw[1].id, "132", 48.5, pt("2021/06/05T08:07:54")),
+    (3, 2, membersRaw[1].id, "00", 12.4, pt("2021/06/05T08:07:54")),
+    (4, 3, membersRaw[1].id, "21334", 100.0, pt("2021/06/05T08:07:54")),
+    (5, 4, membersRaw[2].id, "22", 10.4, pt("2021/06/05T08:07:54")),
+    (6, 3, membersRaw[3].id, "22021", 7.8, pt("2021/06/05T08:07:54")),
   ]
 
 
@@ -97,7 +100,7 @@ suite "INIT":
 suite "INSERT":
   test "add member":
     for m in membersRaw:
-      discard db.addMember(m[0], m[1], m[2], m[3], m[4])
+      discard db.addMember(m[0], m[1], m[2], m[3], m[4], m[5])
 
   test "add tag":
     for t in tagsRaw:
@@ -105,11 +108,11 @@ suite "INSERT":
 
   test "add quiz":
     for q in quizzesRaw:
-      discard db.addQuiz(q[1], q[2], q[3], q[4], q[5])
+      discard db.addQuiz(q[1], q[2], q[3], q[4], q[5], q[6])
 
   test "add record":
     for r in recordsRaw:
-      discard db.addRecord(r[1].int64, r[2].int64, r[3], r[4])
+      discard db.addRecord(r[1].int64, r[2].int64, r[3], r[4], r[5])
 
 suite "SELECT":
   test "single member":
@@ -117,6 +120,7 @@ suite "SELECT":
     check:
       member.site_name == "ali site"
       member.tg_name == "ali tg"
+      member.joined_at == membersRaw[0][5]
 
   test "single quiz info":
     let r = db.getQuizInfo(quizzesRaw[0].id.int64).get
@@ -125,6 +129,7 @@ suite "SELECT":
       r.quiz.time == 100
       r.quiz.tagid == 1
       r.quiz.questions_count == 3
+      r.quiz.created_at == quizzesRaw[0][5]
 
   test "get quiz itself with no join":
     let q = db.getQuizItself(4)
@@ -162,7 +167,9 @@ suite "SELECT":
 
   test "get record for":
     let res = db.getRecordFor(membersRaw[2].id, 4)
-    check res.get.percent == 10.4
+    check:
+      res.get.percent == 10.4
+      res.get.created_at == recordsRaw[4][5]
 
 suite "UPSERT":
   test "new tag":

@@ -1,4 +1,4 @@
-import options
+import options, times
 import results
 
 const NotFound* = -1
@@ -18,3 +18,6 @@ func parseInt*(n: char): int =
 
 func forget*[T](opt:var Option[T])=
   opt = none T
+
+proc unixNow*(): int64=
+  getTime().toUnix

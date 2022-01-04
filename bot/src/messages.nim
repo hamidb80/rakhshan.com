@@ -1,6 +1,6 @@
 import options, strutils, strformat, times
 import telebot
-import ./telegram/[helper, controller], ./database/[queries, models]
+import ./telegram/[helper, controller], ./database/[queries, models], utils
 
 
 func escapeMarkdownV2*(s: string): string =
@@ -141,6 +141,10 @@ const
     fromQuestionNumberT* = "از سوال شماره"
 
     noRecordsAvailableT* = "سابقه ای وجود ندارد"
+    createdAtT* = "تاریخ ایجاد"
+    persianNumbers = ["۰","۱","۲","۳","۴","۵","۶","۷","۸","۹"]
+    dateT* = "تاریخ"
+    hourT* = "ساعت"
 
 let
     noReply* = newReplyKeyboardRemove(true)
@@ -257,6 +261,13 @@ func underline*(s: string): string = fmt"__{s}__"
 func spoiler*(s: string): string = fmt"||{s}||"
 func link*(url, hover: string): string = fmt"[{url}]({hover})"
 
+func toPersianNumbers*(str: string): string =
+  for c in str:
+    if c in '0' .. '9':
+      result &= persianNumbers[c.parseint]
+    else:
+      result.add c
+
 func greeting*(uname: string): string =
     fmt"'{uname.escapeMarkdownV2}' {dearT} {welcomeT}"
 
@@ -264,27 +275,33 @@ func timeFormat*[T: SomeInteger](t: T): string =
     let d = initDuration(seconds = t).toParts
     fmt"{d[Hours]:02}:{d[Minutes]:02}:{d[Seconds]:02}"
 
+proc unixDatetimeFormat*(dt: int64): string=
+  let s = dt.fromUnix.format "yyyy/MM/dd '|' HH:mm:ss"
+  escapeMarkdownV2(s.toPersianNumbers)
+
 func percentSerialize*(n: SomeFloat): string =
     escapeMarkdownV2 fmt"{n:.2f}%"
 
-func miniRecordInfo*(ri: RecordInfo): string =
+proc miniRecordInfo*(ri: RecordInfo): string =
     [
       fmt"{bold quizNameT}: {ri.quiz.name.escapeMarkdownV2}",
       fmt"{bold resultT}: {ri.record.percent.percentSerialize}",
+      fmt"{bold dateT}: {{unixDatetimeFormat ri.record.created_at}}",
       fmt"{bold analyzeYourAnswersT}: /a{ri.quiz.id}"
     ].join "\n"
 
-func miniQuizInfo*(qi: QuizInfo): string =
+proc miniQuizInfo*(qi: QuizInfo): string =
     [
       fmt"{bold quizNameT}: {escapeMarkdownV2 qi.quiz.name}",
       fmt"{bold numberOfQuestionsT}: {qi.quiz.questions_count}",
       fmt"{bold gradeT}: {qi.tag.grade}",
       fmt"{bold lessonT}: {escapeMarkdownV2 qi.tag.lesson}",
+      fmt"{bold createdAtT}: {unixDatetimeFormat qi.quiz.created_at}",
       fmt"{bold detailsT}: /q{qi.quiz.id}",
       "\n",
     ].join "\n"
 
-func fullQuizInfo*(qi: QuizInfo, rec: Option[RecordModel]): string =
+proc fullQuizInfo*(qi: QuizInfo, rec: Option[RecordModel]): string =
     let recSection =
         if issome rec:
             [
@@ -304,6 +321,7 @@ func fullQuizInfo*(qi: QuizInfo, rec: Option[RecordModel]): string =
       fmt"{bold chapterT}: {qi.tag.chapter}",
       fmt"{bold numberOfQuestionsT}: {qi.quiz.questions_count}",
       fmt"{bold durationT}: {timeFormat qi.quiz.time}",
+      fmt"{bold createdAtT}: {unixDatetimeFormat qi.quiz.created_at}",
       recSection,
     ].join "\n"
 

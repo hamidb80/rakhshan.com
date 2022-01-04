@@ -19,4 +19,4 @@ requires "https://github.com/hamidb80/easydb"
 
 task go, "run app":
   putenv "DB_PATH", "./temp/play.db"
-  exec "nim r -d:ssl --gc:orc -d:goAsyncTimeInterval=20 src/main.nim"
+  exec "nim cc -d:ssl --gc:orc -d:goAsyncTimeInterval=20 --run src/main.nim"

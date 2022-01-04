@@ -43,7 +43,7 @@ newRouter router:
         dbworks dbPath:
           discard |>db.addMemberHandler(chatid, userinfo.display_name,
             (ct.firstname & " " & ct.lastname.get("")),
-            ct.phoneNumber, userInfo.is_admin.int).tryGet
+            ct.phoneNumber, userInfo.is_admin.int, unixNow()).tryGet
 
           uctx.membership = db.getMemberHandler(chatid).tryGet
 
@@ -112,7 +112,7 @@ newRouter router:
 
   route(chatid: int64, input: string) as "add-quiz":
     let msgid = u.message.get.messageId
-    
+
     if input == cancelT:
       uctx.quizCreation.forget
       asyncCheck redirect("enter-menu", %*[chatid])
@@ -167,10 +167,10 @@ newRouter router:
         asyncCheck chatid << wrongCommandT
 
   route(chatid: int64, input: string) as "add-question":
-    let 
+    let
       msg = u.message.get
       msgid = msg.messageid
-    
+
     template qs: untyped = uctx.quizCreation.get.questions
     template lqi: untyped = qc.msgids.questions[^1]
 
@@ -183,6 +183,7 @@ newRouter router:
           qc.quiz.description,
           qc.quiz.time,
           tg.id,
+          unixNow(),
           qc.questions).tryGet
 
       asyncCheck chatid << quizAddedDialog(qc.quiz.name)
@@ -204,7 +205,7 @@ newRouter router:
         template goNext: untyped =
           qs.add QuestionModel()
           qc.msgids.questions.add [msgid, 0, 0, 0].QuestionTracker
-          
+
           asyncCheck chatId << enterQuestionInfoT
           /-> sAQQDesc
 
@@ -513,7 +514,8 @@ newRouter router:
         else:
           max(myrecord.qi - 1, 0)
 
-      asyncCheck redirect("jump-question", %*[chatid, msgid, $targetQuestionIndex])
+      asyncCheck redirect("jump-question", %*[chatid, msgid,
+          $targetQuestionIndex])
 
   callbackQuery(chatid: int64, _: int64, param: string) as "select-answer":
     if isDoingQuiz:
@@ -575,7 +577,7 @@ newRouter router:
       # save record
       dbworks dbpath:
         discard |>db.addRecordHandler(r.quiz.id, chatid, r.answerSheet.join,
-            percent).tryGet
+            percent, unixNow()).tryGet
 
       # show complete result
       asyncCheck chatid << recordResultDialog(r.quiz, percent)
