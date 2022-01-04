@@ -111,6 +111,8 @@ newRouter router:
       asyncCheck chatid << wrongCommandT
 
   route(chatid: int64, input: string) as "add-quiz":
+    let msgid = u.message.get.messageId
+    
     if input == cancelT:
       uctx.quizCreation.forget
       asyncCheck redirect("enter-menu", %*[chatid])
@@ -124,34 +126,40 @@ newRouter router:
 
       of sAQName:
         qc.quiz.name = input
+        qc.msgids.quiz[qzfName] = msgid
         asyncCheck chatid << enterQuizInfoT
         /-> sAQDesc
 
       of sAQDesc:
         qc.quiz.description = input
-        /-> sAQTime
+        qc.msgids.quiz[qzfDescription] = msgid
         asyncCheck chatid << enterQuizTimeT
+        /-> sAQTime
 
       of sAQTime: # TODO parse time rather than giving a number in seconds
         trySendInvalid:
-          qc.quiz.time = input.parseInt
+          qc.quiz.time = parseInt input
+          qc.msgids.quiz[qzfTime] = msgid
           asyncCheck chatid << enterQuizGradeT
           /-> sAQgrade
 
       of sAQgrade:
         trySendInvalid:
-          qc.tag.grade = input.parseInt
+          qc.tag.grade = parseInt input
+          qc.msgids.tag[tfGrade] = msgid
           asyncCheck chatid << enterQuizLessonT
           /-> sAQLesson
 
       of sAQLesson:
         qc.tag.lesson = input
+        qc.msgids.tag[tfLesson] = msgid
         asyncCheck chatid << enterQuizChapterT
         /-> sAQchapter
 
       of sAQchapter:
         trySendInvalid:
-          qc.tag.chapter = input.parseInt
+          qc.tag.chapter = parseInt input
+          qc.msgids.tag[tfChapter] = msgid
           /-> sAQQuestion
           asyncCheck redirect("add-question", %*[chatid, ""])
 
@@ -159,8 +167,12 @@ newRouter router:
         asyncCheck chatid << wrongCommandT
 
   route(chatid: int64, input: string) as "add-question":
-    let msg = u.message.get
+    let 
+      msg = u.message.get
+      msgid = msg.messageid
+    
     template qs: untyped = uctx.quizCreation.get.questions
+    template lqi: untyped = qc.msgids.questions[^1]
 
     if input == endT and uctx.stage == sAQQPic:
       dbworks dbpath:
@@ -184,16 +196,17 @@ newRouter router:
           asyncCheck chatid << addQuizQuestionT
           asyncCheck chatid << (uploadQuizQuestionPicT, withoutPhotoReply)
         else:
-          asyncCheck chatid << (addQuizQuestionMoreT, addingMoreQuestion)
+          asyncCheck chatid << (addQuizQuestionMoreT, addingMoreQuestionsReply)
 
         /-> sAQQPic
 
       of sAQQPic:
         template goNext: untyped =
+          qs.add QuestionModel()
+          qc.msgids.questions.add [msgid, 0, 0, 0].QuestionTracker
+          
           asyncCheck chatId << enterQuestionInfoT
           /-> sAQQDesc
-
-        qs.add QuestionModel()
 
         if input == withoutPhotoT:
           goNext()
@@ -207,17 +220,20 @@ newRouter router:
 
       of sAQQDesc:
         qs[^1].description = input
+        lqi[qfDescription] = msgid
         asyncCheck chatId << (enterQuestionAnswerT, answersReply)
         /-> sAQQAns
 
       of sAQQAns:
         trySendInvalid:
           qs[^1].answer = parseint input[0]
+          lqi[qfAnswer] = msgid
           asyncCheck chatid << enterQuestionWhyY
           /-> sAQQWhy
 
       of sAQQWhy:
         qs[^1].why = input
+        lqi[qfWhy] = msgid
         /-> sAQQuestion
         asyncCheck redirect("add-question", %*[chatid, ""])
 
@@ -624,7 +640,7 @@ proc dispatcher*(bot: TeleBot, u: Update): Future[bool] {.async.} =
 
     uctx.firsttime = false
 
-  debugEcho ">> ", uctx.stage
+  debugEcho ">> ", uctx.stage, " || ", chatid
 
   if u.message.issome:
     let

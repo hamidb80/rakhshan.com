@@ -89,8 +89,11 @@ const
     operationCancelledT* = "عملیات لغو شد"
 
     youInTheQuizT* = "شما در آزمون"
-    gradeT* = "نمره"
+    gradeT* = "پایه"
     youGotT* = "را کسب کردید"
+    lessonT* = "درس"
+    scoreT* = "نمره"
+    chapterT* = "فصل"
 
     durationT* = "مدت"
     endT* = "خاتمه"
@@ -168,7 +171,7 @@ let
       @[cancelT]
     ]
 
-    addingMoreQuestion* = newReplyKeyboardMarkup @[
+    addingMoreQuestionsReply* = newReplyKeyboardMarkup @[
       @[endT],
       @[withoutPhotoT]
     ]
@@ -261,14 +264,6 @@ func timeFormat*[T: SomeInteger](t: T): string =
     let d = initDuration(seconds = t).toParts
     fmt"{d[Hours]:02}:{d[Minutes]:02}:{d[Seconds]:02}"
 
-func miniQuizInfo*(qi: QuizInfo): string =
-    [
-      fmt"{quizNameT}: {qi.quiz.name}",
-      fmt"{numberOfQuestionsT}: {qi.quiz.questions_count}",
-      fmt"{detailsT}: /q{qi.quiz.id}",
-      "\n",
-    ].join "\n"
-
 func percentSerialize*(n: SomeFloat): string =
     escapeMarkdownV2 fmt"{n:.2f}%"
 
@@ -279,13 +274,23 @@ func miniRecordInfo*(ri: RecordInfo): string =
       fmt"{bold analyzeYourAnswersT}: /a{ri.quiz.id}"
     ].join "\n"
 
+func miniQuizInfo*(qi: QuizInfo): string =
+    [
+      fmt"{bold quizNameT}: {escapeMarkdownV2 qi.quiz.name}",
+      fmt"{bold numberOfQuestionsT}: {qi.quiz.questions_count}",
+      fmt"{bold gradeT}: {qi.tag.grade}",
+      fmt"{bold lessonT}: {escapeMarkdownV2 qi.tag.lesson}",
+      fmt"{bold detailsT}: /q{qi.quiz.id}",
+      "\n",
+    ].join "\n"
+
 func fullQuizInfo*(qi: QuizInfo, rec: Option[RecordModel]): string =
     let recSection =
         if issome rec:
             [
               youWereAttendedBeforeT,
-              fmt"{yourLastResultIsT}: {percentSerialize rec.get.percent}",
-              fmt"{analyzeYourAnswersT}: /a{qi.quiz.id}",
+              fmt"{bold yourLastResultIsT}: {percentSerialize rec.get.percent}",
+              fmt"{bold analyzeYourAnswersT}: /a{qi.quiz.id}",
             ].join "\n"
 
         else:
@@ -294,8 +299,11 @@ func fullQuizInfo*(qi: QuizInfo, rec: Option[RecordModel]): string =
     [
       fmt"{bold $idT} {bold quizT}: {escapeMarkdownV2 $qi.quiz.id}",
       fmt"{bold quizNameT}: {escapeMarkdownV2 qi.quiz.name}",
-      fmt"{numberOfQuestionsT}: {qi.quiz.questions_count}",
-      fmt"{durationT}: {timeFormat qi.quiz.time}",
+      fmt"{bold gradeT}: {qi.tag.grade}",
+      fmt"{bold lessonT}: {escapeMarkdownV2 qi.tag.lesson}",
+      fmt"{bold chapterT}: {qi.tag.chapter}",
+      fmt"{bold numberOfQuestionsT}: {qi.quiz.questions_count}",
+      fmt"{bold durationT}: {timeFormat qi.quiz.time}",
       recSection,
     ].join "\n"
 
@@ -319,7 +327,7 @@ func answerSheetSerialize*(sheet: seq[int]): string =
 func recordResultDialog*(quiz: QuizModel, percent: float): string =
     let score = spoiler(percentSerialize percent)
     [
-      fmt"{youInTheQuizT} '{quiz.name.escapeMarkdownV2}' {gradeT} {score} {youGotT}",
+      fmt"{youInTheQuizT} '{quiz.name.escapeMarkdownV2}' {scoreT} {score} {youGotT}",
       fmt"{analyzeYourAnswersT}: /a{quiz.id}",
     ].join("\n\n")
 

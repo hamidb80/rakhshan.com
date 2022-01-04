@@ -66,12 +66,14 @@ type
     qzNoField = -1
     qzfName, qzfTime, qzfDescription
     tfGrade, tfLesson, tfChapter
-    qfPhotoPath, qfDescription, qfWhy, qfAnswer
+    qfPhotoPath, qfDescription, qfAnswer, qfWhy
+
+  QuestionTracker* = array[qfPhotoPath .. qfWhy, int]
 
   MessageIdTracker* = object
     quiz*: array[qzfName .. qzfDescription, int]
     tag*: array[tfGrade .. tfChapter, int]
-    questions*: seq[array[qfPhotoPath .. qfAnswer, int]]
+    questions*: seq[QuestionTracker]
 
   QuizCreate* = ref object
     quiz*: QuizModel
@@ -92,7 +94,8 @@ type
 const
   HomeStages* = {sMain, sSendContact} # primary
   DeleteQuiz* = {sDeleteQuiz, sDQEnterId, sDQConfirm}
-  AddQuizStages* = {sAddQuiz, sAQName, sAQDesc, sAQTime, sAQGrade, sAQLesson, sAQchapter} # admin
+  AddQuizStages* = {sAddQuiz, sAQName, sAQDesc, sAQTime, sAQGrade, sAQLesson,
+      sAQchapter}                     # admin
   AddQuestionStages* = {sAQQuestion, sAQQPic, sAQQDesc, sAQQWhy, sAQQAns}
   FindQuizStages* = {sFindQuizMain, sFQname, sFQgrade, sFQlesson}
   TakingQuizStages* = {sTakingQuiz}
@@ -123,7 +126,7 @@ func findEditedMessageIdContext*(
   elif (
     var
       index = NotFound
-      field = none range[qfPhotoPath .. qfAnswer]
+      field = none range[qfPhotoPath .. qfWhy]
 
     for i, q in qc.msgids.questions.pairs:
       field = q.findInEnum(msgid)
