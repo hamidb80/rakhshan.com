@@ -242,6 +242,7 @@ newRouter router:
       /-> sFindQuizMain
 
     of showResultsT:
+      # TODO send his quiz query to himself
       let quizzes = dbworksCapture dbpath:
         |> db.findQuizzesHandler(qq, int64.high, pageSize, saLess).tryGet
 

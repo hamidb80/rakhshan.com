@@ -104,8 +104,7 @@ proc totag*(s: seq[string]): TagModel {.errorHandler.} =
         id: s[0].parseint,
         grade: s[1].parseint,
         lesson: s[2],
-        chapter: s[3].parseint,
-    )
+        chapter: s[3].parseint)
 
 proc addTag*(db;
     grade: int64, lesson: string, chapter: int64
