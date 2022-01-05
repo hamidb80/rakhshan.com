@@ -1,4 +1,4 @@
-import macros, db_common, db_sqlite
+import macros, db_sqlite
 import results, macroplus
 
 func getName(n: NimNode): string =
@@ -73,8 +73,6 @@ proc customTryGet*[T](r: Result[T, HandledError]): T =
   if r.isOk: result = r.get
   else:
     let e = r.error()
-    debugecho "ERROR ---------\n", e.exceptionMsg
-
     case e.kind:
-      of heDberror: raise newException(DbError, "")
-      of heOtherErrors: raise newException(RunTimeError, "")
+      of heDberror: raise newException(DbError, e.exceptionMsg)
+      of heOtherErrors: raise newException(RunTimeError, e.exceptionMsg)

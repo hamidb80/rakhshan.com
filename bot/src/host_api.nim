@@ -1,8 +1,8 @@
-import asyncdispatch, httpclient, json, strformat, strutils
+import asyncdispatch, httpclient, json, strformat, strutils, os
 
 const
   baseUrl = "https://rakhshan.com/wp-json/wp_api_ext"
-  apiToken = "okm098QAZ" # getEnv("HOST_API_TOKEN")
+  apiToken = getEnv("HOST_API_TOKEN")
 
 let
   accessHeader = newHttpHeaders {"api-token": apiToken}

@@ -11,9 +11,10 @@ import
 randomize()
 
 const
-  dbPath = getenv("DB_PATH")
-  authorChatId = 101862091
-  pageSize {.intdefine.} = 3 #FIXME
+  dbPath* = getenv("DB_PATH")
+  authorChatId* = getenv("AUTHOR_CHAT_ID").parseInt
+  pageSize* = getenv("RESULT_PAGE_SIZR", "3").parseint
+  tgToken* = getEnv("TG_TOKEN")
 
 var defaultPhotoUrl = ""
 
@@ -29,10 +30,6 @@ newRouter router:
     else:
       asyncCheck chatid << firstTimeStartMsgT
       asyncCheck redirect("home", %*[chatid, ""])
-
-  route(chatid: int64) as "where-am-i":
-    # ،TODO show ehere he is
-    discard
 
   route(chatid: int64, msgtext: string) as "home":
     if isSome uctx.membership:
@@ -105,7 +102,8 @@ newRouter router:
 
   route(chatid: int64) as "my-records":
     let recs = dbworksCapture dbpath:
-      |> db.getMyRecordsHandler(chatid, int64.high, pageSize, saLess).customTryGet
+      |> db.getMyRecordsHandler(chatid, int64.high, pageSize,
+          saLess).customTryGet
 
     if recs.len == 0:
       asyncCheck chatid << noRecordsAvailableT
@@ -367,7 +365,8 @@ newRouter router:
           case qp.context:
           of sfQuiz:
             let quizzes = dbworksCapture dbpath:
-              |> db.findQuizzesHandler(qq, qp.indexRange[dir], pageSize, dir).customTryGet
+              |> db.findQuizzesHandler(qq, qp.indexRange[dir], pageSize,
+                  dir).customTryGet
 
             if quizzes.len != 0:
               let qi = [quizzes[0].quiz.id, quizzes[^1].quiz.id]
@@ -430,7 +429,8 @@ newRouter router:
   command(chatid: int64, param: string) as "get-rank":
     let
       quizid = parseint param
-      rank = dbworksCapture dbpath: |> db.getRankHandler(chatid, quizid).customTryGet
+      rank = dbworksCapture dbpath: |> db.getRankHandler(chatid,
+          quizid).customTryGet
 
     asyncCheck chatid << (
       if isSome rank: fmt"{yourRankInThisQuizYetT}: {rank.get}"
@@ -455,7 +455,8 @@ newRouter router:
         asyncCheck:
           if input == yesT:
             dbworks dbpath:
-              discard |>db.deleteQuizHandler(uctx.quizidToDelete.get).customTryGet
+              discard |>db.deleteQuizHandler(
+                  uctx.quizidToDelete.get).customTryGet
 
             chatid << quizGotDeletedT
           else:
@@ -472,7 +473,8 @@ newRouter router:
     if not isDoingQuiz:
       let
         quizid = parseint param
-        quiz = dbworksCapture dbpath: |> db.getQuizItselfHandler(quizid).customTryGet
+        quiz = dbworksCapture dbpath: |> db.getQuizItselfHandler(
+            quizid).customTryGet
 
       if issome quiz:
         if not dbpath.dbworksCapture( |> db.isRecordExistsForHandler(chatid,
@@ -481,7 +483,8 @@ newRouter router:
 
           uctx.record = some QuizTaking()
           myrecord.quiz = quiz.get
-          myrecord.questions = dbworksCapture dbpath: |> db.getQuestionsHandler(quizid).customTryGet
+          myrecord.questions = dbworksCapture dbpath: |> db.getQuestionsHandler(
+              quizid).customTryGet
 
           myrecord.questionsOrder = toseq(0 .. myrecord.questions.high).dup(shuffle)
           let fqi = myrecord.questionsOrder[0] # first question index
@@ -570,13 +573,16 @@ newRouter router:
   command(chatid: int64, param: string) as "analyze":
     let
       quizid = parseint param
-      quiz = dbworksCapture dbpath: |> db.getQuizItselfHandler(quizid).customTryGet
+      quiz = dbworksCapture dbpath: |> db.getQuizItselfHandler(
+          quizid).customTryGet
 
     if quiz.issome:
-      let rec = dbworksCapture dbpath: |> db.getRecordForHandler(chatid, quizid).customTryGet
+      let rec = dbworksCapture dbpath: |> db.getRecordForHandler(chatid,
+          quizid).customTryGet
       if rec.issome:
         let
-          questions = dbworksCapture dbpath: |> db.getQuestionsHandler(quizid).customTryGet
+          questions = dbworksCapture dbpath: |> db.getQuestionsHandler(
+              quizid).customTryGet
           qoi = rec.get.questionsOrder.parseJson.to(seq[int]) # question order index
 
         for i in 0 .. questions.high:
@@ -644,8 +650,7 @@ newRouter router:
 
 # controllers ---
 proc checkNofitications(
-  pch: ptr Channel[Notification], delay: int,
-  bot: TeleBot
+  pch: ptr Channel[Notification], delay: int, bot: TeleBot
 ) {.async.} =
   while true:
     await sleepAsync delay
@@ -674,104 +679,106 @@ proc dispatcher*(bot: TeleBot, u: Update): Future[bool] {.async.} =
 
   if uctx.firstTime:
     castSafety:
-      let m = dbworksCapture dbPath: |> getMemberHandler(db, u.getchatid).customTryGet
+      let m = dbworksCapture dbPath:
+        |> getMemberHandler(db, u.getchatid).customTryGet
+
       if issome m:
         uctx.membership = m
 
+      asyncCheck trigger(router, "start", bot, uctx, u, args)
     uctx.firsttime = false
 
-  debugEcho ">> ", uctx.stage, " || ", chatid
+  else:
+    debugEcho ">> ", uctx.stage, " || ", chatid
 
-  try:
-    if u.message.issome:
-      let
-        msg = u.message.get
-        text = msg.text.get("")
+    template `!!`(stuff): untyped = asyncCheck chatid << stuff
+    template `!!<<`(stuff): untyped = 
+      !! stuff
+      debugEcho "START ---", getCurrentExceptionMsg(), "END ---"
 
-      if text.startsWith("/") and text.len > 2:
+    try:
+      if u.message.issome:
         let
-          parameter = text[2..^1]
-          route = case text[1]:
-            of 's': "start"
-            of 'w': "where-am-i"
-            of 'q': "show-quiz"
-            of 'a': "analyze"
-            of 'r': "get-rank"
+          msg = u.message.get
+          text = msg.text.get("")
+
+        if text.startsWith("/") and text.len > 2:
+          let
+            parameter = text[2..^1]
+            route = case text[1]:
+              of 's': "start"
+              of 'w': "where-am-i"
+              of 'q': "show-quiz"
+              of 'a': "analyze"
+              of 'r': "get-rank"
+              else: "invalid-command"
+
+          args.add %parameter
+          castSafety:
+            discard await trigger(router, route, bot, uctx, u, args)
+
+        # it's a text message
+        else:
+          args.add %text
+
+          let route = case uctx.stage:
+            of sMain: "home"
+            of sSendContact: "verify-user"
+            of AddQuizStages: "add-quiz"
+            of AddQuestionStages: "add-question"
+            of sEnterMainMenu: "enter-menu"
+            of sMainMenu: "menu"
+            of FindQuizStages: "find-quiz"
+            of DeleteQuiz: "delete-quiz"
+            of sTakingQuiz: "middle-of-quiz"
+            of sScroll: "middle-of-scroll"
             else: "invalid-command"
 
-        args.add %parameter
-        castSafety:
-          discard await trigger(router, route, bot, uctx, u, args)
+          castSafety:
+            discard await trigger(router, route, bot, uctx, u, args)
 
-      # it's a text message
-      else:
-        args.add %text
+      elif u.editedMessage.issome:
+        args.add %u.editedMessage.get.messageId
 
-        let route = case uctx.stage:
-          of sMain: "home"
-          of sSendContact: "verify-user"
-          of AddQuizStages: "add-quiz"
-          of AddQuestionStages: "add-question"
-          of sEnterMainMenu: "enter-menu"
-          of sMainMenu: "menu"
-          of FindQuizStages: "find-quiz"
-          of DeleteQuiz: "delete-quiz"
-          of sTakingQuiz: "middle-of-quiz"
-          of sScroll: "middle-of-scroll"
-          else: "invalid-command"
+        let route =
+          case uctx.stage:
+          of AddQuizStages, AddQuestionStages: "edit-quiz-creation"
+          else: raise newException(ValueError,
+              "cant edit message when stage is: " & $uctx.stage)
 
         castSafety:
-          discard await trigger(router, route, bot, uctx, u, args)
+          asyncCheck trigger(router, route, bot, uctx, u, args)
 
-    elif u.editedMessage.issome:
-      args.add %u.editedMessage.get.messageId
+      elif u.callbackQuery.issome:
+        let
+          cq = u.callbackQuery.get
+          cmd = cq.data.get("/d")
+          parameter = cmd[2..^1]
+          route = case cmd[1]:
+            of 't': "take-quiz"
+            of 'j': "jump-question"
+            of 'p': "select-answer"
+            of 'g': "goto"
+            of 'm': "scroll"
+            of 'd': "dont-care"
+            else: "invalid-command"
 
-      let route =
-        case uctx.stage:
-        of AddQuizStages, AddQuestionStages: "edit-quiz-creation"
-        else: raise newException(ValueError, "cant edit message when stage is: " & $uctx.stage)
+        castSafety:
+          let res = await trigger(
+            router, route,
+            bot, uctx, u,
+            %*[cq.message.get.chat.id, cq.message.get.messageId, parameter])
 
-      castSafety:
-        asyncCheck trigger(router, route, bot, uctx, u, args)
+          asyncCheck bot.answerCallbackQuery($cq.id, res)
 
-    elif u.callbackQuery.issome:
-      let
-        cq = u.callbackQuery.get
-        cmd = cq.data.get("/d")
-        parameter = cmd[2..^1]
-        route = case cmd[1]:
-          of 't': "take-quiz"
-          of 'j': "jump-question"
-          of 'p': "select-answer"
-          of 'g': "goto"
-          of 'm': "scroll"
-          of 'd': "dont-care"
-          else: "invalid-command"
+    except DbError: !!<< databaseErrorT
+    except RuntimeError: !!<< runtimeErrorT
+    except FValueError: !! invalidInputT
+    except FmRangeError: !! rangeErrorT
+    except Exception: !!<< someErrorT
 
-      castSafety:
-        let res = await trigger(
-          router, route,
-          bot, uctx, u,
-          %*[cq.message.get.chat.id, cq.message.get.messageId, parameter])
-
-        asyncCheck bot.answerCallbackQuery($cq.id, res)
-
-  except DbError:
-    asyncCheck chatid << databaseErrorT
-  except RuntimeError:
-    asyncCheck chatid << runtimeErrorT
-  except FValueError:
-    asyncCheck chatid << invalidInputT
-  except FmRangeError:
-    asyncCheck chatid << rangeErrorT
-  except Exception:
-    asyncCheck chatid << someErrorT
-
-
-# FIXME add secret.key
 when isMainModule:
-  const API_KEY = "2004052302:AAHm_oICftfs5xLmY0QwGVTE3o-gYgD6ahw"
-  let bot = newTeleBot API_KEY
+  let bot = newTeleBot tgToken
 
   # set default photo
   let m = waitFor authorChatId <@ ("file://" & getCurrentDir() / "assets/no-photo.png")
