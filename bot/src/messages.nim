@@ -81,6 +81,7 @@ const
 
     emptyBoxJ* = "◻"
     correctBoxJ* = "✅"
+    dangerJ* = "⚠️"
 
     gotoQuestionT* = "برو به سوال"
     emptyT* = "خالی"
@@ -380,17 +381,19 @@ func questionAnswer(n: int): string =
     if n == 0: emptyT
     else: $n
 
-func toEmoji(cond: bool): string =
-    if cond: correctBoxJ
+func compareEmoji(test, correct: int): string =
+    if test == 0: dangerJ
+    elif test == correct: correctBoxJ
     else: wrongJ
 
-func questionAnalyzeDialog*(index: int, q: QuestionModel,
-        yourAnswer: int): string =
+func questionAnalyzeDialog*(
+  index: int, q: QuestionModel, yourAnswer: int
+): string =
     [
       &"{bold quizOfNumberT}: {(index+1)}\n",
       &"{bold yourAnswerT}: {questionAnswer yourAnswer}",
       &"{bold correctAnswerT}: {q.answer}",
-      &"{bold comparisionT}: {toEmoji(q.answer == yourAnswer)}\n",
+      &"{bold comparisionT}: {compareEmoji(yourAnswer, q.answer.int)}\n",
       &"{bold questionDescT}:\n{q.description.escapeMarkdownV2}\n",
       &"{bold reasonT}:\n{q.why.escapeMarkdownV2}",
     ].join "\n"

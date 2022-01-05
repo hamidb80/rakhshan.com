@@ -330,7 +330,7 @@ proc getMyRecords*(db;
             quiz_id: it[3].parseint))
 
 proc getRank*(db;
-    member_id: int64, quizid: int64
+    member_id: int64, quizid: int64,
 ): Option[int] {.errorHandler.} =
     let rec = db.getSingleRow(sql"""
         SELECT percent
@@ -344,5 +344,5 @@ proc getRank*(db;
         result = some db.getSingleRow(sql"""
             SELECT COUNT(*)
             FROM record r
-            WHERE r.quiz_id = ? AND r.percent > ?
+            WHERE r.quiz_id = ? AND r.percent - ? > 0.01
         """, quizid, myPercent).get[0].parseint + 1

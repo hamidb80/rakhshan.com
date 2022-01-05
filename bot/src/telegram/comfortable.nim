@@ -1,6 +1,6 @@
 import asyncdispatch
-import telebot
-import ./controller
+import telebot, asyncanything
+import ./controller, ../concurrency
 
 type
   MsgInfo = tuple[chatid: int64, msgid: int]
@@ -8,8 +8,9 @@ type
 template redirect*(alias, params): untyped {.dirty.} =
   trigger(router, alias, bot, uctx, u, params)
 
-template `<<`*(chatid: int64, box: tuple[t: string,
-    k: KeyboardMarkup]): untyped {.dirty.} =
+template `<<`*(
+  chatid: int64, box: tuple[t: string, k: KeyboardMarkup]
+): untyped {.dirty.} =
   bot.sendMessage(chatid, box[0], replyMarkup = box[1],
       parsemode = "MarkdownV2")
 
@@ -37,11 +38,6 @@ template `<^`*(msginfo: MsgInfo,
 
 template `<!`*(chatid: int64, msgid: int): untyped {.dirty.} =
   bot.deleteMessage($chatId, msgid)
-
-template `!!`(stuff): untyped = asyncCheck chatid << stuff
-template `!!<<`(stuff): untyped = 
-  !! stuff
-  debugEcho "START ---", getCurrentExceptionMsg(), "END ---"
 
 template `/->`*(newStage: Stages): untyped {.dirty.} =
   uctx.stage = newStage
@@ -71,6 +67,12 @@ template qq*: untyped {.dirty.} =
 template qp*: untyped {.dirty.} =
   uctx.queryPaging.get
 
-template `!!`*(chatid, stuff) {.dirty.} =
+template `!!`*(chatid, stuff): untyped {.dirty.} =
   asyncCheck chatid << stuff
   debugEcho "START ---", getCurrentExceptionMsg(), "END ---"
+
+template `\>>`*(work): untyped =
+  discard customTryGet |>work
+
+template `>>`*(work): untyped =
+  customTryGet |>work

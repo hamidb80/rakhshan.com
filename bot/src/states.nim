@@ -9,7 +9,6 @@ type
     kind*: NotificationKinds
     quiz_id*: int64
     user_chat_id*: int64
-    # msg: string
 
 const
   # maxActivityTimeout = 60 * 60
@@ -28,6 +27,10 @@ proc getOrCreateUser*(chatId: int64): UserCtx =
       users[chatId].firstTime = true
 
     result = users[chatId]
+
+# proc deleteUser*(chatId: int64): UserCtx =
+#   withLock usersLock:
+#     users.del chatid
 
 proc startTimer*(delay: int) {.thread.} =
   castSafety:

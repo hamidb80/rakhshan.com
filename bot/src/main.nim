@@ -1,7 +1,7 @@
 import
   sequtils, tables, strutils, options, json, times, random,
   asyncdispatch, threadpool, db_sqlite, os, strformat, sugar
-import telebot, asyncanything
+import telebot
 import
   telegram/[controller, helper, comfortable], messages, forms, concurrency,
   host_api, states, utils, ./mymath, database/[queries, models]
@@ -53,11 +53,11 @@ newRouter router:
           userInfo = await ct.phoneNumber.getUserInfo # number
 
         dbworks dbPath:
-          discard |>db.addMemberHandler(chatid, userinfo.display_name,
+          \>> db.addMemberHandler(chatid, userinfo.display_name,
             (ct.firstname & " " & ct.lastname.get("")),
-            ct.phoneNumber, userInfo.is_admin.int, unixNow()).customTryGet
+            ct.phoneNumber, userInfo.is_admin.int, unixNow())
 
-          uctx.membership = db.getMemberHandler(chatid).customTryGet
+          uctx.membership = >> db.getMemberHandler(chatid)
 
         asyncCheck chatid << (greeting(userinfo.displayName), noReply)
         asyncCheck redirect("enter-menu", %*[chatid])
@@ -102,8 +102,8 @@ newRouter router:
 
   route(chatid: int64) as "my-records":
     let recs = dbworksCapture dbpath:
-      |> db.getMyRecordsHandler(chatid, int64.high, pageSize,
-          saLess).customTryGet
+      >> db.getMyRecordsHandler(chatid, int64.high, pageSize,
+          saLess)
 
     if recs.len == 0:
       asyncCheck chatid << noRecordsAvailableT
@@ -187,15 +187,15 @@ newRouter router:
 
     if input == endT and uctx.stage == sAQQPic:
       dbworks dbpath:
-        let tg = |> db.upsertTagHandler(
-          qc.tag.grade, qc.tag.lesson, qc.tag.chapter).customTryGet
-        discard |>db.addQuizHandler(
+        let tg = >> db.upsertTagHandler(
+          qc.tag.grade, qc.tag.lesson, qc.tag.chapter)
+        \>> db.addQuizHandler(
           qc.quiz.name,
           qc.quiz.description,
           qc.quiz.time,
           tg.id,
           unixNow(),
-          qc.questions).customTryGet
+          qc.questions)
 
       asyncCheck chatid << quizAddedDialog(qc.quiz.name)
       asyncCheck redirect("enter-menu", %*[chatid])
@@ -274,7 +274,7 @@ newRouter router:
       asyncCheck chatid << $qq
 
       let quizzes = dbworksCapture dbpath:
-        |> db.findQuizzesHandler(qq, int64.high, pageSize, saLess).customTryGet
+        >> db.findQuizzesHandler(qq, int64.high, pageSize, saLess)
 
       if quizzes.len == 0:
         asyncCheck chatid << noResultFoundT
@@ -365,8 +365,9 @@ newRouter router:
           case qp.context:
           of sfQuiz:
             let quizzes = dbworksCapture dbpath:
-              |> db.findQuizzesHandler(qq, qp.indexRange[dir], pageSize,
-                  dir).customTryGet
+              >> db.findQuizzesHandler(
+                  qq, qp.indexRange[dir],
+                  pageSize, dir)
 
             if quizzes.len != 0:
               let qi = [quizzes[0].quiz.id, quizzes[^1].quiz.id]
@@ -382,8 +383,8 @@ newRouter router:
 
           of sfmyRecords:
             let recs = dbworksCapture dbpath:
-              |> db.getMyRecordsHandler(chatid, qp.indexRange[dir],
-                  pageSize, dir).customTryGet
+              >> db.getMyRecordsHandler(chatid, qp.indexRange[dir],
+                  pageSize, dir)
 
             if recs.len != 0:
               let ri = [recs[0].record.id, recs[^1].record.id]
@@ -409,13 +410,15 @@ newRouter router:
   command(chatid: int64, param: string) as "show-quiz":
     let
       quizid = parseint param
-      qm = dbworksCapture dbpath: |> db.getQuizInfoHandler(quizid).customTryGet
+      qm = dbworksCapture dbpath:
+        >> db.getQuizInfoHandler(quizid)
 
     asyncCheck:
       if qm.issome:
         let
-          rec = dbworksCapture dbpath: |> db.getRecordForHandler(chatid,
-              qm.get.quiz.id).customTryGet
+          rec = dbworksCapture dbpath:
+            >> db.getRecordForHandler(chatid, qm.get.quiz.id)
+
           text = fullQuizInfo(qm.get, rec)
 
         if rec.issome:
@@ -429,8 +432,8 @@ newRouter router:
   command(chatid: int64, param: string) as "get-rank":
     let
       quizid = parseint param
-      rank = dbworksCapture dbpath: |> db.getRankHandler(chatid,
-          quizid).customTryGet
+      rank = dbworksCapture dbpath:
+        >> db.getRankHandler(chatid, quizid)
 
     asyncCheck chatid << (
       if isSome rank: fmt"{yourRankInThisQuizYetT}: {rank.get}"
@@ -455,8 +458,7 @@ newRouter router:
         asyncCheck:
           if input == yesT:
             dbworks dbpath:
-              discard |>db.deleteQuizHandler(
-                  uctx.quizidToDelete.get).customTryGet
+              \>> db.deleteQuizHandler(uctx.quizidToDelete.get)
 
             chatid << quizGotDeletedT
           else:
@@ -473,18 +475,18 @@ newRouter router:
     if not isDoingQuiz:
       let
         quizid = parseint param
-        quiz = dbworksCapture dbpath: |> db.getQuizItselfHandler(
-            quizid).customTryGet
+        quiz = dbworksCapture dbpath:
+          >> db.getQuizItselfHandler(quizid)
 
       if issome quiz:
-        if not dbpath.dbworksCapture( |> db.isRecordExistsForHandler(chatid,
-            quizid).customTryGet):
+        if not dbpath.dbworksCapture( >> db.isRecordExistsForHandler(chatid,
+            quizid)):
           asyncCheck chatid << quizWillStartSoonT
 
           uctx.record = some QuizTaking()
           myrecord.quiz = quiz.get
-          myrecord.questions = dbworksCapture dbpath: |> db.getQuestionsHandler(
-              quizid).customTryGet
+          myrecord.questions = dbworksCapture dbpath: >> db.getQuestionsHandler(
+              quizid)
 
           myrecord.questionsOrder = toseq(0 .. myrecord.questions.high).dup(shuffle)
           let fqi = myrecord.questionsOrder[0] # first question index
@@ -573,16 +575,16 @@ newRouter router:
   command(chatid: int64, param: string) as "analyze":
     let
       quizid = parseint param
-      quiz = dbworksCapture dbpath: |> db.getQuizItselfHandler(
-          quizid).customTryGet
+      quiz = dbworksCapture dbpath: >> db.getQuizItselfHandler(
+          quizid)
 
     if quiz.issome:
-      let rec = dbworksCapture dbpath: |> db.getRecordForHandler(chatid,
-          quizid).customTryGet
+      let rec = dbworksCapture dbpath: >> db.getRecordForHandler(chatid,
+          quizid)
       if rec.issome:
         let
-          questions = dbworksCapture dbpath: |> db.getQuestionsHandler(
-              quizid).customTryGet
+          questions = dbworksCapture dbpath: >> db.getQuestionsHandler(
+              quizid)
           qoi = rec.get.questionsOrder.parseJson.to(seq[int]) # question order index
 
         for i in 0 .. questions.high:
@@ -622,8 +624,8 @@ newRouter router:
 
       # save record
       dbworks dbpath:
-        discard |>db.addRecordHandler(r.quiz.id, chatid, r.answerSheet.join,
-            ($r.questionsOrder).substr(1), percent, unixNow()).customTryGet
+        \>> db.addRecordHandler(r.quiz.id, chatid, r.answerSheet.join,
+            ($r.questionsOrder).substr(1), percent, unixNow())
 
       # show complete result
       asyncCheck chatid << recordResultDialog(r.quiz, percent)
@@ -684,7 +686,7 @@ proc dispatcher*(bot: TeleBot, u: Update): Future[bool] {.async.} =
   if uctx.firstTime:
     castSafety:
       let m = dbworksCapture dbPath:
-        |> getMemberHandler(db, u.getchatid).customTryGet
+        >> getMemberHandler(db, u.getchatid)
 
       if issome m:
         uctx.membership = m
@@ -784,12 +786,11 @@ when isMainModule:
   defaultPhotoUrl = getBiggestPhotoFileId m
 
   bot.onUpdate dispatcher
-
-  spawn startTimer(100)
+  spawn startTimer(50)
   asyncCheck checkNofitications(addr notifier, 100, bot)
 
   while true:
     echo "running ..."
 
     try: bot.poll(timeout = 100)
-    except: echo ">>>  " & getCurrentExceptionMsg()
+    except: echo ">>  " & getCurrentExceptionMsg()
