@@ -101,7 +101,7 @@ proc addMember*(db;
 
 # quiz -------------------------------------------
 
-proc totag*(s: seq[string]): TagModel {.errorHandler.} =
+proc totag*(s: seq[string]): TagModel =
     TagModel(
         id: s[0].parseint,
         grade: s[1].parseint,
@@ -176,7 +176,7 @@ func quizInfoQueryGen(whereClause: string, dir = saMore): string =
     {whereClause} ORDER BY qid {ortsd[dir]}
     """
 
-func toQuizInfo(row: Row): QuizInfo {.errorHandler.} =
+func toQuizInfo(row: Row): QuizInfo =
     result.quiz = QuizModel(
         id: row[0].parseInt,
         name: row[1],

@@ -1,4 +1,5 @@
-import results, macroplus, macros
+import macros, db_common, db_sqlite
+import results, macroplus
 
 func getName(n: NimNode): string =
   case n.kind:
@@ -9,6 +10,15 @@ func getName(n: NimNode): string =
   else:
     raise newException(ValueError, "cannot get name from node kind: " & $n.kind)
 
+type
+  HandledErrorKinds* = enum
+    heDberror, heOtherErrors
+
+  HandledError* = object
+    kind*: HandledErrorKinds
+    exceptionMsg*: string
+
+  RunTimeError* = object of CatchableError
 
 macro errorHandler*(body: untyped): untyped =
   let
@@ -17,7 +27,7 @@ macro errorHandler*(body: untyped): untyped =
     params = RoutineArguments body
     returnType = RoutineReturnType body
 
-    newReturnType = quote: Result[`returnType`, string]
+    newReturnType = quote: Result[`returnType`, HandledError]
 
   var callProcWithParams = newCall(procName)
   for p in params:
@@ -29,8 +39,16 @@ macro errorHandler*(body: untyped): untyped =
     proc `handlerName`(): `newReturnType` =
       try:
         result.ok `callProcWithParams`
+
+      except `DbError`:
+        result.err HandledError(kind: heDberror,
+          exceptionMsg: getCurrentExceptionMsg())
+        close(db)
+
       except:
-        result.err getCurrentExceptionMsg()
+        result.err HandledError(kind: heOtherErrors,
+            exceptionMsg: getCurrentExceptionMsg())
+        close(db)
 
   for p in params:
     result[^1][RoutineFormalParams].add p
@@ -42,10 +60,21 @@ macro errorHandler*(body: untyped): untyped =
 # test:
 # func doOp(a: int, b: bool): float {.errorHandler.} =
 #   if a <= 5: a.toFloat
-#   else: raise newException(ValueError, "more than 5 ??") 
-# 
+#   else: raise newException(ValueError, "more than 5 ??")
+#
 # func doOpHandler(a: int, b: bool): Result[float, string] =
 #   try:
 #     result.ok doOp(a, b)
 #   except:
 #     result.err getCurrentExceptionMsg()
+
+
+proc customTryGet*[T](r: Result[T, HandledError]): T =
+  if r.isOk: result = r.get
+  else:
+    let e = r.error()
+    debugecho "ERROR ---------\n", e.exceptionMsg
+
+    case e.kind:
+      of heDberror: raise newException(DbError, "")
+      of heOtherErrors: raise newException(RunTimeError, "")

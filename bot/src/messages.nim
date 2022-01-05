@@ -6,12 +6,13 @@ import ./telegram/[helper, controller], ./database/[queries, models], utils
 func escapeMarkdownV2*(s: string): string =
     result = newStringOfCap(s.len * 2)
     for c in s:
-        if c in "_*[]()~`>#+-=|{}.!":
+        if c in "_*[]()~`>#+-=|{}.!\\":
             result.add '\\'
 
         result.add c
 
 # texts: texts that are recieved from the client
+# TODO add giude for number forms
 const
     cancelT* = "انصراف"
     invalidInputT* = "ورودی اشتباه"
@@ -148,7 +149,7 @@ const
 
     calcRank* = "محاسبه رتبه"
 
-    yourRankInThisQuizT* = "رتبه شما در این آزمون"
+    yourRankInThisQuizYetT* = "رتبه شما در این آزمون فعلا"
     appliedFiltersT* = "فیلتر های اعمالی"
     separatorLine* = escapeMarkdownV2 "-----------------------"
     minesT* = escapeMarkdownV2 "-"
@@ -163,6 +164,12 @@ const
     ].join "\n\n"
 
     loggedInAsT* = "وارد شده به عنوان"
+    inputIsnotAIntegerT* = "ورودی عدد نیست"
+    numberIsnotInValidRangeT* = "عدد داده شده در محدوده مجاز نیست"
+    databaseErrorT* = "مشکل با دیتابیس"
+    runtimeErrorT* = "مشکل در داخلی"
+    someErrorT* = "مشکلی پیش آمده"
+    rangeErrorT* = "ورودی داده شده در بازه مجاز نیست"
 
 let
     noReply* = newReplyKeyboardRemove(true)

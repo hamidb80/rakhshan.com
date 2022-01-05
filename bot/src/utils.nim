@@ -1,5 +1,6 @@
 import options, times
 import results
+import concurrency
 
 const NotFound* = -1
 
@@ -16,8 +17,8 @@ template `or`*(s1, s2: string): string =
 func parseInt*(n: char): int =
   n.ord - '0'.ord
 
-func forget*[T](opt:var Option[T])=
+func forget*[T](opt: var Option[T]) =
   opt = none T
 
-proc unixNow*(): int64=
+proc unixNow*(): int64 =
   getTime().toUnix
