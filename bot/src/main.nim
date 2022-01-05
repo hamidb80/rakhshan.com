@@ -26,10 +26,10 @@ newRouter router:
   route(chatid: int64) as "start":
     if isSome uctx.membership:
       asyncCheck chatid << fmt"{loggedInAsT} '{uctx.membership.get.site_name}'"
-
     else:
       asyncCheck chatid << firstTimeStartMsgT
-      asyncCheck redirect("home", %*[chatid, ""])
+
+    asyncCheck redirect("home", %*[chatid, ""])
 
   route(chatid: int64, msgtext: string) as "home":
     if isSome uctx.membership:
@@ -649,6 +649,14 @@ newRouter router:
   callbackQuery(_: int) as "dont-care": discard
 
 # controllers ---
+proc eventHandler(
+  route: string, bot: TeleBot, uctx: UserCtx, u: Update, chatid: int64
+) {.async.} =
+  try: discard await trigger(router, route, bot, uctx, u, %[chatid])
+  except DbError: chatid !! databaseErrorT
+  except RuntimeError: chatid !! runtimeErrorT
+  except Exception: chatid !! someErrorT
+
 proc checkNofitications(
   pch: ptr Channel[Notification], delay: int, bot: TeleBot
 ) {.async.} =
@@ -659,16 +667,12 @@ proc checkNofitications(
       let (ok, notif) = pch[].tryRecv
       if not ok: break
 
-      let
-        args = %[notif.user_chatid]
-        routeName =
-          case notif.kind:
-          of nkEndQuizTime: "end-quiz"
-          of nkUpdateQuizTime: "update-timer"
+      let routeName = case notif.kind:
+        of nkEndQuizTime: "end-quiz"
+        of nkUpdateQuizTime: "update-timer"
 
-      asyncCheck router[routeName](
-        bot, getOrCreateUser(notif.user_chatid),
-        Update(), args)
+      asyncCheck eventHandler(routeName, bot,
+        getOrCreateUser(notif.user_chatid), Update(), notif.user_chatid)
 
 proc dispatcher*(bot: TeleBot, u: Update): Future[bool] {.async.} =
   let
@@ -690,11 +694,6 @@ proc dispatcher*(bot: TeleBot, u: Update): Future[bool] {.async.} =
 
   else:
     debugEcho ">> ", uctx.stage, " || ", chatid
-
-    template `!!`(stuff): untyped = asyncCheck chatid << stuff
-    template `!!<<`(stuff): untyped = 
-      !! stuff
-      debugEcho "START ---", getCurrentExceptionMsg(), "END ---"
 
     try:
       if u.message.issome:
@@ -771,11 +770,11 @@ proc dispatcher*(bot: TeleBot, u: Update): Future[bool] {.async.} =
 
           asyncCheck bot.answerCallbackQuery($cq.id, res)
 
-    except DbError: !!<< databaseErrorT
-    except RuntimeError: !!<< runtimeErrorT
-    except FValueError: !! invalidInputT
-    except FmRangeError: !! rangeErrorT
-    except Exception: !!<< someErrorT
+    except DbError: chatid !! databaseErrorT
+    except RuntimeError: chatid !! runtimeErrorT
+    except FValueError: asyncCheck chatid << invalidInputT
+    except FmRangeError: asyncCheck chatid << rangeErrorT
+    except Exception: chatid !! someErrorT
 
 when isMainModule:
   let bot = newTeleBot tgToken

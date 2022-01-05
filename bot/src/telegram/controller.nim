@@ -220,12 +220,12 @@ template newRouter*(varname, body) =
   initRouter(varname, bot: TeleBot, uctx: UserCtx, u: Update, body)
 
 proc trigger*(
-  router: RouterMap, alias: string,
+  router: RouterMap, route: string,
   bot: TeleBot, uctx: UserCtx, u: Update, args: JsonNode = newJArray()
 ): Future[string] {.async.} =
   doassert args.kind == JArray
 
-  if alias in router:
-    return await router[alias](bot, uctx, u, args)
+  if route in router:
+    return await router[route](bot, uctx, u, args)
 
-  raise newException(ValueError, "route alias is not defined: " & alias)
+  raise newException(ValueError, "route alias is not defined: " & route)

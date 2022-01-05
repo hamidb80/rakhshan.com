@@ -38,6 +38,11 @@ template `<^`*(msginfo: MsgInfo,
 template `<!`*(chatid: int64, msgid: int): untyped {.dirty.} =
   bot.deleteMessage($chatId, msgid)
 
+template `!!`(stuff): untyped = asyncCheck chatid << stuff
+template `!!<<`(stuff): untyped = 
+  !! stuff
+  debugEcho "START ---", getCurrentExceptionMsg(), "END ---"
+
 template `/->`*(newStage: Stages): untyped {.dirty.} =
   uctx.stage = newStage
 
@@ -65,3 +70,7 @@ template qq*: untyped {.dirty.} =
 
 template qp*: untyped {.dirty.} =
   uctx.queryPaging.get
+
+template `!!`*(chatid, stuff) {.dirty.} =
+  asyncCheck chatid << stuff
+  debugEcho "START ---", getCurrentExceptionMsg(), "END ---"
