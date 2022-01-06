@@ -16,7 +16,7 @@ type
 
   HandledError* = object
     kind*: HandledErrorKinds
-    exceptionMsg*: string
+    msg*: string
 
   RunTimeError* = object of CatchableError
 
@@ -41,15 +41,17 @@ macro errorHandler*(body: untyped): untyped =
         result.ok `callProcWithParams`
 
       except `DbError`:
+        debugecho getCurrentExceptionMsg()
+        
         result.err HandledError(
           kind: heDbError,
-          exceptionMsg: getCurrentExceptionMsg())
+          msg: getCurrentExceptionMsg())
         close(db)
 
       except:
         result.err HandledError(
           kind: heRuntimeError,
-          exceptionMsg: getCurrentExceptionMsg())
+          msg: getCurrentExceptionMsg())
         close(db)
 
   for p in params:
@@ -61,6 +63,8 @@ proc customTryGet*[T](r: Result[T, HandledError]): T =
   if r.isOk: result = r.get
   else:
     let e = r.error()
+    debugecho "!!!!!!!!!!!!!!!!!!/"
+    debugecho e.msg
     case e.kind:
-      of heDbError: raise newException(DbError, e.exceptionMsg)
-      of heRuntimeError: raise newException(RunTimeError, e.exceptionMsg)
+      of heDbError: raise newException(DbError, e.msg)
+      of heRuntimeError: raise newException(RunTimeError, e.msg)

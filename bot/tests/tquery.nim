@@ -1,4 +1,4 @@
-import db_sqlite, strutils, sequtils, unittest, options, os, times, json
+import db_sqlite, strutils, sequtils, unittest, options, os, times, json, algorithm
 import database/[models, queries], telegram/controller
 
 # init
@@ -10,8 +10,7 @@ func toQuestion(t: tuple[quizId: int, description, why: string,
     quiz_id: t[0],
     description: t[1],
     why: t[2],
-    answer: t[3]
-  )
+    answer: t[3])
 
 template id(rawRow): untyped = rawRow[0]
 
@@ -159,20 +158,21 @@ suite "SELECT":
 
   test "find quizzes":
     block by_grade:
-      let qs = db.findQuizzes(QuizQuery(grade: some 11), 0, 5, saMore)
-      check qs.mapIt(it.quiz.name) == @["Qz1", "Qz2", "Qz3"]
+      let qs = db.findQuizzes(QuizQuery(grade: some 11), 0, 5, saMore, Descending)
+      check qs.mapIt(it.quiz.name) == @["Qz3", "Qz2", "Qz1"]
 
     block by_lesson:
-      let qs = db.findQuizzes(QuizQuery(lesson: some "phyz"), 0, 10, saMore)
-      check qs.mapIt(it.quiz.name) == @["Qz4", "Qz5"]
+      let qs = db.findQuizzes(QuizQuery(lesson: some "phyz"), 0, 10, saMore, Descending)
+      check qs.mapIt(it.quiz.name) == @["Qz5", "Qz4"]
 
     block by_name:
-      let qs = db.findQuizzes(QuizQuery(name: some "ah"), int64.high, 10, saLess)
+      let qs = db.findQuizzes(QuizQuery(name: some "ah"), int64.high, 10,
+          saLess, Descending)
       check qs.mapIt(it.quiz.name) == @["blah blah"]
 
     block paging:
-      let qs = db.findQuizzes(QuizQuery(), 5, 2, saLess)
-      check qs.mapIt(it.quiz.id) == @[4'i64, 3]
+      let qs = db.findQuizzes(QuizQuery(), 5, 2, saLess, Ascending)
+      check qs.mapIt(it.quiz.id) == @[3'i64, 4]
 
   test "get questions":
     let
@@ -184,10 +184,10 @@ suite "SELECT":
       ids == (15'i64 ..< (15+7).int64).toseq
 
   test "get my records":
-    let rs1 = db.getMyRecords(membersRaw[1].id, 7, 2, saLess)
-    check rs1.mapIt(it.record.percent) == [15.7, 48.5]
+    let rs1 = db.getMyRecords(membersRaw[1].id, 7, 2, saLess, Ascending)
+    check rs1.mapIt(it.record.percent) == [48.5, 15.7]
 
-    let rs2 = db.getMyRecords(membersRaw[1].id, 6, 1, saMore)
+    let rs2 = db.getMyRecords(membersRaw[1].id, 6, 1, saMore, Descending)
     check rs2.mapIt(it.record.percent) == [100.0]
 
   test "get record for":
@@ -237,5 +237,5 @@ suite "DELETE":
       isNone db.getQuizInfo(1) # delete quiz
       db.getQuestions(1).len == 0 # delete question
 
-      db.getMyRecords(membersRaw[1].id, 0, 10, saMore)
-        .mapIt(it.quiz.id) == @[2'i64, 3] # delete records
+      db.getMyRecords(membersRaw[1].id, 0, 10, saMore, Descending)
+        .mapIt(it.quiz.id) == @[3'i64, 2] # delete records

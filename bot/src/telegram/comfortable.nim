@@ -32,8 +32,8 @@ template `<^`*(msginfo: MsgInfo, box: tuple[t: string,
   bot.editMessageText(box[0], $msginfo[0], msginfo[1], replyMarkup = box[1],
       parsemode = "MarkdownV2")
 
-template `<^`*(msginfo: MsgInfo,
-    text: string): untyped {.dirty.} =
+template `<^`*(msginfo: MsgInfo, text: string
+): untyped {.dirty.} =
   bot.editMessageText(text, $msginfo[0], msginfo[1], parsemode = "MarkdownV2")
 
 template `<!`*(chatid: int64, msgid: int): untyped {.dirty.} =
@@ -41,12 +41,6 @@ template `<!`*(chatid: int64, msgid: int): untyped {.dirty.} =
 
 template `/->`*(newStage: Stages): untyped {.dirty.} =
   uctx.stage = newStage
-
-template trySendInvalid*(body) =
-  try:
-    body
-  except:
-    discard await chatid << invalidInputT
 
 template myrecord*: untyped {.dirty.} =
   uctx.record.get
@@ -69,7 +63,8 @@ template qp*: untyped {.dirty.} =
 
 template `!!`*(chatid, stuff): untyped {.dirty.} =
   asyncCheck chatid << stuff
-  debugEcho "START ---", getCurrentExceptionMsg(), "END ---"
+  debugEcho "START ---", getCurrentExceptionMsg(), "END ---" 
+  #FIXME seems like using getCurrentExceptionMsg() inside a template results in empty string
 
 template `\>>`*(work): untyped =
   discard customTryGet |>work

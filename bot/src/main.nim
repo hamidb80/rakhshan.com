@@ -1,5 +1,5 @@
 import
-  sequtils, tables, strutils, options, json, times, random,
+  sequtils, tables, strutils, options, json, times, random, algorithm,
   asyncdispatch, threadpool, db_sqlite, os, strformat, sugar
 import telebot
 import
@@ -50,8 +50,17 @@ newRouter router:
       fmt"{bold helpT}: {'\n'}",
       fmt"{bold gradesT} {italic positiveIntegerT} {areT}",
       fmt"{bold chaptersT} {italic positiveIntegerT} {areT}",
-      fmt"{bold minQuizTimeT} {underline($minQuizTime & secondT)} {isT}"
+      fmt"{bold minQuizTimeT} {underline($minQuizTime & secondT)} {isT}",
+      "\n",
+      fmt"{bold commandsT}:",
+      fmt"{underline startT} /start",
+      fmt"{underline helpT}: /help",
+      fmt"{underline resetT}: /zzz",
     ].join "\n"
+
+  command(chatid: int64) as "reset":
+    uctx.reset
+    asyncCheck redirect("enter-menu", %*[chatid])
 
   route(chatid: int64) as "verify-user":
     try:
@@ -111,8 +120,7 @@ newRouter router:
 
   route(chatid: int64) as "my-records":
     let recs = dbworksCapture dbpath:
-      >> db.getMyRecordsHandler(chatid, int64.high, pageSize,
-          saLess)
+      >> db.getMyRecordsHandler(chatid, int64.high, pageSize, saLess, Descending)
 
     if recs.len == 0:
       asyncCheck chatid << noRecordsAvailableT
@@ -127,9 +135,7 @@ newRouter router:
         genQueryPageInlineBtns(0)
       )).messageid
 
-      let minmaxId = [0, recs.high].mapIt(recs[it].record.id)
-      qp.indexrange = min(minmaxId) .. max(minmaxId)
-
+      qp.indexrange = recs[^1].record.id .. recs[0].record.id
       qp.context = sfmyRecords
       /-> sScroll
 
@@ -266,7 +272,6 @@ newRouter router:
     template goBack: untyped = /-> sFindQuizMain
 
     case input:
-    # FIXME say something
     of findQuizChangeNameT:
       asyncCheck chatid << enterQuizNameToSearchT
       /-> sFQname
@@ -286,7 +291,7 @@ newRouter router:
       asyncCheck chatid << $qq
 
       let quizzes = dbworksCapture dbpath:
-        >> db.findQuizzesHandler(qq, int64.high, pageSize, saLess)
+        >> db.findQuizzesHandler(qq, int64.high, pageSize, saLess, Descending)
 
       if quizzes.len == 0:
         asyncCheck chatid << noResultFoundT
@@ -300,8 +305,7 @@ newRouter router:
           genQueryPageInlineBtns(0)
         )).messageid
 
-        let minmaxId = [0, quizzes.high].mapIt(quizzes[it].quiz.id)
-        qp.indexrange = min(minmaxId) .. max(minmaxId)
+        qp.indexrange = quizzes[^1].quiz.id .. quizzes[0].quiz.id
         qp.context = sfQuiz
         /-> sScroll
 
@@ -377,30 +381,26 @@ newRouter router:
           case qp.context:
           of sfQuiz:
             let quizzes = dbworksCapture dbpath:
-              >> db.findQuizzesHandler(
-                  qq, qp.indexRange[dir],
-                  pageSize, dir)
+              >> db.findQuizzesHandler(qq, qp.indexRange[dir], pageSize, dir, Descending)
 
-            if quizzes.len != 0:
-              let qi = [quizzes[0].quiz.id, quizzes[^1].quiz.id]
-              qp.indexRange = min(qi) .. max(qi)
+            if quizzes.len == 0:
+              result = itsTheEndT
+
+            else:
+              qp.indexRange = quizzes[^1].quiz.id .. quizzes[0].quiz.id
               qp.page.inc btnDir.toInt
 
               asyncCheck (chatid, msgid) <^ (
                 quizzes.map(miniQuizInfo).join "\n",
                 genQueryPageInlineBtns(qp.page))
 
-            else:
-              result = itsTheEndT
-
           of sfmyRecords:
             let recs = dbworksCapture dbpath:
               >> db.getMyRecordsHandler(chatid, qp.indexRange[dir],
-                  pageSize, dir)
+                  pageSize, dir, Descending)
 
             if recs.len != 0:
-              let ri = [recs[0].record.id, recs[^1].record.id]
-              qp.indexRange = min(ri) .. max(ri)
+              qp.indexRange = recs[^1].record.id .. recs[0].record.id
               qp.page.inc btnDir.toInt
 
               asyncCheck (chatid, msgid) <^ (
@@ -689,7 +689,7 @@ proc checkNofitications(
 
 proc dispatcher*(bot: TeleBot, u: Update): Future[bool] {.async.} =
   if (let chid = findChatId u; isSome chid):
-    let 
+    let
       chatid = chid.get
       uctx = castSafety: getOrCreateUser chatid
 
@@ -715,24 +715,25 @@ proc dispatcher*(bot: TeleBot, u: Update): Future[bool] {.async.} =
             msg = u.message.get
             text = msg.text.get("")
 
-          if text.startsWith("/") and text.len > 2:
+          if text.startsWith("/") and text.len > 2: # it's a command
             let
               parameter = text[2..^1]
               route = case text[1]:
+                # without argument
                 of 's': "start"
-                of 'w': "where-am-i"
+                of 'h': "help"
+                of 'z': "reset"
+                # with arguemnt
                 of 'q': "show-quiz"
                 of 'a': "analyze"
                 of 'r': "get-rank"
-                of 'h': "help"
                 else: "invalid-command"
 
             args.add %parameter
             castSafety:
               discard await trigger(router, route, bot, uctx, u, args)
 
-          # it's a text message
-          else:
+          else: # it's a text message
             args.add %text
 
             let route = case uctx.stage:
@@ -785,7 +786,9 @@ proc dispatcher*(bot: TeleBot, u: Update): Future[bool] {.async.} =
 
             asyncCheck bot.answerCallbackQuery($cq.id, res)
 
-      except DbError: chatid !! databaseErrorT
+      except DbError:
+        debugEcho getCurrentExceptionMsg() # FIXME
+        chatid !! databaseErrorT
       except RuntimeError: chatid !! runtimeErrorT
       except FValueError: asyncCheck chatid << invalidInputT
       except FmRangeError: asyncCheck chatid << rangeErrorT

@@ -1,4 +1,4 @@
-import db_sqlite, sequtils, strutils, options, strformat
+import db_sqlite {.all.}, sequtils, strutils, options, strformat, algorithm
 import models, ../telegram/controller, ../concurrency
 
 type
@@ -17,8 +17,7 @@ const
     # direction operator
     dop: array[SearchDirection, char] = ['>', '<']
     # Order Respected To Search Direction
-    ortsd: array[SearchDirection, string] = ["ASC", "DESC"]
-
+    ortsd: array[SearchDirection, SortOrder] = [Ascending, Descending]
 
 using db: DbConn
 
@@ -64,11 +63,15 @@ func `[]`*[T](h: HSlice[T, T], dir: SearchDirection): T =
     of saLess: h.a
     of saMore: h.b
 
-
 func `~`*(dir: SearchDirection): SearchDirection =
     case dir:
     of saLess: saMore
     of saMore: saLess
+
+func `$`(so: SortOrder): string=
+    case so:
+    of Ascending: "ASC"
+    of Descending: "DESC"
 
 # member ----------------------------------------
 
@@ -192,20 +195,25 @@ func toQuizInfo(row: Row): QuizInfo =
         lesson: row[7],
         chapter: row[8].parseInt)
 
+func wrapWith(s:string, c: char): string =
+    fmt"{c}{s}{c}"
+
+template keepOrder(result, dir, order): untyped =
+    if (dir == saMore and order == Descending) or (dir == saLess and order == Ascending):
+        result.reverse
+
 proc findQuizzes*(db;
     qq: QuizQuery, pinnedIndex: int64, limit: int,
-    dir: SearchDirection,
+    dir: SearchDirection, order: SortOrder
 ): seq[QuizInfo] {.errorHandler.} =
     var conditions = @[fmt"qid {dop[dir]} {pinnedIndex}"]
 
     if issome qq.grade:
-        conditions.add fmt"tgrade = {qq.grade.get}"
+        conditions.add dbFormat(sql"tgrade = ?", $qq.grade.get)
     if issome qq.lesson:
-        # TODO security checks
-        conditions.add fmt "tlesson = \"{qq.lesson.get}\""
+        conditions.add dbFormat(sql"tlesson LIKE ?", wrapWith(qq.lesson.get, '%'))
     if issome qq.name:
-        # TODO security checks
-        conditions.add fmt "qname LIKE \"%{qq.name.get}%\""
+        conditions.add dbFormat(sql"qname LIKE ?", wrapWith(qq.name.get, '%')) # FIXM not used
 
     let query =
         quizInfoQueryGen(
@@ -214,7 +222,8 @@ proc findQuizzes*(db;
             , dir
         ) & fmt"LIMIT {limit}"
 
-    db.getAllRows(query.sql).map(toQuizInfo)
+    result = db.getAllRows(query.sql).map(toQuizInfo)
+    result.keepOrder(dir, order)
 
 proc getQuizInfo*(db; quizid: int64): Option[QuizInfo] {.errorHandler.} =
     let row = db.getSingleRow(quizInfoQueryGen("WHERE qid = ?").sql, quizid, quizid)
@@ -299,7 +308,7 @@ proc getRecordFor*(db;
 
 proc getMyRecords*(db;
     memberId: int64, pinnedIndex: int64, limit: int,
-    dir: SearchDirection
+    dir: SearchDirection, order: SortOrder
 ): seq[RecordInfo] {.errorHandler.} =
     let rows = db.getAllRows(sql fmt"""
         SELECT  
@@ -318,7 +327,7 @@ proc getMyRecords*(db;
         LIMIT ?
     """, memberid, pinnedIndex, limit)
 
-    rows.mapIt (
+    result = rows.mapIt (
         QuizModel(
             id: it[3].parseInt,
             name: it[4],
@@ -328,6 +337,8 @@ proc getMyRecords*(db;
             percent: it[1].parseFloat,
             createdAt: it[2].parseInt,
             quiz_id: it[3].parseint))
+
+    result.keepOrder(dir, order)
 
 proc getRank*(db;
     member_id: int64, quizid: int64,

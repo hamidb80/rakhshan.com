@@ -14,7 +14,6 @@ type
     sAddQuiz, sAQName, sAQDesc, sAQTime, sAQGrade, sAQLesson, sAQchapter
     sAQQuestion, sAQQPic, sAQQDesc, sAQQWhy, sAQQAns
 
-type
   SearchFor* = enum
     sfQuiz, sfmyRecords
 
@@ -26,17 +25,15 @@ type
 
   UserCtx* = ref object
     chatId*: int64
+    firstTime*: bool # is 
     stage*: Stages
-
     lastActivity*: DateTime
     membership*: Option[MemberModel]
-
     quizCreation*: Option[QuizCreate]
     record*: Option[QuizTaking]
     quizQuery*: Option[QuizQuery]
     quizIdToDelete*: Option[int64]
     queryPaging*: Option[QueryPageInfo[SearchFor]]
-    firstTime*: bool
 
   QuizQuery* = object
     name*: Option[string]
@@ -107,6 +104,13 @@ func findInEnum[Idx: range](wrapper: array[Idx, int], lookingFor: int): Option[I
   for i in Idx.low .. Idx.high:
     if wrapper[i] == lookingFor:
       return some i
+
+proc reset*(u: UserCtx)=
+  u.quizCreation.forget
+  u.record.forget
+  u.quizQuery.forget
+  u.quizIdToDelete.forget
+  u.queryPaging.forget
 
 func findEditedMessageIdContext*(
   qc: QuizCreate, msgid: int

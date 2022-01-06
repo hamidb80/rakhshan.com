@@ -17,7 +17,6 @@ func underline*(s: string): string = fmt"__{s}__"
 func spoiler*(s: string): string = fmt"||{s}||"
 func link*(url, hover: string): string = fmt"[{url}]({hover})"
 
-# TODO add giude for number forms
 const
     cancelT* = "انصراف"
     invalidInputT* = "ورودی اشتباه"
@@ -64,8 +63,8 @@ const
 
     findQuizDialogT* = "میتوانید به طور اختیاری فیلتر هایی اعمال کنید و سپس روی دکمه جستجوی آزمون بزنید"
     findQuizT* = "جستجوی آزمون"
-    findQuizChangeNameT* = "نام آزمون"
     findQuizChangeGradeT* = "پایه"
+    findQuizChangeNameT* = "نام آزمون"
     findQuizChangeLessonT* = "نام درس"
     showFiltersT* = "نمایش فیلتر ها"
 
@@ -135,6 +134,10 @@ const
     yesT* = "بله"
     noTx* = "خیر"
     resultT* = "نتیجه"
+    commandsT* = "دستورات"
+    numberT* = "عدد"
+    resetT* = "بازگشت به حالت اول"
+    startT* = "راه انداختن ربات"
 
     quizGotDeletedT* = "آزمون مورد نظر حذف شد"
     quizStartedT* = "آزمون شروع شد"
@@ -233,7 +236,7 @@ let
     ]
 
     quizFilterReply* = newReplyKeyboardMarkup @[
-      @[findQuizChangeGradeT, findQuizChangeLessonT],
+      @[findQuizChangeGradeT, findQuizChangeLessonT, findQuizChangeNameT],
       @[showFiltersT],
       @[showResultsT, cancelT]
     ]
