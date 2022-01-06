@@ -108,8 +108,7 @@ let db = open(dbPath, "", "", "")
 # TODO add test to make sure suffeling works fine
 
 suite "INIT":
-  for q in initQuery:
-    db.exec q.sql
+  initDatabase(dbPath)
 
   let allTables = initQuery
     .filterit(it.startswith "CREATE TABLE")

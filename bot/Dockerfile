@@ -10,5 +10,4 @@ WORKDIR /app
 COPY . /app/
 
 RUN nimble go
-
 CMD ["./bin.exe"]

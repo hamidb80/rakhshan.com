@@ -1,13 +1,8 @@
 kind: ExternalService
 name: azmoonak-tg-bot
 spec:
-  image: aztgb:0.0.8
-  port: 3000
-
-  volume_mounts:
-  - mount_path: /databases
-    volume_name: vol1
-
+  image: aztgb:0.0.20
+  
   resources:
     memory: 200Mi
 
@@ -21,5 +16,5 @@ spec:
   - name: TG_TOKEN
     value: "2004052302:AAHm_oICftfs5xLmY0QwGVTE3o-gYgD6ahw"
 
-  - name: DB_PATH
-    value: "/databases/azmoonak.db"
+  - name: STORAGE
+    value: "/mnt/shared-volume/azmoonak"

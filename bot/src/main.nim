@@ -15,7 +15,7 @@ const
   minQuizTime = 60
 
 let
-  dbPath = getenv("DB_PATH")
+  dbPath = getenv("STORAGE") / "main.db"
   authorChatId = getenv("AUTHOR_CHAT_ID").parseInt
   tgToken = getEnv("TG_TOKEN")
 
@@ -319,7 +319,7 @@ newRouter router:
     else:
       template alertChange(field: QuizCreateFields): untyped =
         asyncCheck chatid << changeQuizFieldAlert(field)
-      
+
       case uctx.stage:
       of sfindQuizMain:
         asyncCheck chatid << findQuizDialogT
@@ -804,8 +804,7 @@ proc dispatcher*(bot: TeleBot, u: Update): Future[bool] {.async.} =
 
 when isMainModule:
   if not fileExists dbPath:
-    echo fmt"{getCurrentDir()=}"
-    echo fmt"{dbpath=}"
+    echo "not found DB, creating one ..."
     initDatabase dbpath
 
   let bot = newTeleBot tgToken
