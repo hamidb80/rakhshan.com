@@ -12,7 +12,7 @@ func getName(n: NimNode): string =
 
 type
   HandledErrorKinds* = enum
-    heDberror, heOtherErrors
+    heDbError, heRuntimeError
 
   HandledError* = object
     kind*: HandledErrorKinds
@@ -41,38 +41,26 @@ macro errorHandler*(body: untyped): untyped =
         result.ok `callProcWithParams`
 
       except `DbError`:
-        result.err HandledError(kind: heDberror,
+        result.err HandledError(
+          kind: heDbError,
           exceptionMsg: getCurrentExceptionMsg())
         close(db)
 
       except:
-        result.err HandledError(kind: heOtherErrors,
-            exceptionMsg: getCurrentExceptionMsg())
+        result.err HandledError(
+          kind: heRuntimeError,
+          exceptionMsg: getCurrentExceptionMsg())
         close(db)
 
   for p in params:
     result[^1][RoutineFormalParams].add p
 
-  # echo repr result
-  # echo "--------------"
   return result
-
-# test:
-# func doOp(a: int, b: bool): float {.errorHandler.} =
-#   if a <= 5: a.toFloat
-#   else: raise newException(ValueError, "more than 5 ??")
-#
-# func doOpHandler(a: int, b: bool): Result[float, string] =
-#   try:
-#     result.ok doOp(a, b)
-#   except:
-#     result.err getCurrentExceptionMsg()
-
 
 proc customTryGet*[T](r: Result[T, HandledError]): T =
   if r.isOk: result = r.get
   else:
     let e = r.error()
     case e.kind:
-      of heDberror: raise newException(DbError, e.exceptionMsg)
-      of heOtherErrors: raise newException(RunTimeError, e.exceptionMsg)
+      of heDbError: raise newException(DbError, e.exceptionMsg)
+      of heRuntimeError: raise newException(RunTimeError, e.exceptionMsg)

@@ -15,6 +15,7 @@ const
   authorChatId* = getenv("AUTHOR_CHAT_ID").parseInt
   pageSize* = getenv("RESULT_PAGE_SIZR", "3").parseint
   tgToken* = getEnv("TG_TOKEN")
+  minQuizTime* = 60
 
 var defaultPhotoUrl = ""
 
@@ -23,7 +24,7 @@ var defaultPhotoUrl = ""
 # router ---
 var router = new RouterMap
 newRouter router:
-  route(chatid: int64) as "start":
+  command(chatid: int64) as "start":
     if isSome uctx.membership:
       asyncCheck chatid << fmt"{loggedInAsT} '{uctx.membership.get.site_name}'"
     else:
@@ -43,6 +44,14 @@ newRouter router:
 
       else:
         asyncCheck chatid << (selectOptionsT, notLoggedInReply)
+
+  command(chatid: int64) as "help":
+    asyncCheck chatid << [
+      fmt"{bold helpT}: {'\n'}",
+      fmt"{bold gradesT} {italic positiveIntegerT} {areT}",
+      fmt"{bold chaptersT} {italic positiveIntegerT} {areT}",
+      fmt"{bold minQuizTimeT} {underline($minQuizTime & secondT)} {isT}"
+    ].join "\n"
 
   route(chatid: int64) as "verify-user":
     try:
@@ -151,7 +160,7 @@ newRouter router:
         /-> sAQTime
 
       of sAQTime:
-        qc.quiz.time = protectedParseint(input, 60)
+        qc.quiz.time = protectedParseint(input, minQuizTime)
         qc.msgids.quiz[qzfTime] = msgid
         asyncCheck chatid << enterQuizGradeT
         /-> sAQgrade
@@ -259,16 +268,19 @@ newRouter router:
     case input:
     # FIXME say something
     of findQuizChangeNameT:
+      asyncCheck chatid << enterQuizNameToSearchT
       /-> sFQname
 
     of findQuizChangeGradeT:
+      asyncCheck chatid << enterQuizGradeToSearchT
       /-> sFQgrade
 
     of findQuizChangeLessonT:
+      asyncCheck chatid << enterQuizLessonToSearchT
       /-> sFQlesson
 
-    of findQuizClearFiltersT:
-      /-> sFindQuizMain
+    of showFiltersT:
+      asyncCheck chatid << $qq
 
     of showResultsT:
       asyncCheck chatid << $qq
@@ -327,7 +339,7 @@ newRouter router:
     of qcmsQuiz, qcmsTag:
       case field:
       of qzfName: qc.quiz.name = input
-      of qzfTime: qc.quiz.time = protectedParseint input
+      of qzfTime: qc.quiz.time = protectedParseint(input, minQuizTime)
       of qzfDescription: qc.quiz.description = input
       of tfGrade: qc.tag.grade = protectedParseint input
       of tfLesson: qc.tag.lesson = input
@@ -471,7 +483,6 @@ newRouter router:
         discard
 
   callbackQuery(chatid: int64, _: int, param: string) as "take-quiz":
-    # TODO gaurd for when is taking quiz
     if not isDoingQuiz:
       let
         quizid = parseint param
@@ -677,106 +688,108 @@ proc checkNofitications(
         getOrCreateUser(notif.user_chatid), Update(), notif.user_chatid)
 
 proc dispatcher*(bot: TeleBot, u: Update): Future[bool] {.async.} =
-  let
-    chatid = findChatId u
-    uctx = castSafety: getOrCreateUser chatid
+  if (let chid = findChatId u; isSome chid):
+    let 
+      chatid = chid.get
+      uctx = castSafety: getOrCreateUser chatid
 
-  var args = %*[chatid]
+    var args = %*[chatid]
 
-  if uctx.firstTime:
-    castSafety:
-      let m = dbworksCapture dbPath:
-        >> getMemberHandler(db, u.getchatid)
+    if uctx.firstTime:
+      castSafety:
+        let m = dbworksCapture dbPath:
+          >> getMemberHandler(db, u.getchatid)
 
-      if issome m:
-        uctx.membership = m
+        if issome m:
+          uctx.membership = m
 
-      asyncCheck trigger(router, "start", bot, uctx, u, args)
-    uctx.firsttime = false
+        asyncCheck trigger(router, "start", bot, uctx, u, args)
+      uctx.firsttime = false
 
-  else:
-    debugEcho ">> ", uctx.stage, " || ", chatid
+    else:
+      debugEcho ">> ", uctx.stage, " || ", chatid
 
-    try:
-      if u.message.issome:
-        let
-          msg = u.message.get
-          text = msg.text.get("")
-
-        if text.startsWith("/") and text.len > 2:
+      try:
+        if u.message.issome:
           let
-            parameter = text[2..^1]
-            route = case text[1]:
-              of 's': "start"
-              of 'w': "where-am-i"
-              of 'q': "show-quiz"
-              of 'a': "analyze"
-              of 'r': "get-rank"
+            msg = u.message.get
+            text = msg.text.get("")
+
+          if text.startsWith("/") and text.len > 2:
+            let
+              parameter = text[2..^1]
+              route = case text[1]:
+                of 's': "start"
+                of 'w': "where-am-i"
+                of 'q': "show-quiz"
+                of 'a': "analyze"
+                of 'r': "get-rank"
+                of 'h': "help"
+                else: "invalid-command"
+
+            args.add %parameter
+            castSafety:
+              discard await trigger(router, route, bot, uctx, u, args)
+
+          # it's a text message
+          else:
+            args.add %text
+
+            let route = case uctx.stage:
+              of sMain: "home"
+              of sSendContact: "verify-user"
+              of AddQuizStages: "add-quiz"
+              of AddQuestionStages: "add-question"
+              of sEnterMainMenu: "enter-menu"
+              of sMainMenu: "menu"
+              of FindQuizStages: "find-quiz"
+              of DeleteQuiz: "delete-quiz"
+              of sTakingQuiz: "middle-of-quiz"
+              of sScroll: "middle-of-scroll"
               else: "invalid-command"
 
-          args.add %parameter
-          castSafety:
-            discard await trigger(router, route, bot, uctx, u, args)
+            castSafety:
+              discard await trigger(router, route, bot, uctx, u, args)
 
-        # it's a text message
-        else:
-          args.add %text
+        elif u.editedMessage.issome:
+          args.add %u.editedMessage.get.messageId
 
-          let route = case uctx.stage:
-            of sMain: "home"
-            of sSendContact: "verify-user"
-            of AddQuizStages: "add-quiz"
-            of AddQuestionStages: "add-question"
-            of sEnterMainMenu: "enter-menu"
-            of sMainMenu: "menu"
-            of FindQuizStages: "find-quiz"
-            of DeleteQuiz: "delete-quiz"
-            of sTakingQuiz: "middle-of-quiz"
-            of sScroll: "middle-of-scroll"
-            else: "invalid-command"
+          let route =
+            case uctx.stage:
+            of AddQuizStages, AddQuestionStages: "edit-quiz-creation"
+            else: raise newException(ValueError,
+                "cant edit message when stage is: " & $uctx.stage)
 
           castSafety:
-            discard await trigger(router, route, bot, uctx, u, args)
+            asyncCheck trigger(router, route, bot, uctx, u, args)
 
-      elif u.editedMessage.issome:
-        args.add %u.editedMessage.get.messageId
+        elif u.callbackQuery.issome:
+          let
+            cq = u.callbackQuery.get
+            cmd = cq.data.get("/d")
+            parameter = cmd[2..^1]
+            route = case cmd[1]:
+              of 't': "take-quiz"
+              of 'j': "jump-question"
+              of 'p': "select-answer"
+              of 'g': "goto"
+              of 'm': "scroll"
+              of 'd': "dont-care"
+              else: "invalid-command"
 
-        let route =
-          case uctx.stage:
-          of AddQuizStages, AddQuestionStages: "edit-quiz-creation"
-          else: raise newException(ValueError,
-              "cant edit message when stage is: " & $uctx.stage)
+          castSafety:
+            let res = await trigger(
+              router, route,
+              bot, uctx, u,
+              %*[cq.message.get.chat.id, cq.message.get.messageId, parameter])
 
-        castSafety:
-          asyncCheck trigger(router, route, bot, uctx, u, args)
+            asyncCheck bot.answerCallbackQuery($cq.id, res)
 
-      elif u.callbackQuery.issome:
-        let
-          cq = u.callbackQuery.get
-          cmd = cq.data.get("/d")
-          parameter = cmd[2..^1]
-          route = case cmd[1]:
-            of 't': "take-quiz"
-            of 'j': "jump-question"
-            of 'p': "select-answer"
-            of 'g': "goto"
-            of 'm': "scroll"
-            of 'd': "dont-care"
-            else: "invalid-command"
-
-        castSafety:
-          let res = await trigger(
-            router, route,
-            bot, uctx, u,
-            %*[cq.message.get.chat.id, cq.message.get.messageId, parameter])
-
-          asyncCheck bot.answerCallbackQuery($cq.id, res)
-
-    except DbError: chatid !! databaseErrorT
-    except RuntimeError: chatid !! runtimeErrorT
-    except FValueError: asyncCheck chatid << invalidInputT
-    except FmRangeError: asyncCheck chatid << rangeErrorT
-    except Exception: chatid !! someErrorT
+      except DbError: chatid !! databaseErrorT
+      except RuntimeError: chatid !! runtimeErrorT
+      except FValueError: asyncCheck chatid << invalidInputT
+      except FmRangeError: asyncCheck chatid << rangeErrorT
+      except Exception: chatid !! someErrorT
 
 when isMainModule:
   let bot = newTeleBot tgToken

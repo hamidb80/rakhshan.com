@@ -1,6 +1,5 @@
 import options, times
 import results
-import concurrency
 
 const NotFound* = -1
 

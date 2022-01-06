@@ -1,5 +1,5 @@
 import options, strutils, strformat, times
-import telebot
+import telebot, jalali_nim
 import ./telegram/[helper, controller], ./database/[queries, models], utils
 
 
@@ -11,7 +11,12 @@ func escapeMarkdownV2*(s: string): string =
 
         result.add c
 
-# texts: texts that are recieved from the client
+func bold*(s: string): string = fmt"*{s}*"
+func italic*(s: string): string = fmt"_{s}_"
+func underline*(s: string): string = fmt"__{s}__"
+func spoiler*(s: string): string = fmt"||{s}||"
+func link*(url, hover: string): string = fmt"[{url}]({hover})"
+
 # TODO add giude for number forms
 const
     cancelT* = "انصراف"
@@ -27,6 +32,15 @@ const
       "شماره اشتباه میباشد",
       "مطمئن شو که از همون شماره ای استفاده میکنی که توی سایت باهاش ثبت نام کردی"
     ].join("\n")
+
+    helpT* = "راهنما"
+    gradesT* = "پایه ها"
+    chaptersT* = "شماره فصل ها"
+    minQuizTimeT* = "حداقل زمان آزمون"
+    secondT* = "ثانیه"
+    positiveIntegerT* = "عدد صحیح بزرگتر از صفر"
+    areT* = "هستند"
+    isT* = "است"
 
     selectOptionsT* = "‌یکی از گزینه ها رو انتخاب کنید‌"
     sendAdminPassT* = "رمز را وارد کنید"
@@ -53,7 +67,7 @@ const
     findQuizChangeNameT* = "نام آزمون"
     findQuizChangeGradeT* = "پایه"
     findQuizChangeLessonT* = "نام درس"
-    findQuizClearFiltersT* = "حذف فیلتر ها"
+    showFiltersT* = "نمایش فیلتر ها"
 
     chooseOneT* = "یکی را انتخاب کنید"
 
@@ -172,6 +186,10 @@ const
     someErrorT* = "مشکلی پیش آمده"
     rangeErrorT* = "ورودی داده شده در بازه مجاز نیست"
 
+    enterQuizNameToSearchT* = "نام آزمون مورد نظر را وارد کمید"
+    enterQuizGradeToSearchT* = "پایه آزمون را برای جستجو وارد کنید"
+    enterQuizLessonToSearchT* = "نام درس آزمون را برای جستحو وارد کنید"
+
 let
     noReply* = newReplyKeyboardRemove(true)
 
@@ -216,7 +234,7 @@ let
 
     quizFilterReply* = newReplyKeyboardMarkup @[
       @[findQuizChangeGradeT, findQuizChangeLessonT],
-      @[findQuizChangeNameT],
+      @[showFiltersT],
       @[showResultsT, cancelT]
     ]
 
@@ -280,12 +298,6 @@ func genQuestionJumpBtns*(number: int): InlineKeyboardMarkup =
     result = newInlineKeyboardMarkup()
     result.inlineKeyboard = btnRows
 
-func bold*(s: string): string = fmt"*{s}*"
-func italic*(s: string): string = fmt"_{s}_"
-func underline*(s: string): string = fmt"__{s}__"
-func spoiler*(s: string): string = fmt"||{s}||"
-func link*(url, hover: string): string = fmt"[{url}]({hover})"
-
 func toPersianNumbers*(str: string): string =
     for c in str:
         if c in '0' .. '9':
@@ -300,9 +312,11 @@ func timeFormat*[T: SomeInteger](t: T): string =
     let d = initDuration(seconds = t).toParts
     fmt"{d[Hours]:02}:{d[Minutes]:02}:{d[Seconds]:02}"
 
-proc unixDatetimeFormat*(dt: int64): string =
-    let s = dt.fromUnix.format "yyyy/MM/dd '|' HH:mm:ss"
-    escapeMarkdownV2 s.toPersianNumbers
+proc unixDatetimeFormat*(ud: int64): string =
+    let
+        dt = ud.fromUnix.local
+        j = gregorian_to_jalali(dt.year, dt.month.int, dt.monthday.int)
+    escapeMarkdownV2 toPersianNumbers fmt"""{j[0]}/{j[1]:02}/{j[2]:02} | {dt.format("HH:mm:ss")}"""
 
 func percentSerialize*(n: SomeFloat): string =
     escapeMarkdownV2 fmt"{n:.2f}%"
