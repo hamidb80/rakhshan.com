@@ -1,7 +1,7 @@
 import
   sequtils, tables, strutils, options, json, times, random, algorithm,
   asyncdispatch, threadpool, db_sqlite, os, strformat, sugar
-import telebot
+import telebot, prometheus
 import
   telegram/[controller, helper, comfortable], messages, forms, concurrency,
   host_api, states, utils, ./mymath, database/[queries, models]
@@ -46,6 +46,10 @@ newRouter router:
 
       else:
         asyncCheck chatid << (selectOptionsT, notLoggedInReply)
+
+  command(chatid: int64) as "metrics":
+   if chatid == authorChatId:
+     asyncCheck chatid << escapeMarkdownV2 generateLatest()
 
   command(chatid: int64) as "help":
     asyncCheck chatid << [
@@ -729,6 +733,7 @@ proc dispatcher*(bot: TeleBot, u: Update): Future[bool] {.async.} =
               route = case text[1]:
                 # without argument
                 of 's': "start"
+                of 'k': "metrics"
                 of 'h': "help"
                 of 'z': "reset"
                 # with arguemnt
