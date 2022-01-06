@@ -1,4 +1,3 @@
-import asyncdispatch
 import telebot, asyncanything
 import ./controller, ../concurrency
 
