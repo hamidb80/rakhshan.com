@@ -29,11 +29,11 @@ task initDB, "initilize database":
   discard
 
 task go, "run app for release":
-  exec "nim cc --gc:arc -d:release --out:bin.exe -d:ssl -d:pageSize=10 -d:goAsyncTimeInterval=20 src/main.nim"
+  exec "nim cc --gc:arc -d:useMalloc -d:release --out:bin.exe -d:ssl -d:pageSize=10 -d:goAsyncTimeInterval=20 src/main.nim"
 
 task dev, "run app in dev mode":
   putenv "AUTHOR_CHAT_ID", "101862091"
   putenv "HOST_API_TOKEN", "okm098QAZ"
   putenv "TG_TOKEN", "2004052302:AAHm_oICftfs5xLmY0QwGVTE3o-gYgD6ahw"
   putenv "DB_PATH", "./temp/play.db"
-  exec "nim cc -d:ssl --gc:arc --run src/main.nim "
+  exec "nim c -d:ssl --gc:arc -d:useMalloc --run src/main.nim "
