@@ -169,8 +169,8 @@ const
 
     yourRankInThisQuizYetT* = "رتبه شما در این آزمون فعلا"
     appliedFiltersT* = "فیلتر های اعمالی"
-    separatorLine* = escapeMarkdownV2 "-----------------------"
-    minesT* = escapeMarkdownV2 "-"
+    separatorLineEscaped* = escapeMarkdownV2 "-----------------------"
+    minesT* = "-"
     nameT* = "نام"
 
     youAreTakingQuizT* = "شما در حال انجام آزمون هستید"
@@ -247,7 +247,6 @@ let
       @[endT, cancelT],
     ]
 
-
     memberMenuReply* = newReplyKeyboardMarkup memberReplyRaw
     adminMenuReply* = newReplyKeyboardMarkup adminReplyRaw & memberReplyRaw
 
@@ -309,7 +308,7 @@ func toPersianNumbers*(str: string): string =
             result.add c
 
 func greeting*(uname: string): string =
-    fmt"'{uname.escapeMarkdownV2}' {dearT} {welcomeT}"
+    fmt"'{escapeMarkdownV2 uname}' {dearT} {welcomeT}"
 
 func timeFormat*[T: SomeInteger](t: T): string =
     let d = initDuration(seconds = t).toParts
@@ -358,7 +357,7 @@ proc fullQuizInfo*(qi: QuizInfo, rec: Option[RecordModel]): string =
             "\n"
 
     [
-      fmt"{bold $idT} {bold quizT}: {escapeMarkdownV2 $qi.quiz.id}",
+      fmt"{bold $idT} {bold quizT}: {escapeMarkdownV2($qi.quiz.id)}",
       fmt"{bold quizNameT}: {escapeMarkdownV2 qi.quiz.name}",
       fmt"{bold gradeT}: {qi.tag.grade}",
       fmt"{bold lessonT}: {escapeMarkdownV2 qi.tag.lesson}",
@@ -373,7 +372,7 @@ func questionSerialize*(q: QuestionModel, index: int): string =
     fmt"""
     {questionT} {index+1}:
     
-    {q.description.escapeMarkdownV2}
+    {escapeMarkdownV2 q.description}
   """
 
 func answerSerialize(ans: int): string =
@@ -389,7 +388,7 @@ func answerSheetSerialize*(sheet: seq[int]): string =
 func recordResultDialog*(quiz: QuizModel, percent: float): string =
     let score = spoiler(percentSerialize percent)
     [
-      fmt"{youInTheQuizT} '{quiz.name.escapeMarkdownV2}' {scoreT} {score} {youGotT}",
+      fmt"{youInTheQuizT} '{escapeMarkdownV2 quiz.name}' {scoreT} {score} {youGotT}",
       fmt"{analyzeYourAnswersT}: /a{quiz.id}",
       fmt"{bold calcRank}: /r{quiz.id}",
     ].join("\n\n")
@@ -411,8 +410,8 @@ func questionAnalyzeDialog*(
       &"{bold yourAnswerT}: {questionAnswer yourAnswer}",
       &"{bold correctAnswerT}: {q.answer}",
       &"{bold comparisionT}: {compareEmoji(yourAnswer, q.answer.int)}\n",
-      &"{bold questionDescT}:\n{q.description.escapeMarkdownV2}\n",
-      &"{bold reasonT}:\n{q.why.escapeMarkdownV2}",
+      &"{bold questionDescT}:\n{escapeMarkdownV2 q.description}\n",
+      &"{bold reasonT}:\n{escapeMarkdownV2 q.why}",
     ].join "\n"
 
 func quizAddedDialog*(qname: string): string =
@@ -432,6 +431,9 @@ func `$`*(f: QuizCreateFields): string =
     of qfAnswer: "جواب سوال"
     of qzNoField: "قیلد اشتباه"
 
+func changeQuizFieldAlert*(f: QuizCreateFields): string=
+  fmt"{fieldT} '{f}' {changedT}"
+
 func getStr[T](o: Option[T], alternative: string): string =
     if issome o: $o.get
     else: alternative
@@ -439,8 +441,8 @@ func getStr[T](o: Option[T], alternative: string): string =
 func `$`*(qq: QuizQuery): string =
     [
       bold appliedFiltersT,
-      separatorLine,
-      fmt"{bold nameT}: {qq.name.get(minesT)}",
-      fmt"{bold gradeT}: {qq.grade.getStr(minesT)}",
-      fmt"{bold lessonT}: {qq.lesson.getStr(minesT)}",
+      separatorLineEscaped,
+      fmt"{bold nameT}: {escapeMarkdownV2 qq.name.get(minesT)}",
+      fmt"{bold gradeT}: {escapeMarkdownV2 qq.grade.getStr(minesT)}",
+      fmt"{bold lessonT}: {escapeMarkdownV2 qq.lesson.getStr(minesT)}",
     ].join "\n"

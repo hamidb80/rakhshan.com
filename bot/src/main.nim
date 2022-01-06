@@ -315,20 +315,26 @@ newRouter router:
       asyncCheck redirect("enter-menu", %*[chatid])
 
     else:
+      template alertChange(field: QuizCreateFields): untyped =
+        asyncCheck chatid << changeQuizFieldAlert(field)
+      
       case uctx.stage:
       of sfindQuizMain:
         asyncCheck chatid << findQuizDialogT
 
       of sFQname:
         qq.name = some input
+        alertChange qzfName
         goBack()
 
       of sFQgrade:
         qq.grade = some protectedParseint input
+        alertChange tfGrade
         goBack()
 
       of sFQlesson:
         qq.lesson = some input
+        alertChange tfLesson
         goBack()
 
       else: discard
@@ -349,7 +355,7 @@ newRouter router:
       of tfLesson: qc.tag.lesson = input
       of tfChapter: qc.tag.chapter = protectedParseint input
       else: discard
-      asyncCheck chatid << fmt"{fieldT} '{field}' {changedT}"
+      asyncCheck chatid << changeQuizFieldAlert(field)
 
     of qcmsQuestions:
       case field:
@@ -552,7 +558,7 @@ newRouter router:
         asyncCheck (chatid, myrecord.questionDescMsgId) <^ (
           questionSerialize(q, newQuestionIndex), answerKeyboard)
 
-        # telegram sucks
+        # if you set the same photo, telegram complains
         let newPhotoUrl = q.photo_path or defaultPhotoUrl
         if newPhotoUrl != myrecord.lastQuestionPhotoUrl:
           myrecord.lastQuestionPhotoUrl = newPhotoUrl
