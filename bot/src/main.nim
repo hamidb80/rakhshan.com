@@ -11,11 +11,13 @@ import
 randomize()
 
 const
-  dbPath* = getenv("DB_PATH")
-  authorChatId* = getenv("AUTHOR_CHAT_ID").parseInt
-  pageSize* = getenv("RESULT_PAGE_SIZR", "3").parseint
-  tgToken* = getEnv("TG_TOKEN")
-  minQuizTime* = 60
+  pageSize {.intdefine.} = 3
+  minQuizTime = 60
+
+let
+  dbPath = getenv("DB_PATH")
+  authorChatId = getenv("AUTHOR_CHAT_ID").parseInt
+  tgToken = getEnv("TG_TOKEN")
 
 var defaultPhotoUrl = ""
 
@@ -801,6 +803,11 @@ proc dispatcher*(bot: TeleBot, u: Update): Future[bool] {.async.} =
       except Exception: chatid !! someErrorT
 
 when isMainModule:
+  if not fileExists dbPath:
+    echo fmt"{getCurrentDir()=}"
+    echo fmt"{dbpath=}"
+    initDatabase dbpath
+
   let bot = newTeleBot tgToken
 
   # set default photo

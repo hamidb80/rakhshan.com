@@ -1,10 +1,8 @@
 import asyncdispatch, httpclient, json, strformat, strutils, os
 
-const
-  baseUrl = "https://rakhshan.com/wp-json/wp_api_ext"
-  apiToken = getEnv("HOST_API_TOKEN")
-
+const baseUrl = "https://rakhshan.com/wp-json/wp_api_ext"
 let
+  apiToken = getEnv("HOST_API_TOKEN")
   accessHeader = newHttpHeaders {"api-token": apiToken}
 
 type UserApiModel* = object

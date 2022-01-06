@@ -47,6 +47,7 @@ Blueprint [queryHolder: initQuery, postfix: "Model"]:
 func hasPhoto*(q: QuestionModel): bool=
     q.photo_path != ""
 
+
 when isMainModule:
     import strutils
     writefile "src/database/init.sql", initQuery.join "\n"

@@ -75,6 +75,11 @@ func `$`(so: SortOrder): string=
 
 # member ----------------------------------------
 
+proc initDatabase*(path: string) =
+    dbworks path:
+        for q in initQuery:
+            db.exec q.sql
+
 proc getMember*(db; chatId: int64): Option[MemberModel] {.errorHandler.} =
     let row = db.getSingleRow(sql"""
         SELECT chat_id, site_name, tg_name, phone_number, is_admin, joined_at 
