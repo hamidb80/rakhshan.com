@@ -1,7 +1,7 @@
 kind: ExternalService
 name: azmoonak-tg-bot
 spec:
-  image: aztgb:0.0.24
+  image: aztgb:0.0.27
   
   resources:
     memory: 200Mi

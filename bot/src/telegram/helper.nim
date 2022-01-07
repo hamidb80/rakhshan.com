@@ -22,7 +22,7 @@ func newReplyKeyboardMarkup*(
   keyboards: seq[seq[KeyboardButton]]
 ): ReplyKeyboardMarkup =
   new(result)
-  result.type = kReplyKeyboardMarkup
+  result.kind = kReplyKeyboardMarkup
   result.keyboard = keyboards
 
 func newReplyKeyboardMarkup*(

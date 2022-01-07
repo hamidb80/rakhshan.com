@@ -278,7 +278,7 @@ func genQueryPageInlineBtns*(pageIndex: int): InlineKeyboardMarkup =
     ]]
 
 func genTakeQuizInlineBtn*(quizId: int64): InlineKeyboardMarkup =
-    result = InlineKeyboardMarkup(`type`: kInlineKeyboardMarkup)
+    result = InlineKeyboardMarkup(kind: kInlineKeyboardMarkup)
     result.inlineKeyboard = @[@[
       InlineKeyboardButton(
         text: takeQuizT,
