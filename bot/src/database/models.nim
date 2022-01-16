@@ -43,6 +43,8 @@ Blueprint [queryHolder: initQuery, postfix: "Model"]:
         percent: float
         created_at: int
 
+        Index [quiz_id, percent] as "rank"
+
 
 func hasPhoto*(q: QuestionModel): bool=
     q.photo_path != ""

@@ -15,7 +15,7 @@ requires "macroplus == 0.1.4"
 requires "asyncanything == 0.0.4"
 requires "result == 0.3.0"
 requires "jalali_nim == 0.0.2"
-requires "https://github.com/hamidb80/easydb == 0.0.8"
+requires "https://github.com/hamidb80/easydb == 0.0.10"
 
 # Commands
 
