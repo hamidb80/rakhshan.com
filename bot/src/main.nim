@@ -800,6 +800,8 @@ proc dispatcher*(bot: TeleBot, u: Update): Future[bool] {.async.} =
       except Exception: chatid !! someErrorT
 
 when isMainModule:
+  setMaxPoolSize(12)
+
   if not fileExists dbPath:
     echo "not found DB, creating one ..."
     initDatabase dbpath
