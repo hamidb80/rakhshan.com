@@ -1,7 +1,7 @@
 kind: ExternalService
 name: azmoonak-tg-bot
 spec:
-  image: aztgb:0.0.27
+  image: aztb:0.0.3
   
   resources:
     memory: 200Mi
@@ -14,7 +14,7 @@ spec:
     value: "okm098QAZ"
   
   - name: TG_TOKEN
-    value: "2004052302:AAHm_oICftfs5xLmY0QwGVTE3o-gYgD6ahw"
+    value: "5085688285:AAHlNTqxX64eRSm3fMia815TL17a51cAosk"
 
   - name: STORAGE
     value: "/mnt/shared-volume/azmoonak"

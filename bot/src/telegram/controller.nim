@@ -161,12 +161,6 @@ func initQueryPageInfo*[T](context: T): QueryPageInfo[T] =
   result.indexRange = 0'i64 .. int64.high
   result.context = context
 
-proc add(father: NimNode; children: openArray[NimNode]): NimNode =
-  for node in children:
-    father.add node
-
-  return father
-
 proc extractArgsFromJson(args: openArray[NimNode]): NimNode =
   doassert args.allIt it.kind == nnkExprColonExpr
   result = newStmtList()

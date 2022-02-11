@@ -46,6 +46,7 @@ newRouter router:
 
       else:
         asyncCheck chatid << (selectOptionsT, notLoggedInReply)
+  
   command(chatid: int64) as "help":
     asyncCheck chatid << [
       fmt"{bold helpT}: {'\n'}",
@@ -821,3 +822,4 @@ when isMainModule:
 
     try: bot.poll(timeout = 100)
     except: echo ">>  " & getCurrentExceptionMsg()
+
