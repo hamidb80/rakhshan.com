@@ -59,7 +59,3 @@ template qq*: untyped {.dirty.} =
 
 template qp*: untyped {.dirty.} =
   uctx.queryPaging.get
-
-template `!!`*(chatid, stuff): untyped {.dirty.} =
-  asyncCheck chatid << stuff
-  debugEcho "START ---", getCurrentExceptionMsg(), "END ---"

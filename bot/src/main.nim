@@ -3,9 +3,8 @@ import
   asyncdispatch, threadpool, db_sqlite, os]
 import telebot
 import
-  controller, comfortable,
-  settings, router,
-  states, utils, database/[queries]
+  controller, comfortable, settings, router,
+  messages, forms, states, utils, database/[queries]
 
 
 let bot = newTeleBot tgToken
@@ -102,16 +101,19 @@ proc dispatcher*(bot: TeleBot, up: Update): Future[bool] {.async, fakeSafety.} =
 
   return true
 
-
-# FIXME
-# asyncCheck bot.answerCallbackQuery($cq.id, res)
-
-# except DbError: chatid !! databaseErrorT
-# except FValueError: asyncCheck chatid << invalidInputT
-# except FmRangeError: asyncCheck chatid << rangeErrorT
-# except: chatid !! someErrorT
-
 # app --------------------
+
+proc resultWrapper(a: Action){.async.} =
+  try:
+    let res = await a.handler(bot, a.update, getOrCreateUser(a.chatid), a.args)
+
+    if issome a.update.callbackQuery:
+      asyncCheck bot.answerCallbackQuery($a.update.callbackQuery.get.id, res)
+
+  except DbError: asyncCheck a.chatid << databaseErrorT
+  except FValueError: asyncCheck a.chatid << invalidInputT
+  except FmRangeError: asyncCheck a.chatid << rangeErrorT
+  except: asyncCheck a.chatid << someErrorT
 
 proc agentLoopImpl(ch: ptr Channel[Action], timeout: int) {.async, fakeSafety.} =
   while true:
@@ -120,12 +122,8 @@ proc agentLoopImpl(ch: ptr Channel[Action], timeout: int) {.async, fakeSafety.} 
     while true:
       let (ok, action) = ch[].tryRecv
 
-      if ok:
-        let us = getOrCreateUser(action.chatid)
-        asyncCheck action.handler(bot, action.update, us, action.args)
-
-      else:
-        break
+      if ok: asyncCheck resultWrapper(action)
+      else: break
 
 proc agentLoop(ch: ptr Channel[Action], timeout: int) {.fakeSafety.} =
   waitfor agentLoopImpl(ch, timeout)
@@ -147,6 +145,7 @@ when isMainModule:
     open agentsInput[i]
     spawn agentLoop(addr agentsInput[i], agentsTimeOut)
 
+  # FIXME use thread instead of spawn
   spawn startBackgroudJob(addr agentsInput, 50)
   bot.onUpdate dispatcher
 
@@ -156,5 +155,3 @@ when isMainModule:
     try: bot.poll(timeout = 100)
     except: echo " " & getCurrentExceptionMsg()
 
-
-# FIXME use thread instead of spawn
