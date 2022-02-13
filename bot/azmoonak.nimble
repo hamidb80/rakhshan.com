@@ -29,6 +29,6 @@ task go, "run app for release":
 task dev, "run app in dev mode":
   putenv "AUTHOR_CHAT_ID", "101862091"
   putenv "HOST_API_TOKEN", "okm098QAZ"
-  putenv "TG_TOKEN", "5085688285:AAHlNTqxX64eRSm3fMia815TL17a51cAosk"
+  putenv "TG_TOKEN", "2004052302:AAFi_3lrI0dcUa0CRSkVFMD1lBTFyDM_PSs"
   putenv "DB_PATH", "./temp/play.db"
   exec "nim c -d:ssl --gc:orc -d:useMalloc --run src/main.nim "

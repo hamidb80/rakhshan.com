@@ -1,69 +1,55 @@
 import std/[options, locks, times, os]
-import telegram/controller, ./database/models,  ./utils
+import controller, database/models, utils, router, settings
 
 type
-  NotificationKinds* = enum
-    nkEndQuizTime, nkUpdateQuizTime
-
-  Notification* = object
-    kind*: NotificationKinds
-    quiz_id*: int64
-    user_chat_id*: int64
-
   UserInfoPair* = tuple[chatid: int64, ctx: UserCtx]
 
 const
   minResreshTimeSeconds = 10
 
 var
-  activeUsers: seq[UserInfoPair]
-  notifier*: Channel[Notification]
-  usersLock: Lock
-
+  activeUsers = newSeq[seq[UserInfoPair]](agents)
+  usersLock = newseq[Lock](agents)
 
 proc getOrCreateUser*(chatId: int64): UserCtx =
-  withLock usersLock:
-    for au in activeUsers:
+  let tid = findthreadid chatid
+  withLock usersLock[tid]:
+    for au in activeUsers[tid]:
       if au.chatid == chatId:
         result = au.ctx
         break
 
     if result == nil:
       result = UserCtx(chatId: chatId, firstTime: true)
-      activeUsers.add (chatId, result)
+      activeUsers[tid].add (chatId, result)
 
 
-proc startTimer*(delay: int) {.thread, fakeSafety.} =
+proc startBackgroudJob*(agentsInput: ptr seq[Channel[Action]], delay: int) {.thread, fakeSafety.} =
   while true:
-    var myActiveUsers: seq[UserInfoPair]
+    for (tid, localThreadUsers) in activeUsers.pairs:
+      # TODO make experiment | access a esizing seq from different threads
+      for (chid, user) in localThreadUsers:
+        if issome user.record:
+          let record = user.record.get
 
-    withLock usersLock:
-      myActiveUsers = activeUsers
+          if record.isReady and not record.isEnded:
+            let
+              freshNow = now()
+              quiz = record.quiz
+              dtStart = (freshNow - record.startTime).inSeconds
+              dtLastCheck = (freshNow - record.lastCheckedTime).inSeconds
 
-    for (uid, user) in myActiveUsers:
-      if issome user.record:
-        let record = user.record.get
+            if dtStart >= quiz.time:
+              record.isEnded = true
+              agentsInput[tid].send Action(handler: router[reEndquiz], chatid: chid)
 
-        if record.isReady and not record.isEnded:
-          let
-            freshNow = now()
-            quiz = record.quiz
-            dtStart = (freshNow - record.startTime).inSeconds
-            dtLastCheck = (freshNow - record.lastCheckedTime).inSeconds
-
-          if dtStart >= quiz.time:
-            record.isEnded = true
-            notifier.send Notification(kind: nkEndQuizTime,
-                quizid: quiz.id, userchatid: uid)
-
-          elif dtLastCheck > minResreshTimeSeconds:
-            record.lastCheckedTime = freshNow
-            notifier.send Notification(kind: nkUpdateQuizTime,
-              quizid: quiz.id, userchatid: uid)
+            elif dtLastCheck > minResreshTimeSeconds:
+              record.lastCheckedTime = freshNow
+              agentsInput[tid].send Action(handler: router[reUpdatetimer], chatid: chid)
 
     sleep delay
 
 
 # init env --------------
-notifier.open
-initLock usersLock
+for ul in usersLock.mitems:
+  initLock ul

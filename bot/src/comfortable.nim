@@ -5,7 +5,7 @@ type
   MsgInfo = tuple[chatid: int64, msgid: int]
 
 template redirect*(alias, params): untyped {.dirty.} =
-  trigger(router[alias.ord], bot, u, uctx, params)
+  trigger(router[alias], bot, u, uctx, params)
 
 template `<<`*(
   chatid: int64, box: tuple[t: string, k: KeyboardMarkup]

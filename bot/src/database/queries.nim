@@ -1,5 +1,5 @@
 import std/[db_sqlite {.all.}, sequtils, strutils, options, strformat, algorithm]
-import models, ../telegram/controller
+import models, ../controller
 
 type
     QuizInfo* = tuple

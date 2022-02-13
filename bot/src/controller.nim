@@ -1,6 +1,6 @@
 import std/[tables, sequtils, strutils, json, options, times, macros, asyncdispatch]
 import telebot, macroplus
-import ../database/models, ../utils
+import database/models, utils
 
 type
   Stages* = enum
@@ -82,11 +82,15 @@ type
   QCMsgIdSearch* = enum
     qcmsNothing, qcmsQuiz, qcmsTag, qcmsQuestions
 
-  RouterProc = proc(
-        bot: Telebot, u: Update, uctx: UserCtx,
-        args: JsonNode): Future[string] {.async.}
+  RouteProc* = proc(
+    bot: Telebot, u: Update, uctx: UserCtx,
+    args: JsonNode): Future[string] {.async.}
 
-  Router = ref seq[RouterProc]
+  Action* = object
+    handler*: RouteProc
+    update*: Update
+    args*: JsonNode
+    chatid*: int64
 
 const
   HomeStages* = {sMain, sSendContact} # primary
@@ -180,7 +184,7 @@ macro initRouter(varName: untyped, args: varargs[untyped]): untyped =
   var aliasList: seq[NimNode]
   let
     body = args[^1]
-    fnEnums = "fns".ident
+    routerEnum = "RouteEnum".ident
 
   for entity in body:
     assert:
@@ -211,12 +215,12 @@ macro initRouter(varName: untyped, args: varargs[untyped]): untyped =
     discard paramList.add commonArgs.mapIt newIdentDefs(it[0], it[1])
 
     result.add quote do:
-      `varname`[].add `definedProc`
+      `varname`[`alias`] = `definedProc`
 
   result.insert 0, quote do:
-    var `varName`: `Router`
+    var `varName`*: array[`routerEnum`, `RouteProc`]
 
-  result.insert 0, newEnum(fnEnums, aliasList, true, false)
+  result.insert 0, newEnum(routerEnum, aliasList, true, false)
 
   # echo treeRepr result
   # echo repr result
@@ -226,8 +230,8 @@ template newRouter*(varname, body) =
   initRouter(varname, bot: TeleBot, u: Update, uctx: UserCtx, body)
 
 proc trigger*(
-  fn: RouterProc, bot: TeleBot, up: Update,
+  handler: RouteProc, bot: TeleBot, up: Update,
   uctx: UserCtx, args: JsonNode = newJArray()
 ): Future[string] {.async.} =
   assert args.kind == JArray
-  return await fn(bot, up, uctx, args)
+  return await handler(bot, up, uctx, args)

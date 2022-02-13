@@ -1,6 +1,6 @@
 import std/[options, strutils, strformat, times]
 import telebot, jalali_nim
-import ./telegram/[helper, controller], ./database/[queries, models], utils
+import controller, database/[queries, models], utils
 
 
 func escapeMarkdownV2*(s: string): string =
