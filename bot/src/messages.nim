@@ -1,4 +1,4 @@
-import options, strutils, strformat, times
+import std/[options, strutils, strformat, times]
 import telebot, jalali_nim
 import ./telegram/[helper, controller], ./database/[queries, models], utils
 
@@ -431,8 +431,8 @@ func `$`*(f: QuizCreateFields): string =
     of qfAnswer: "جواب سوال"
     of qzNoField: "قیلد اشتباه"
 
-func changeQuizFieldAlert*(f: QuizCreateFields): string=
-  fmt"{fieldT} '{f}' {changedT}"
+func changeQuizFieldAlert*(f: QuizCreateFields): string =
+    fmt"{fieldT} '{f}' {changedT}"
 
 func getStr[T](o: Option[T], alternative: string): string =
     if issome o: $o.get

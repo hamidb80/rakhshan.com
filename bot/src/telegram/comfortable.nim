@@ -1,11 +1,11 @@
-import telebot, asyncanything
-import ./controller, ../concurrency
+import telebot
+import ./controller
 
 type
   MsgInfo = tuple[chatid: int64, msgid: int]
 
 template redirect*(alias, params): untyped {.dirty.} =
-  trigger(router, alias, bot, uctx, u, params)
+  trigger(router[alias.ord], bot, u, uctx, params)
 
 template `<<`*(
   chatid: int64, box: tuple[t: string, k: KeyboardMarkup]
@@ -62,11 +62,4 @@ template qp*: untyped {.dirty.} =
 
 template `!!`*(chatid, stuff): untyped {.dirty.} =
   asyncCheck chatid << stuff
-  debugEcho "START ---", getCurrentExceptionMsg(), "END ---" 
-  #FIXME seems like using getCurrentExceptionMsg() inside a template results in empty string
-
-template `\>>`*(work): untyped =
-  discard customTryGet |>work
-
-template `>>`*(work): untyped =
-  customTryGet |>work
+  debugEcho "START ---", getCurrentExceptionMsg(), "END ---"

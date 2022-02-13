@@ -1,5 +1,5 @@
-import db_sqlite {.all.}, sequtils, strutils, options, strformat, algorithm
-import models, ../telegram/controller, ../concurrency
+import std/[db_sqlite {.all.}, sequtils, strutils, options, strformat, algorithm]
+import models, ../telegram/controller
 
 type
     QuizInfo* = tuple
@@ -80,7 +80,7 @@ proc initDatabase*(path: string) =
         for q in initQuery:
             db.exec q.sql
 
-proc getMember*(db; chatId: int64): Option[MemberModel] {.errorHandler.} =
+proc getMember*(db; chatId: int64): Option[MemberModel] =
     let row = db.getSingleRow(sql"""
         SELECT chat_id, site_name, tg_name, phone_number, is_admin, joined_at 
         FROM member 
@@ -99,7 +99,7 @@ proc getMember*(db; chatId: int64): Option[MemberModel] {.errorHandler.} =
 proc addMember*(db;
     chatId: int64, site_name: string, tg_name: string,
     phone_number: string, isAdmin: int, joined_at: int64
-): int64 {.errorHandler.} =
+): int64 =
     # add site_name + tg_name
     db.insertID(sql"""
         INSERT INTO member (chat_id, site_name, tg_name, phone_number, is_admin, joined_at) 
@@ -118,7 +118,7 @@ proc totag*(s: seq[string]): TagModel =
 
 proc addTag*(db;
     grade: int64, lesson: string, chapter: int64
-): int64 {.errorHandler.} =
+): int64 =
     db.insertID(
         sql"INSERT INTO tag (grade, lesson, chapter) VALUES (?, ?, ?)",
         grade, lesson.limit(120), chapter)
@@ -127,7 +127,7 @@ const getTagQuery = "SELECT id, grade, lesson, chapter FROM tag "
 
 proc getTag(db;
 grade: int64, lesson: string, chapter: int64
-): Option[TagModel] {.errorHandler.} =
+): Option[TagModel] =
     let row = db.getSingleRow((getTagQuery &
         "WHERE grade = ? AND lesson = ? AND chapter = ?"
     ).sql, grade, lesson, chapter)
@@ -137,7 +137,7 @@ grade: int64, lesson: string, chapter: int64
 
 proc upsertTag*(db;
     grade: int64, lesson: string, chapter: int64
-): TagModel {.errorHandler.} =
+): TagModel =
     let tag = db.getTag(grade, lesson, chapter)
 
     if issome tag:
@@ -152,7 +152,7 @@ proc upsertTag*(db;
 proc addQuiz*(db;
     name: string, description: string, time: int64, tag_id: int64,
     created_at: int64, questions: openArray[QuestionModel],
-): int64 {.errorHandler.} =
+): int64 =
     transaction db:
         result = db.insertID(sql"""
             INSERT INTO quiz (name, description, time, tag_id, questions_count, created_at) 
@@ -210,7 +210,7 @@ template keepOrder(result, dir, order): untyped =
 proc findQuizzes*(db;
     qq: QuizQuery, pinnedIndex: int64, limit: int,
     dir: SearchDirection, order: SortOrder
-): seq[QuizInfo] {.errorHandler.} =
+): seq[QuizInfo] =
     var conditions = @[fmt"qid {dop[dir]} {pinnedIndex}"]
 
     if issome qq.grade:
@@ -230,13 +230,13 @@ proc findQuizzes*(db;
     result = db.getAllRows(query.sql).map(toQuizInfo)
     result.keepOrder(dir, order)
 
-proc getQuizInfo*(db; quizid: int64): Option[QuizInfo] {.errorHandler.} =
+proc getQuizInfo*(db; quizid: int64): Option[QuizInfo] =
     let row = db.getSingleRow(quizInfoQueryGen("WHERE qid = ?").sql, quizid, quizid)
 
     if issome row:
         result = some row.get.toQuizInfo
 
-proc getQuizItself*(db; quizid: int64): Option[QuizModel] {.errorHandler.} =
+proc getQuizItself*(db; quizid: int64): Option[QuizModel] =
     let row = db.getSingleRow("""
         SELECT name, description, time, tag_id
         FROM quiz
@@ -251,7 +251,7 @@ proc getQuizItself*(db; quizid: int64): Option[QuizModel] {.errorHandler.} =
             time: parseint row.get[2],
             tag_id: parseint row.get[3])
 
-proc getQuestions*(db; quizid: int64): seq[QuestionModel] {.errorHandler.} =
+proc getQuestions*(db; quizid: int64): seq[QuestionModel] =
     let rows = db.getAllRows("""
         SELECT id, photo_path, description, why, answer 
         FROM question 
@@ -267,7 +267,7 @@ proc getQuestions*(db; quizid: int64): seq[QuestionModel] {.errorHandler.} =
         why: it[3],
         answer: parseint it[4])
 
-proc deleteQuiz*(db; quizid: int64): bool {.errorHandler.} =
+proc deleteQuiz*(db; quizid: int64): bool =
     transaction db:
         db.exec("DELETE FROM record WHERE quiz_id = ?".sql, quizid)
         db.exec("DELETE FROM question WHERE quiz_id = ?".sql, quizid)
@@ -278,7 +278,7 @@ proc deleteQuiz*(db; quizid: int64): bool {.errorHandler.} =
 proc addRecord*(db;
     quizId: int64, member_chatId: int64, answers: string,
     questions_order: string, precent: float, created_at: int64,
-): int64 {.errorHandler.} =
+): int64 =
     db.insertID(sql"""
         INSERT INTO record (quiz_id, member_chatid, answer_list, percent, created_at, questions_order) 
         VALUES (?, ?, ?, ?, ?, ?)
@@ -286,7 +286,7 @@ proc addRecord*(db;
 
 proc isRecordExistsFor*(db;
     memberId: int64, quizId: int64
-): bool {.errorHandler.} =
+): bool =
     isSome db.getSingleRow(
         sql"SELECT 1 FROM record WHERE member_chatid = ? AND quiz_id = ?",
         memberid, quizid)
@@ -294,7 +294,7 @@ proc isRecordExistsFor*(db;
 
 proc getRecordFor*(db;
     memberId: int64, quizId: int64
-): Option[RecordModel] {.errorHandler.} =
+): Option[RecordModel] =
     let row = db.getSingleRow(sql"""
         SELECT id, answer_list, percent, created_at, questions_order
         FROM record
@@ -314,7 +314,7 @@ proc getRecordFor*(db;
 proc getMyRecords*(db;
     memberId: int64, pinnedIndex: int64, limit: int,
     dir: SearchDirection, order: SortOrder
-): seq[RecordInfo] {.errorHandler.} =
+): seq[RecordInfo] =
     let rows = db.getAllRows(sql fmt"""
         SELECT  
             r.id,
@@ -347,7 +347,7 @@ proc getMyRecords*(db;
 
 proc getRank*(db;
     member_id: int64, quizid: int64,
-): Option[int] {.errorHandler.} =
+): Option[int] =
     let rec = db.getSingleRow(sql"""
         SELECT percent
         FROM record r

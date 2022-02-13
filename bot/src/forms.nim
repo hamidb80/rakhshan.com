@@ -1,4 +1,4 @@
-import strutils
+import std/[strutils]
 
 type
   FormError* = object of CatchableError
@@ -6,7 +6,7 @@ type
   FValueError* = object of FormError
 
 func protectedParseint*(
-  s: string,   min = 0, max = int.high
+  s: string, min = 0, max = int.high
 ): int {.raises: [FormError].} =
   try:
     result = parseint s

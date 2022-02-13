@@ -1,4 +1,4 @@
-import asyncdispatch, httpclient, json, strformat, strutils, os
+import std/[asyncdispatch, httpclient, json, strformat, strutils, os]
 
 const baseUrl = "https://rakhshan.com/wp-json/wp_api_ext"
 let

@@ -1,4 +1,4 @@
-import sequtils, options
+import std/[sequtils, options]
 import telebot
 
 # ------------------------------------------

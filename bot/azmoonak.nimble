@@ -12,8 +12,6 @@ bin           = @["main"]
 requires "nim == 1.6.2"
 requires "telebot == 2022.01.07"
 requires "macroplus == 0.1.17"
-requires "asyncanything == 0.0.4"
-requires "result == 0.3.0"
 requires "jalali_nim == 0.0.2"
 requires "https://github.com/hamidb80/easydb == 0.0.11"
 
@@ -26,7 +24,7 @@ task deploy, "deploy the app":
   exec "fandogh service apply -f fandogh.yml"
 
 task go, "run app for release":
-  exec "nim cc --gc:orc -d:useMalloc -d:release --out:bin.exe -d:ssl -d:pageSize=10 -d:goAsyncTimeInterval=20 src/main.nim"
+  exec "nim cc --gc:orc -d:useMalloc -d:release --out:bin.exe -d:ssl -d:pageSize=10  src/main.nim"
 
 task dev, "run app in dev mode":
   putenv "AUTHOR_CHAT_ID", "101862091"

@@ -1,5 +1,5 @@
-import tables, sequtils, strutils, json, options, times, macros
-import asyncdispatch, telebot, macroplus
+import std/[tables, sequtils, strutils, json, options, times, macros, asyncdispatch]
+import telebot, macroplus
 import ../database/models, ../utils
 
 type
@@ -25,7 +25,7 @@ type
 
   UserCtx* = ref object
     chatId*: int64
-    firstTime*: bool # is 
+    firstTime*: bool # is
     stage*: Stages
     lastActivity*: DateTime
     membership*: Option[MemberModel]
@@ -83,11 +83,10 @@ type
     qcmsNothing, qcmsQuiz, qcmsTag, qcmsQuestions
 
   RouterProc = proc(
-        bot: Telebot, uctx: UserCtx,
-        u: Update, args: JsonNode): Future[string] {.async.}
+        bot: Telebot, u: Update, uctx: UserCtx,
+        args: JsonNode): Future[string] {.async.}
 
-  RouterMap* = ref Table[string, RouterProc]
-
+  Router = ref seq[RouterProc]
 
 const
   HomeStages* = {sMain, sSendContact} # primary
@@ -105,7 +104,9 @@ func findInEnum[Idx: range](wrapper: array[Idx, int], lookingFor: int): Option[I
     if wrapper[i] == lookingFor:
       return some i
 
-proc reset*(u: UserCtx)=
+func first(n: NimNode): NimNode = n[0]
+
+proc reset*(u: UserCtx) =
   u.quizCreation.forget
   u.record.forget
   u.quizQuery.forget
@@ -162,7 +163,7 @@ func initQueryPageInfo*[T](context: T): QueryPageInfo[T] =
   result.context = context
 
 proc extractArgsFromJson(args: openArray[NimNode]): NimNode =
-  doassert args.allIt it.kind == nnkExprColonExpr
+  assert args.allIt it.kind == nnkExprColonExpr
   result = newStmtList()
 
   for (index, arg) in args.pairs:
@@ -174,56 +175,59 @@ proc extractArgsFromJson(args: openArray[NimNode]): NimNode =
         arg[1],
     ))
 
-
-macro initRouter(varName: typed, args: varargs[untyped]): untyped =
+macro initRouter(varName: untyped, args: varargs[untyped]): untyped =
   result = newStmtList()
-  let body = args[^1]
+  var aliasList: seq[NimNode]
+  let
+    body = args[^1]
+    fnEnums = "fns".ident
 
   for entity in body:
-    doAssert:
+    assert:
       entity.kind == nnkInfix and
       entity[InfixIdent].strVal == "as"
 
     let
-      alias = entity[InfixRightSide]
+      alias = ("re" & entity[InfixRightSide].strVal.normalize.capitalizeAscii).ident
       procBody = entity[^1]
       customArgs = entity[1][1..^1]
       commonArgs = args[0..^2] & @[
           newColonExpr(ident "args", bindsym "JsonNode")]
       extractArgs = extractArgsFromJson(customArgs)
 
-    result.add quote do:
-      `varname`[`alias`] = proc(): Future[string] {.async.} =
-        `extractArgs`
-        `procBody`
+      definedProc = first quote do:
+        (proc (): Future[string] {.async.} =
+          `extractArgs`
+          `procBody`)
 
-    let
-      definedProc = result[^1][3]
       paramList = definedProc[RoutineFormalParams]
+      entityKind = entity[InfixLeftSide][0].strval.normalize
 
-    case entity[InfixLeftSide][0].strval.normalize:
-    of "route": discard
-    of "callbackquery": discard
-    of "event": discard
-    of "command": discard
-    else: error "undefined entity"
+    aliasList.add alias
+
+    if entityKind notin ["route", "callbackquery", "event", "command"]:
+      error "undefined entity"
 
     discard paramList.add commonArgs.mapIt newIdentDefs(it[0], it[1])
+
+    result.add quote do:
+      `varname`[].add `definedProc`
+
+  result.insert 0, quote do:
+    var `varName`: `Router`
+
+  result.insert 0, newEnum(fnEnums, aliasList, true, false)
 
   # echo treeRepr result
   # echo repr result
   return result
 
 template newRouter*(varname, body) =
-  initRouter(varname, bot: TeleBot, uctx: UserCtx, u: Update, body)
+  initRouter(varname, bot: TeleBot, u: Update, uctx: UserCtx, body)
 
 proc trigger*(
-  router: RouterMap, route: string,
-  bot: TeleBot, uctx: UserCtx, u: Update, args: JsonNode = newJArray()
+  fn: RouterProc, bot: TeleBot, up: Update,
+  uctx: UserCtx, args: JsonNode = newJArray()
 ): Future[string] {.async.} =
-  doassert args.kind == JArray
-
-  if route in router:
-    return await router[route](bot, uctx, u, args)
-
-  raise newException(ValueError, "route alias is not defined: " & route)
+  assert args.kind == JArray
+  return await fn(bot, up, uctx, args)
