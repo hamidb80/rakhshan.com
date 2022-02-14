@@ -1,7 +1,7 @@
 import
   std/[tables, strutils, options, json, random,
   asyncdispatch, threadpool, db_sqlite, os]
-import telebot
+import telebot, packedArgs
 import
   controller, comfortable, settings, router,
   messages, forms, states, utils, database/[queries]
@@ -10,7 +10,7 @@ import
 let bot = newTeleBot tgToken
 var agentsInput = newseq[Channel[Action]](agents)
 
-# -------------------
+# ---------------------------------------
 
 template toFn(name): untyped = router[name]
 
@@ -125,7 +125,7 @@ proc agentLoopImpl(ch: ptr Channel[Action], timeout: int) {.async, fakeSafety.} 
       if ok: asyncCheck resultWrapper(action)
       else: break
 
-proc agentLoop(ch: ptr Channel[Action], timeout: int) {.fakeSafety.} =
+proc agentLoop(ch: ptr Channel[Action], timeout: int) {.packedArgs.} =
   waitfor agentLoopImpl(ch, timeout)
 
 when isMainModule:
@@ -143,10 +143,15 @@ when isMainModule:
 
   for i in 0 ..< agents:
     open agentsInput[i]
-    spawn agentLoop(addr agentsInput[i], agentsTimeOut)
+    var th: Thread[AgentLoopArgs]
+    th.createThread(agentLoopPacked, 
+      toAgentLoopArgs(addr agentsInput[i], agentsTimeOut))
 
-  # FIXME use thread instead of spawn
-  spawn startBackgroudJob(addr agentsInput, 50)
+
+  var t: Thread[StartBackgroudJobArgs]
+  t.createThread(startBackgroudJobPacked,
+    toStartBackgroudJobArgs(addr agentsInput, 50))
+
   bot.onUpdate dispatcher
 
   # app loop

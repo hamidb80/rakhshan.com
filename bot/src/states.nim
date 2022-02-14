@@ -1,4 +1,5 @@
 import std/[options, locks, times, os]
+import packedArgs
 import controller, database/models, utils, router, settings
 
 type
@@ -24,7 +25,7 @@ proc getOrCreateUser*(chatId: int64): UserCtx =
       activeUsers[tid].add (chatId, result)
 
 
-proc startBackgroudJob*(agentsInput: ptr seq[Channel[Action]], delay: int) {.thread, fakeSafety.} =
+proc startBackgroudJob*(agentsInput: ptr seq[Channel[Action]], delay: int) {.packedArgs, fakeSafety.} =
   while true:
     for (tid, localThreadUsers) in activeUsers.pairs:
       # TODO make experiment | access a esizing seq from different threads
@@ -48,6 +49,7 @@ proc startBackgroudJob*(agentsInput: ptr seq[Channel[Action]], delay: int) {.thr
               agentsInput[tid].send Action(handler: router[reUpdatetimer], chatid: chid)
 
     sleep delay
+
 
 
 # init env --------------
