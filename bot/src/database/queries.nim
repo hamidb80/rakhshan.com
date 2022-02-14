@@ -104,8 +104,8 @@ proc addMember*(db;
     db.insertID(sql"""
         INSERT INTO member (chat_id, site_name, tg_name, phone_number, is_admin, joined_at) 
         VALUES (?, ?, ?, ?, ?, ?)
-    """, chatId, site_name.limit(255), tg_name.limit(255),
-        phone_number.limit(15), isAdmin, joined_at)
+    """, chatId, site_name.limit(LongStrLimit), tg_name.limit(LongStrLimit),
+        phone_number.limit(PhoneNumberLimit), isAdmin, joined_at)
 
 # quiz -------------------------------------------
 
@@ -121,7 +121,7 @@ proc addTag*(db;
 ): int64 =
     db.insertID(
         sql"INSERT INTO tag (grade, lesson, chapter) VALUES (?, ?, ?)",
-        grade, lesson.limit(120), chapter)
+        grade, lesson.limit(LessonNameLimit), chapter)
 
 const getTagQuery = "SELECT id, grade, lesson, chapter FROM tag "
 
@@ -157,7 +157,7 @@ proc addQuiz*(db;
         result = db.insertID(sql"""
             INSERT INTO quiz (name, description, time, tag_id, questions_count, created_at) 
             VALUES (?, ?, ?, ?, ?, ?)
-        """, name.limit(255), description, time, tagid, questions.len, created_at)
+        """, name.limit(LongStrLimit), description, time, tagid, questions.len, created_at)
 
         for q in questions:
             db.exec(
@@ -282,7 +282,7 @@ proc addRecord*(db;
     db.insertID(sql"""
         INSERT INTO record (quiz_id, member_chatid, answer_list, percent, created_at, questions_order) 
         VALUES (?, ?, ?, ?, ?, ?)
-    """, quizId, member_chatId, answers.limit(255), precent, created_at, questions_order)
+    """, quizId, member_chatId, answers.limit(LongStrLimit), precent, created_at, questions_order)
 
 proc isRecordExistsFor*(db;
     memberId: int64, quizId: int64
