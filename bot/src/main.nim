@@ -1,6 +1,5 @@
 import
-  std/[tables, strutils, options, json, random,
-  asyncdispatch, threadpool, db_sqlite, os]
+  std/[options, json, tables, strutils, random, asyncdispatch, db_sqlite, os]
 import telebot, packedArgs
 import
   controller, comfortable, settings, router,
@@ -143,13 +142,10 @@ when isMainModule:
 
   for i in 0 ..< agents:
     open agentsInput[i]
-    var th: Thread[AgentLoopArgs]
-    th.createThread(agentLoopPacked, 
+    discard runThread(agentLoopPacked,
       toAgentLoopArgs(addr agentsInput[i], agentsTimeOut))
 
-
-  var t: Thread[StartBackgroudJobArgs]
-  t.createThread(startBackgroudJobPacked,
+  discard runThread(startBackgroudJobPacked,
     toStartBackgroudJobArgs(addr agentsInput, 50))
 
   bot.onUpdate dispatcher
@@ -158,5 +154,4 @@ when isMainModule:
   while true:
     echo "running ..."
     try: bot.poll(timeout = 100)
-    except: echo " " & getCurrentExceptionMsg()
-
+    except: echo getCurrentExceptionMsg()

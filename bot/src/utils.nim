@@ -20,22 +20,22 @@ proc unixNow*(): int64 =
   getTime().toUnix
 
 func getPercent*(userAnswers, correctAnswers: seq[int]): float =
-    var
-        corrects = 0
-        wrongs = 0
-        empties = 0
+  var
+    corrects = 0
+    wrongs = 0
+    empties = 0
 
-    for i in 0..userAnswers.high:
-        if userAnswers[i] == 0: empties.inc
-        elif userAnswers[i] == correctAnswers[i]: corrects.inc
-        else: wrongs.inc
+  for i in 0..userAnswers.high:
+    if userAnswers[i] == 0: empties.inc
+    elif userAnswers[i] == correctAnswers[i]: corrects.inc
+    else: wrongs.inc
 
-    (corrects * 3 - wrongs) / (userAnswers.len * 3) * 100
+  (corrects * 3 - wrongs) / (userAnswers.len * 3) * 100
 
-macro fakeSafety*(def)=
+macro fakeSafety*(def) =
   assert def.kind in RoutineNodes
   let b = def[RoutineBody]
-  
+
   def[RoutineBody] = quote:
     {.cast(gcsafe).}:
       {.cast(noSideEffect).}:
@@ -103,3 +103,10 @@ proc findChatId*(u: Update): Option[int64] =
   elif issome u.editedMessage: u.findMsgChatId(editedMessage)
   elif issome u.callbackQuery: u.callbackQuery.get.findMsgChatId(message)
   else: none int64
+
+# ------------------------------
+
+template runThread*(prc, args): untyped =
+  var th: Thread[typeof args]
+  th.createThread(prc, args)
+  th
