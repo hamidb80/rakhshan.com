@@ -57,25 +57,26 @@ Blueprint [queryHolder: initQuery, postfix: "Model"]:
         photo_path: string
         audio_path: string
         title: string[300]
-        info: string
+        description: string
 
     Table plan:
         id: int {.primary.}
-        kind: string[60]
+        kind: string[60] # مشاوره ای یا تحصیلی
         title: string[300]
         video_path: string
-        info: string
+        description: string
         link: string
 
     Table form:
         id: int {.primary.}
         kind: string[300]
         plan_id: Option[int[ref plan.id]]
+        meta: string # meta data like telegram username or ...
+        
         full_name: string[300]
         number: string[15]
         major: string[60]
         grade: int
-
 
 
 func hasPhoto*(q: QuestionModel): bool=
