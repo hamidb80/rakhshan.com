@@ -14,7 +14,16 @@ type
     sAddQuiz, sAQName, sAQDesc, sAQTime, sAQGrade, sAQLesson, sAQchapter
     sAQQuestion, sAQQPic, sAQQDesc, sAQQWhy, sAQQAns
 
+    # form
+    sfPlan, sfSelectPlanType, sfSelectPlan, sfReportProblem
+    sfName, sfNumber, sfGrade, sfMajor, sfContent
+    sfConfirmBefore, sfConfirm
+
+    # add plan
     sAddPlan, spKind, spTitle, spVideo, spDesc, spLink
+
+    # post
+    sPost, spoVideo_path, spoTitle, spoDesc
 
   SearchFor* = enum
     sfQuiz, sfmyRecords
@@ -33,9 +42,12 @@ type
     membership*: Option[MemberModel]
     quizCreation*: Option[QuizCreate]
     record*: Option[QuizTaking]
-    quizQuery*: Option[QuizQuery]
+    quizQuery*: Options[QuizQuery]
     quizIdToDelete*: Option[int64]
     queryPaging*: Option[QueryPageInfo[SearchFor]]
+    form: Option[FormModel]
+    plan: Option[PlanModel]
+    post: Option[PostModel]
 
   QuizQuery* = object
     name*: Option[string]
@@ -110,8 +122,6 @@ func findInEnum[Idx: range](wrapper: array[Idx, int], lookingFor: int): Option[I
     if wrapper[i] == lookingFor:
       return some i
 
-func first(n: NimNode): NimNode = n[0]
-
 proc reset*(u: UserCtx) =
   u.quizCreation.forget
   u.record.forget
@@ -137,16 +147,16 @@ func findEditedMessageIdContext*(
 
   elif (
     var
-      index = NotFound
-      field = none range[qfPhotoPath .. qfWhy]
+    index = NotFound
+    field = none range[qfPhotoPath .. qfWhy]
 
-    for i, q in qc.msgids.questions.pairs:
-      field = q.findInEnum(msgid)
-      if issome field:
-        index = i
-        break
+  for i, q in qc.msgids.questions.pairs:
+    field = q.findInEnum(msgid)
+    if issome field:
+      index = i
+      break
 
-    index != NotFound
+  index != NotFound
   ):
     (qcmsQuestions, index, field.get.ord.QuizCreateFields)
 
@@ -173,13 +183,16 @@ proc extractArgsFromJson(args: openArray[NimNode]): NimNode =
   result = newStmtList()
 
   for (index, arg) in args.pairs:
-    discard result.add newLetStmt(
+    result.add newLetStmt(
       arg[0],
       newcall(
         bindsym "to",
         newNimNode(nnkBracketExpr).add(ident "args", newIntLitNode index),
         arg[1],
     ))
+
+func first(n: NimNode): NimNode =
+  n[0]
 
 macro initRouter(varName: untyped, args: varargs[untyped]): untyped =
   result = newStmtList()

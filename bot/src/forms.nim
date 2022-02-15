@@ -16,3 +16,6 @@ func protectedParseint*(
 
   if result notin min..max:
     raise newException(FmRangeError, "")
+
+func isPhoneNumber*(s: string): bool =
+  (s.len in 8 .. 15) and allCharsInSet(s, {'+', '0'..'9'})

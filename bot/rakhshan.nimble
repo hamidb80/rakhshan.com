@@ -11,9 +11,9 @@ bin           = @["main"]
 
 requires "nim == 1.6.2"
 requires "telebot == 2022.01.07"
-requires "macroplus == 0.1.20"
 requires "jalali_nim == 0.0.2"
 requires "packedargs"
+requires "macroplus == 0.1.20"
 requires "https://github.com/hamidb80/easydb == 0.0.11"
 
 # Commands

@@ -45,8 +45,7 @@ macro fakeSafety*(def) =
 
 # ------------------------------------------
 
-func toInlineButtons*(
-  buttons: openArray[tuple[text, code: string]]
+func toInlineButtons*(buttons: openArray[tuple[text, code: string]]
 ): seq[InlineKeyboardButton] =
   buttons.mapIt:
     InlineKeyboardButton(text: it.text, callbackData: some it.code)
@@ -54,24 +53,28 @@ func toInlineButtons*(
 func toKeyboardButtons*(btntexts: openArray[string]): seq[KeyboardButton] =
   btntexts.mapIt KeyboardButton(text: it)
 
-func newInlineKeyboardMarkup*(
-  keyboards: seq[seq[InlineKeyBoardButton]]
+func newInlineKeyboardMarkup*(keyboards: seq[seq[InlineKeyBoardButton]]
 ): InlineKeyboardMarkup =
   result = newInlineKeyboardMarkup()
   result.inlineKeyboard = keyboards
 
-func newReplyKeyboardMarkup*(
-  keyboards: seq[seq[KeyboardButton]]
+func newReplyKeyboardMarkup*(keyboards: seq[seq[KeyboardButton]]
 ): ReplyKeyboardMarkup =
   new(result)
   result.kind = kReplyKeyboardMarkup
   result.keyboard = keyboards
 
-func newReplyKeyboardMarkup*(
-  keyboards: seq[seq[string]]
+func newReplyKeyboardMarkup*(keyboards: seq[seq[string]]
 ): ReplyKeyboardMarkup =
   newReplyKeyboardMarkup:
     keyboards.mapit it.mapIt initKeyBoardButton(it)
+
+func newReplyKeyboardMarkupEveryRow*(btns: seq[string]
+  ): ReplyKeyboardMarkup =
+  newReplyKeyboardMarkup btns.mapit @[it]
+
+template toRKeyboard*(s): untyped =
+  newReplyKeyboardMarkupEveryRow s
 
 # ------------------------------------------
 
@@ -94,6 +97,10 @@ func getBiggestPhotoFileId*(msg: Message): string =
   # NOTE: when you send an image, telegram will send it to the bot with different sizes
   # - you can pick smallest one or biggest one, or save them all
   msg.photo.get[^1].fileId
+
+func getVideoFileId*(maybeMsg: Option[Message]): Option[string] =
+  if issome(maybeMsg) and issome(maybeMsg.get.video):
+    result = some maybeMsg.get.video.get.fileid
 
 proc findChatId*(u: Update): Option[int64] =
   template findMsgChatId(msgWrapper, msgAlias): untyped =

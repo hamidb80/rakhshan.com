@@ -46,11 +46,11 @@ const
     passwordIsWrongT* = "رمز اشتباه است"
     loggedInAsAdminT* = "به عنوان ادمین وارد شدید"
 
-    removeQuizT* = "حذف آزمون"
     sendContactIntoT* = "ارسال اطلاعات حساب تلگرام"
     pleaseSendByYourCantactT* = "لطفا از طریق کیبرد ربات تلگرام، شماره خود را ارسال کنید"
 
     addQuizT* = "اضافه کردن آزمون"
+    removeQuizT* = "حذف آزمون"
     enterQuizNameT* = "نام آزمون را وارد کنید"
     enterQuizInfoT* = "توضیحات آزمون را وارد کنید"
     enterQuizTimeT* = escapeMarkdownV2 "زمان آزمون را به ثانیه وارد کنید (عدد صحیح)"
@@ -166,18 +166,29 @@ const
     hourT* = "ساعت"
 
     calcRank* = "محاسبه رتبه"
-
+    nameT* = "نام"
     yourRankInThisQuizYetT* = "رتبه شما در این آزمون فعلا"
     appliedFiltersT* = "فیلتر های اعمالی"
-    separatorLineEscaped* = escapeMarkdownV2 "-----------------------"
     minesT* = "-"
-    nameT* = "نام"
+    separatorLineEscaped* = escapeMarkdownV2:
+        "-----------------------"
+
+    sendIfYouSureOtherwiseCancelAndRefillT * = [
+      "اگر اطلاعات آن درست است، روی دکمه ثبت بزنید",
+      "در غیر این صورت گزینه انصراف را بزنید و فرم رو از اول پرکنید"
+    ].join "\n\n"
+
+    submitT* = "ثبت"
 
     youAreTakingQuizT* = "شما در حال انجام آزمون هستید"
     youHaveTakenTheQuizBeforeT* = "شما قبلا در این آزمون شرکت کرده اید"
 
     firstTimeStartMsgT* = escapeMarkdownV2:
-      "سلام! به ربات سایت رخشان خوش اومدی"
+        "سلام! به ربات سایت رخشان خوش اومدی"
+
+    postNotFoundT* = "مطلب پیدا نشد"
+    phoneNumberValidationNoteT* =
+        "شماره تلفن بای فقط با اعداد انگلیسی نوشته شده باشه"
 
     knowUsT* = "آشنایی با ما"
     knowConsultingPlansT* = "آشنایی با طرح های مشاوره"
@@ -185,6 +196,18 @@ const
     registerInVaiousPlansT* = "ثبت نام در طراح های مختلف"
     reportProblemsT* = "ثبت مشکلات"
     adminPanelT* = "پنل ادمین"
+
+    # form
+    enterProblemDescriptionT* = "توضیحات مشکل را بنویسید"
+    enterGradeT* = "پایه تحصیلی خود را وارد کنید"
+    enterMajorT* = "رشته تحصیلی خود را وارد کنید"
+    enterFullNameT* = "نام و نام خانوادگی خود را وارد کنید"
+    thisIsTheFormYouJustFilledT* =        "این فرمی است که همین الان پرکردید"
+    yourFormHasSubmittedT* = "فرم شما ارسال شد"
+
+    # plan
+    selectPlanKindT* = "نوع طرح را اتنخاب کنید"
+    selectPlanTitleT* = "عنوان طرح را انتخاب کنید"
 
     loggedInAsT* = "وارد شده به عنوان"
     inputIsnotAIntegerT* = "ورودی عدد نیست"
@@ -210,7 +233,7 @@ let
     notLoggedInReply* = newReplyKeyboardMarkup:
         commonFirstPageKeyboard & @[ @[loginT]]
 
-    loggedInReply* = newReplyKeyboardMarkup:
+    memberReply* = newReplyKeyboardMarkup:
         commonFirstPageKeyboard
 
     adminReply* = newReplyKeyboardMarkup:
@@ -239,13 +262,24 @@ let
       @[withoutPhotoT]
     ]
 
+    formEndReply* = newReplyKeyboardMarkupEveryRow @[
+      submitT, cancelT
+    ]
+
     withoutPhotoReply* = newReplyKeyboardMarkup @[
       @[withoutPhotoT]
     ]
 
-    memberReplyRaw = @[
+    quizMenuMemberReplyRaw* = @[
       @[findQuizT, myRecordsT]
     ]
+
+    quizMenuMemberReply* = newReplyKeyboardMarkup:
+        quizMenuMemberReplyRaw
+
+    quizMenuAdminReply* = newReplyKeyboardMarkup @[
+      @[addQuizT, removeQuizT]
+    ] & quizMenuMemberReplyRaw
 
     quizFilterReply* = newReplyKeyboardMarkup @[
       @[findQuizChangeGradeT, findQuizChangeLessonT, findQuizChangeNameT],
@@ -253,14 +287,9 @@ let
       @[showResultsT, cancelT]
     ]
 
-    adminReplyRaw = @[ @[addQuizT, removeQuizT]]
-
     addQuestionMoreThanOne* = newReplyKeyboardMarkup @[
       @[endT, cancelT],
     ]
-
-    memberMenuReply* = newReplyKeyboardMarkup memberReplyRaw
-    adminMenuReply* = newReplyKeyboardMarkup adminReplyRaw & memberReplyRaw
 
     sendContactReply* = newReplyKeyboardMarkup @[@[
       KeyboardButton(text: sendContactIntoT, requestContact: some true)
@@ -458,3 +487,11 @@ func `$`*(qq: QuizQuery): string =
       fmt"{bold gradeT}: {escapeMarkdownV2 qq.grade.getStr(minesT)}",
       fmt"{bold lessonT}: {escapeMarkdownV2 qq.lesson.getStr(minesT)}",
     ].join "\n"
+
+func `$`*(f: FormModel): string =
+    discard
+
+func `$`*(pk: PlanKinds): string =
+    case pk:
+    of pkConsulting: "مشاوره ای"
+    of pkEducational: "آموزشی درسی"

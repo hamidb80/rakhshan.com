@@ -2,7 +2,7 @@ import easydb
 
 var initQuery*: seq[string]
 
-const 
+const
     LongStrLimit* = 300
     ShortStrLimit* = 60
     LessonNameLimit* = 120
@@ -51,7 +51,7 @@ Blueprint [queryHolder: initQuery, postfix: "Model"]:
 
         Index [quiz_id, percent] as "rank"
 
-    Table post: 
+    Table post:
         id: int {.primary.}
         video_path: string
         title: string[300]
@@ -59,7 +59,7 @@ Blueprint [queryHolder: initQuery, postfix: "Model"]:
 
     Table plan:
         id: int {.primary.}
-        kind: string[60] # مشاوره ای یا تحصیلی
+        kind: int
         title: string[300]
         video_path: string
         description: string
@@ -67,19 +67,31 @@ Blueprint [queryHolder: initQuery, postfix: "Model"]:
 
     Table form:
         id: int {.primary.}
-        kind: string[60]
-        plan_id: Option[int[ref plan.id]]
+        kind: int
         chat_id: int
+        plan_id: Option[int[ref plan.id]]
         full_name: string[300]
-        number: string[15]
-        major: string[60]
+        phone_number: string[15]
         grade: int
+        major: string[60]
+        content: string
         created_at: int
 
 
-func hasPhoto*(q: QuestionModel): bool=
+type
+    PlanKinds* = enum
+        pkConsulting
+        pkEducational
+
+    FormKinds* = enum
+        fkRegisterInPlans
+        fkReportProblem
+
+
+func hasPhoto*(q: QuestionModel): bool =
     q.photo_path != ""
 
+# -------------------------
 
 when isMainModule:
     import strutils

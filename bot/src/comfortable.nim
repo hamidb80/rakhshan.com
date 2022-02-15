@@ -59,3 +59,19 @@ template qq*: untyped {.dirty.} =
 
 template qp*: untyped {.dirty.} =
   uctx.queryPaging.get
+
+template uf*: untyped {.dirty.} =
+  uctx.form.get
+
+template pl*: untyped {.dirty.} =
+  uctx.plan.get
+
+template ps*: untyped {.dirty.} =
+  uctx.post.get
+
+template `@@`*(dbOperations): untyped =
+  dbWorksCapture dbfPath:
+    dbOperations
+
+template impossible*: untyped=
+  raise newException(ValueError, "impossible")

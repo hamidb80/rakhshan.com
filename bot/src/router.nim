@@ -7,6 +7,7 @@ import
   messages, forms, settings,
   host_api, utils, database/[queries, models]
 
+
 newRouter router:
   command(chatid: int64) as "help":
     asyncCheck chatid << [
@@ -26,10 +27,10 @@ newRouter router:
         t = fmt"{loggedInAsT} '{uctx.membership.get.site_name}'"
         km =
           if uctx.membership.get.isAdmin == 1: adminReply
-          else: loggedInReply
+          else: memberReply
 
       asyncCheck chatid << (t, km)
-    
+
     else:
       asyncCheck chatid << (firstTimeStartMsgT, notLoggedInReply)
 
@@ -38,25 +39,136 @@ newRouter router:
   route(chatid: int64, msgtext: string) as "home":
     case msgtext:
     of knowUsT:
-      discard
-    
+      let p = @@ db.getPost(mainPost)
+
+      if isSome p:
+        asyncCheck bot.sendVideo(chatid,
+          p.get.videoPath, caption = p.get.description)
+      else:
+        asyncCheck chatid << postNotFoundT
+
     of knowConsultingPlansT:
-      discard
-    
+      let plans = @@ db.getPlansTitles pkConsulting
+      # gen keyboard
+
     of knowEducationalPlansT:
-      discard
-    
+      let plans = @@ db.getPlansTitles pkEducational
+
     of registerInVaiousPlansT:
-      discard
+      uctx.form = some FormModel(chatId: chatid,
+        kind: fkRegisterInPlans.ord)
+
+      /-> sfPlan
 
     of reportProblemsT:
-      discard
-    
+      uctx.form = some FormModel(chatId: chatid,
+        kind: fkReportProblem.ord)
+
+      /-> sfReportProblem
+
     of loginT:
       asyncCheck chatid << (enterPhoneNumberT, sendContactReply)
       /-> sSendContact
+
     else:
-      asyncCheck chatid << (selectOptionsT, notLoggedInReply)
+      asyncCheck chatid << wrongCommandT
+
+  route(chatid: int64) as "enter_home":
+    let keyboardReply =
+      if uctx.membership.get.isAdmin == 1: adminReply
+      else: memberReply
+
+    asyncCheck chatid << (chooseOneT, keyboardReply)
+    /-> sMainMenu
+
+  route(chatid: int64, input: string) as "fill_form":
+    case uctx.stage:
+    of sfPlan:
+      asyncCheck chatid << (chooseOneT, newReplyKeyboardMarkup @[
+        @[$pkConsulting],
+        @[$pkEducational]
+      ])
+
+    of sfSelectPlanType:
+      case input:
+      of $pkConsulting:
+        asyncCheck chatid << (chooseOneT, toRKeyboard @@db.getPlansTitles(pkConsulting))
+
+      of $pkEducational:
+        asyncCheck chatid << (chooseOneT, toRKeyboard @@db.getPlansTitles(pkEducational))
+
+      else:
+        asyncCheck chatid << invalidInputT
+
+    of sfSelectPlan:
+      if @@db.isPlanExists(input):
+        asyncCheck chatid << (enterFullNameT, noReply)
+        /-> sfName
+
+      else:
+        asyncCheck chatid << invalidInputT
+
+    of sfReportProblem:
+      asyncCheck chatid << (enterFullNameT, noReply)
+      /-> sfName
+
+    of sfName:
+      uf.fullname = input
+      /-> sfGrade
+      asyncCheck chatid << enterGradeT
+
+    of sfGrade:
+      /-> sfMajor
+      # do some checks
+      asyncCheck chatid << enterMajorT
+
+    of sfMajor:
+      /-> sfNumber
+      # do some checks
+      asyncCheck chatid << enterPhoneNumberT
+
+    of sfNumber:
+      if isPhoneNumber input:
+        uf.phoneNumber = input
+
+        case FormKinds(uf.kind):
+        of fkReportProblem:
+          /-> sfContent
+          asyncCheck chatid << enterProblemDescriptionT
+
+        of fkRegisterInPlans:
+          /-> sfConfirmBefore
+          asyncCheck redirect(reFillform, args)
+
+      else:
+        asyncCheck chatid << phoneNumberValidationNoteT
+
+    of sfContent:
+      uf.content = input
+      /-> sfConfirmBefore
+      asyncCheck redirect(reFillform, args)
+
+    of sfConfirmBefore:
+      discard await chatid << $uf
+      asyncCheck chatid << (sendIfYouSureOtherwiseCancelAndRefillT, formEndReply)
+
+    of sfConfirm:
+      case input:
+
+      of submitT:
+        discard @@db.addForm(uf)
+        forget uctx.form
+        asyncCheck chatid << yourFormHasSubmittedT
+        asyncCheck redirect(reEnterhome, args)
+
+      of cancelT:
+        forget uctx.form
+        asyncCheck redirect(reEnterhome, args)
+
+      else:
+        asyncCheck chatid << invalidInputT
+
+    else: impossible()
 
   route(chatid: int64) as "verify_user":
     try:
@@ -74,7 +186,7 @@ newRouter router:
           uctx.membership = db.getMember(chatid)
 
         asyncCheck chatid << (greeting(userinfo.displayName), noReply)
-        asyncCheck redirect(reEnter_menu, %*[chatid])
+        asyncCheck redirect(reEnterhome, args)
 
       else:
         asyncCheck chatid << pleaseSendByYourCantactT
@@ -82,15 +194,100 @@ newRouter router:
     except ValueError:
       asyncCheck chatid << wrongNumberT
 
-  route(chatid: int64) as "enter_menu":
-    let keyboardReply =
-      if uctx.membership.get.isAdmin == 1: adminMenuReply
-      else: memberMenuReply
+  route(chatid: int64, input: string) as "add_plan":
+    case uctx.stage:
+    of sAddPlan:
+      uctx.plan = some PlanModel()
+      asyncCheck chatid << (selectPlanTypeT)
+      /-> spKind
 
-    asyncCheck chatid << (chooseOneT, keyboardReply)
-    /-> sMainMenu
+    of spKind:
+      template done: untyped =
+        /-> spTitle
 
-  route(chatid: int64, input: string) as "menu":
+      case input:
+      of $pkConsulting:
+        done()
+
+      of $pkEducational:
+        done()
+
+      else:
+        asyncCheck chatid << invalidInputT
+
+    of spTitle:
+      pl.title = input
+      /-> spVideo
+
+    of spVideo:
+      let fid = getVideoFileId(u.message)
+
+      if isSome fid:
+        pl.video_path = fid.get
+        /-> spDesc
+
+      else:
+        asyncCheck chatid << "..."
+
+    of spDesc:
+      pl.description = input
+      /-> spLink
+
+    of spLink:
+      pl.link = input
+      discard @@db.addPlan pl
+      forget uctx.plan
+
+    else: impossible()
+
+  route(chatid: int64, input: string) as "delete_plan":
+    if input == cancelT:
+      forget uctx.plan
+    
+    else:
+      case uctx.stage:
+      of sDeletePlan:
+        uctx.plan = some Plan()
+        asyncCheck chatid << (selectPlanKindT, )
+
+      of sdpKind:
+        pl.kind = ...
+        asyncCheck chatid << (selectPlanTitleT, @@db.getPlansTitles(kind))
+
+      of sdqTitle:
+        discard @@db.deletePlan(pl.kind, input)
+        asyncCheck chatid << deletedT
+        asyncCheck redirect(reEnterhome, args)
+
+      else: 
+        impossible()
+
+  route(chatid: int64, input: string) as "upsert_post":
+    case uctx.stage:
+    of sPost:
+      asyncCheck chatid << enterPostTitleT
+
+    of spoTitle:
+      ps.title = input
+      asyncCheck chatid << sendVideoT
+
+    of spoVideo_path:
+      let fid = getVideoFileId(u.message)
+
+      if isSome fid:
+        ps.video_path = fid.get
+        asyncCheck chatid << enterDescriptionT
+        /-> spoDesc
+
+      else:
+        discard
+
+    of spoDesc:
+      ps.description = input
+
+    else: impossible()
+
+  route(chatid: int64, input: string) as "quiz_menu":
     case input:
     of addQuizT:
       adminRequired:
@@ -112,13 +309,10 @@ newRouter router:
       asyncCheck redirect(reMy_records, %*[chatid])
 
     else:
-      echo "do it"
       asyncCheck chatid << wrongCommandT
-      echo "did it!"
 
   route(chatid: int64) as "my_records":
-    let recs = dbworksCapture dbfpath:
-      db.getMyRecords(chatid, int64.high, pageSize, saLess, Descending)
+    let recs = @@ db.getMyRecords(chatid, int64.high, pageSize, saLess, Descending)
 
     if recs.len == 0:
       asyncCheck chatid << noRecordsAvailableT
@@ -142,7 +336,7 @@ newRouter router:
 
     if input == cancelT:
       uctx.quizCreation.forget
-      asyncCheck redirect(reEnter_menu, %*[chatid])
+      asyncCheck redirect(reEnterhome, %*[chatid])
 
     else:
       case uctx.stage:
@@ -188,7 +382,7 @@ newRouter router:
         asyncCheck redirect(reAdd_question, %*[chatid, ""])
 
       else:
-        asyncCheck chatid << wrongCommandT
+        impossible()
 
   route(chatid: int64, input: string) as "add_question":
     let
@@ -211,7 +405,7 @@ newRouter router:
           qc.questions)
 
       asyncCheck chatid << quizAddedDialog(qc.quiz.name)
-      asyncCheck redirect(reEnter_menu, %*[chatid])
+      asyncCheck redirect(reEnterhome, %*[chatid])
       uctx.quizCreation.forget
 
     else:
@@ -264,7 +458,7 @@ newRouter router:
         /-> sAQQuestion
         asyncCheck redirect(reAdd_question, %*[chatid, ""])
 
-      else: discard
+      else: impossible()
 
   route(chatid: int64, input: string) as "find_quiz":
     template goBack: untyped = /-> sFindQuizMain
@@ -288,8 +482,7 @@ newRouter router:
     of showResultsT:
       asyncCheck chatid << $qq
 
-      let quizzes = dbworksCapture dbfpath:
-        db.findQuizzes(qq, int64.high, pageSize, saLess, Descending)
+      let quizzes = @@ db.findQuizzes(qq, int64.high, pageSize, saLess, Descending)
 
       if quizzes.len == 0:
         asyncCheck chatid << noResultFoundT
@@ -310,7 +503,7 @@ newRouter router:
     of cancelT:
       uctx.quizQuery.forget
       uctx.queryPaging.forget
-      asyncCheck redirect(reEnter_menu, %*[chatid])
+      asyncCheck redirect(reEnterhome, %*[chatid])
 
     else:
       template alertChange(field: QuizCreateFields): untyped =
@@ -335,7 +528,7 @@ newRouter router:
         alertChange tfLesson
         goBack()
 
-      else: discard
+      else: impossible()
 
   route(chatid: int64, msgid: int) as "edit_quiz_creation":
     template msg: untyped = u.editedmessage.get
@@ -352,7 +545,8 @@ newRouter router:
       of tfGrade: qc.tag.grade = protectedParseint input
       of tfLesson: qc.tag.lesson = input
       of tfChapter: qc.tag.chapter = protectedParseint input
-      else: discard
+      else: impossible()
+
       asyncCheck chatid << changeQuizFieldAlert(field)
 
     of qcmsQuestions:
@@ -365,7 +559,7 @@ newRouter router:
       of qfDescription: qi.description = input
       of qfWhy: qi.why = input
       of qfAnswer: qi.answer = protectedParseint(input, 1, 4)
-      else: discard
+      else: impossible()
       asyncCheck chatid << fmt"{fieldT} '{field}' {fromQuestionNumberT} {(index+1)} {changedT}"
 
     of qcmsNothing:
@@ -384,8 +578,8 @@ newRouter router:
 
           case qp.context:
           of sfQuiz:
-            let quizzes = dbworksCapture dbfpath:
-              db.findQuizzes(qq, qp.indexRange[dir], pageSize, dir, Descending)
+            let quizzes = @@ db.findQuizzes(qq, qp.indexRange[dir], pageSize,
+                dir, Descending)
 
             if quizzes.len == 0:
               result = itsTheEndT
@@ -399,8 +593,7 @@ newRouter router:
                 genQueryPageInlineBtns(qp.page))
 
           of sfmyRecords:
-            let recs = dbworksCapture dbfpath:
-              db.getMyRecords(chatid, qp.indexRange[dir],
+            let recs = @@ db.getMyRecords(chatid, qp.indexRange[dir],
                   pageSize, dir, Descending)
 
             if recs.len != 0:
@@ -421,19 +614,17 @@ newRouter router:
 
   route(chatid: int64, input: string) as "middle_of_scroll":
     if input == cancelT:
-      asyncCheck redirect(reEnter_menu, %*[chatid])
+      asyncCheck redirect(reEnterhome, %*[chatid])
 
   command(chatid: int64, param: string) as "show_quiz":
     let
       quizid = parseint param
-      qm = dbworksCapture dbfpath:
-        db.getQuizInfo(quizid)
+      qm = @@ db.getQuizInfo(quizid)
 
     asyncCheck:
       if qm.issome:
         let
-          rec = dbworksCapture dbfpath:
-            db.getRecordFor(chatid, qm.get.quiz.id)
+          rec = @@ db.getRecordFor(chatid, qm.get.quiz.id)
 
           text = fullQuizInfo(qm.get, rec)
 
@@ -448,8 +639,7 @@ newRouter router:
   command(chatid: int64, param: string) as "get_rank":
     let
       quizid = parseint param
-      rank = dbworksCapture dbfpath:
-        db.getRank(chatid, quizid)
+      rank = @@ db.getRank(chatid, quizid)
 
     asyncCheck chatid << (
       if isSome rank: fmt"{yourRankInThisQuizYetT}: {rank.get}"
@@ -457,7 +647,7 @@ newRouter router:
 
   route(chatid: int64, input: string) as "delete_quiz":
     if input == cancelT:
-      asyncCheck redirect(reEnter_menu, %*[chatid])
+      asyncCheck redirect(reEnterhome, %*[chatid])
 
     else:
       case uctx.stage:
@@ -473,15 +663,13 @@ newRouter router:
       of sDQConfirm:
         asyncCheck:
           if input == yesT:
-            dbworks dbfpath:
-              discard db.deleteQuiz(uctx.quizidToDelete.get)
-
+            discard @@db.deleteQuiz(uctx.quizidToDelete.get)
             chatid << quizGotDeletedT
           else:
             chatid << operationCancelledT
 
         uctx.quizidToDelete.forget
-        asyncCheck redirect(reEnter_menu, %*[chatid])
+        asyncCheck redirect(reEnterhome, %*[chatid])
 
       else:
         discard
@@ -490,18 +678,15 @@ newRouter router:
     if not isDoingQuiz:
       let
         quizid = parseint param
-        quiz = dbworksCapture dbfpath:
-          db.getQuizItself(quizid)
+        quiz = @@ db.getQuizItself(quizid)
 
       if issome quiz:
-        if not dbfpath.dbworksCapture(db.isRecordExistsFor(chatid,
-            quizid)):
+        if not @@ db.isRecordExistsFor(chatid, quizid):
           asyncCheck chatid << quizWillStartSoonT
 
           uctx.record = some QuizTaking()
           myrecord.quiz = quiz.get
-          myrecord.questions = dbworksCapture dbfpath: db.getQuestions(
-              quizid)
+          myrecord.questions = @@ db.getQuestions(quizid)
 
           myrecord.questionsOrder = toseq(0 .. myrecord.questions.high).dup(shuffle)
           let fqi = myrecord.questionsOrder[0] # first question index
@@ -590,16 +775,13 @@ newRouter router:
   command(chatid: int64, param: string) as "analyze":
     let
       quizid = parseint param
-      quiz = dbworksCapture dbfpath: db.getQuizItself(
-          quizid)
+      quiz = @@ db.getQuizItself(quizid)
 
     if quiz.issome:
-      let rec = dbworksCapture dbfpath: db.getRecordFor(chatid,
-          quizid)
+      let rec = @@ db.getRecordFor(chatid, quizid)
       if rec.issome:
         let
-          questions = dbworksCapture dbfpath: db.getQuestions(
-              quizid)
+          questions = @@ db.getQuestions(quizid)
           qoi = rec.get.questionsOrder.parseJson.to(seq[int]) # question order index
 
         for i in 0 .. questions.high:
@@ -638,15 +820,14 @@ newRouter router:
         r.answerSheet, r.questionsOrder.mapIt(r.questions[it].answer.int))
 
       # save record
-      dbworks dbfpath:
-        discard db.addRecord(r.quiz.id, chatid, r.answerSheet.join,
-            ($r.questionsOrder).substr(1), percent, unixNow())
+      discard @@db.addRecord(r.quiz.id, chatid, r.answerSheet.join,
+        ($r.questionsOrder).substr(1), percent, unixNow())
 
       # show complete result
       asyncCheck chatid << recordResultDialog(r.quiz, percent)
 
       uctx.record.forget
-      asyncCheck redirect(reEnter_menu, %*[chatid])
+      asyncCheck redirect(reEnterhome, %*[chatid])
 
   route(chatid: int64, input: string) as "middle_of_quiz":
     case input
@@ -656,7 +837,7 @@ newRouter router:
     of cancelT:
       uctx.record.forget
       asyncCheck chatid << quizCancelledT
-      asyncCheck redirect(reEnter_menu, %*[chatid])
+      asyncCheck redirect(reEnterhome, %*[chatid])
 
     else:
       asyncCheck chatid << invalidInputT
@@ -665,5 +846,3 @@ newRouter router:
     asyncCheck chatid << wrongCommandT
 
   callbackQuery() as "dont_care": discard
-
-  # route(chatid: int64, input: string) as "middle_of_quiz":

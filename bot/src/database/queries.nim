@@ -48,11 +48,11 @@ proc initDatabase*(path: string) =
 proc getSingleRow*(db;
     query: SqlQuery, args: varargs[string, `$`]
 ): Option[Row] =
-    for r in getAllRows(db, (query.string & " LIMIT 1").sql, args):
+    for r in getAllRows(db, sql(query.string & " LIMIT 1"), args):
         return some r
 
 proc getAllTables*(db; ): seq[string] =
-    db.getAllRows("SELECT name FROM sqlite_master WHERE type='table';".sql).mapIt:
+    db.getAllRows(sql"SELECT name FROM sqlite_master WHERE type='table';").mapIt:
         it[0]
 
 template limit(s: string, n: int): untyped =
@@ -81,7 +81,7 @@ func `$`(so: SortOrder): string =
 func wrapWith(s: string, c: char): string =
     fmt"{c}{s}{c}"
 
-func toNillableString(i: Option[int]): string =
+func toNillableString[N: SomeInteger](i: Option[N]): string =
     if issome i: $i.get
     else: ""
 
@@ -143,9 +143,9 @@ const getTagQuery = "SELECT id, grade, lesson, chapter FROM tag "
 proc getTag(db;
 grade: int64, lesson: string, chapter: int64
 ): Option[TagModel] =
-    let row = db.getSingleRow((getTagQuery &
+    let row = db.getSingleRow(sql(getTagQuery &
         "WHERE grade = ? AND lesson = ? AND chapter = ?"
-    ).sql, grade, lesson, chapter)
+    ), grade, lesson, chapter)
 
     if issome row:
         result = some totag row.get
@@ -237,7 +237,7 @@ proc findQuizzes*(db;
             , dir
         ) & fmt"LIMIT {limit}"
 
-    result = db.getAllRows(query.sql).map(toQuizInfo)
+    result = db.getAllRows(sql query).map(toQuizInfo)
     result.keepOrder(dir, order)
 
 proc getQuizInfo*(db; quizid: int64): Option[QuizInfo] =
@@ -247,11 +247,11 @@ proc getQuizInfo*(db; quizid: int64): Option[QuizInfo] =
         result = some row.get.toQuizInfo
 
 proc getQuizItself*(db; quizid: int64): Option[QuizModel] =
-    let row = db.getSingleRow("""
+    let row = db.getSingleRow(sql"""
         SELECT name, description, time, tag_id
         FROM quiz
         WHERE id = ?
-    """.sql, quizid)
+    """, quizid)
 
     if issome row:
         result = some QuizModel(
@@ -262,12 +262,12 @@ proc getQuizItself*(db; quizid: int64): Option[QuizModel] =
             tag_id: parseint row.get[3])
 
 proc getQuestions*(db; quizid: int64): seq[QuestionModel] =
-    let rows = db.getAllRows("""
+    let rows = db.getAllRows(sql"""
         SELECT id, photo_path, description, why, answer 
         FROM question 
         WHERE quiz_id = ?
         ORDER by id ASC
-    """.sql, quizid)
+    """, quizid)
 
     rows.mapIt QuestionModel(
         id: it[0].parseInt,
@@ -279,9 +279,9 @@ proc getQuestions*(db; quizid: int64): seq[QuestionModel] =
 
 proc deleteQuiz*(db; quizid: int64): bool =
     transaction db:
-        db.exec("DELETE FROM record WHERE quiz_id = ?".sql, quizid)
-        db.exec("DELETE FROM question WHERE quiz_id = ?".sql, quizid)
-        db.exec("DELETE FROM quiz WHERE id = ?".sql, quizid)
+        db.exec(sql"DELETE FROM record WHERE quiz_id = ?", quizid)
+        db.exec(sql"DELETE FROM question WHERE quiz_id = ?", quizid)
+        db.exec(sql"DELETE FROM quiz WHERE id = ?", quizid)
 
 # record -------------------------------------------
 
@@ -298,9 +298,9 @@ proc addRecord*(db;
 proc isRecordExistsFor*(db;
     memberId: int64, quizId: int64
 ): bool =
-    isSome db.getSingleRow(
-        sql"SELECT 1 FROM record WHERE member_chatid = ? AND quiz_id = ?",
-        memberid, quizid)
+    db.getValue(
+        sql"SELECT COUNT(id) FROM record WHERE member_chatid = ? AND quiz_id = ?",
+        memberid, quizid) != "0"
 
 proc getRecordFor*(db;
     memberId: int64, quizId: int64
@@ -373,15 +373,14 @@ proc getRank*(db;
             WHERE r.quiz_id = ? AND r.percent - ? > 0.01
         """, quizid, myPercent).get[0].parseint + 1
 
-# post / plan / form -------------------------------
+# post -------------------------------
+const mainPost* = "know-us"
 
-proc addPost*(db;
-    title, videoPath, description: string,
-): int64 =
+proc addPost*(db; p: PostModel): int64 =
     db.insertID(sql"""
         INSERT INTO post (title, video_path, description) 
         VALUES (?, ?, ?)
-    """, title.limit(LongStrLimit), videoPath, description)
+    """, p.title.limit(LongStrLimit), p.videoPath, p.description)
 
 proc getPost*(db; title: string): Option[PostModel] =
     let t = db.getSingleRow(sql"""
@@ -397,14 +396,10 @@ proc getPost*(db; title: string): Option[PostModel] =
             title: t.get[2],
             description: t.get[3])
 
-proc upsertPost*(db;
-    title: string,
-    video_path: string,
-    description: string,
-): int64 =
+proc upsertPost*(db; p: PostModel): int64 =
     let t = db.getSingleRow(sql"""
         SELECT id FROM form WHERE title = ?
-    """, title)
+    """, p.title)
 
     if issome t:
         db.exec(sql"""
@@ -413,51 +408,49 @@ proc upsertPost*(db;
             video_path = ?,
             description = ?
             WHERE id = ?
-        """, title, video_path, description, t.get[0])
+        """, p.title, p.video_path, p.description, t.get[0])
 
         parseBiggestInt t.get[0]
 
     else:
-        db.insertID(sql"""
-            INSERT INTO
-            post (title, video_path, description)
-            VALUES (?, ?, ?)
-        """, title, video_path, description)
+        db.addPost(p)
 
-proc addPlan*(db;
-    kind, title, videoPath, description, link: string,
-): int64 =
+# plan -------------------------------
+proc addPlan*(db; p: PlanModel): int64 =
     db.insertID(sql"""
         INSERT INTO plan (kind, title, video_path, description, link) 
         VALUES (?, ?, ?, ?, ?)
-    """, kind.limit(ShortStrLimit), title.limit(LongStrLimit),
-        videoPath, description, link)
+    """, p.kind, p.title.limit(LongStrLimit),
+    p.videoPath, p.description, p.link)
 
-proc getPlansTitle*(db): seq[string] =
+proc isPlanExists*(db; title: string): bool =
+    db.getValue(sql"""
+        SELECT COUNT(id) 
+        FROM plan
+        WHERE title = ?
+    """, title) == "1"
+
+proc getPlansTitles*(db; kind: PlanKinds): seq[string] =
     db.getAllRows(sql"""
         SELECT title FROM plan
+        WHERE kind = ?
         ORDER BY id DESC
-    """).mapIt it[0]
+    """, kind.ord).mapIt it[0]
 
-proc addForm*(db;
-    kind: string,
-    plan_id: Option[int],
-    chat_id: int,
-    createdAt: int,
-    full_name: string,
-    number: string,
-    major: string,
-    grade: int,
-): int64 =
+proc deletePlan*(db; kind: PlanKinds, title: string) =
+    db.exec(sql"DELETE FROM plan WHERE kind = ? AND title = ?", kind, title)
+
+# form -------------------------------
+proc addForm*(db; f: FormModel): int64 =
     db.insertID(sql"""
         INSERT INTO form (
             kind, plan_id, chat_id, created_at,
-            full_name, number, major, grade
+            full_name, phone_number, major, grade
         ) 
         VALUES (?, ?, ?, ?, ?, ?, ?)
-    """, kind.limit(ShortStrLimit), plan_id.toNillableString,
-        chatid, createdAt,
-        fullname, number.limit(PhoneNumberLimit), major, grade)
+    """, f.kind.ord, f.plan_id.toNillableString,
+        f.chatid, f.createdAt,
+        f.fullname, f.phone_number.limit(PhoneNumberLimit), f.major, f.grade)
 
 proc getForms*(db;
     pinnedIndex: int, limit: int,
@@ -467,18 +460,18 @@ proc getForms*(db;
         db.getAllRows(sql fmt"""
             SELECT 
                 id, kind, plan_id, chat_id,
-                full_name, number, major, grade, created_at
+                full_name, phone_number, major, grade, created_at
             FROM form
             WHERE id {dop[dir]} {pinnedIndex}
             ORDER BY id {ortsd[dir]}
             LIMIT {limit}
         """).mapIt FormModel(
             id: parseInt it[0],
-            kind: it[1],
-            # plan_id: parseNillableInt it[2],
+            kind: parseInt it[1],
+            plan_id: parseNillableInt it[2],
             chat_id: parseInt it[3],
             fullname: it[4],
-            number: it[5],
+            phone_number: it[5],
             major: it[6],
             grade: parseint it[7],
             created_at: parseInt it[8])
