@@ -176,10 +176,15 @@ const
     youAreTakingQuizT* = "شما در حال انجام آزمون هستید"
     youHaveTakenTheQuizBeforeT* = "شما قبلا در این آزمون شرکت کرده اید"
 
-    firstTimeStartMsgT* = escapeMarkdownV2 [
-      "سلام! به ربات سایت رخشان خوش اومدی",
-      "برای استفاده از ربات اول باید شماره ات رو وارد کنی تا بشناسیمت"
-    ].join "\n\n"
+    firstTimeStartMsgT* = escapeMarkdownV2:
+      "سلام! به ربات سایت رخشان خوش اومدی"
+
+    knowUsT* = "آشنایی با ما"
+    knowConsultingPlansT* = "آشنایی با طرح های مشاوره"
+    knowEducationalPlansT* = "آشنایی با طرح های آموزشی درسی"
+    registerInVaiousPlansT* = "ثبت نام در طراح های مختلف"
+    reportProblemsT* = "ثبت مشکلات"
+    adminPanelT* = "پنل ادمین"
 
     loggedInAsT* = "وارد شده به عنوان"
     inputIsnotAIntegerT* = "ورودی عدد نیست"
@@ -196,9 +201,20 @@ const
 let
     noReply* = newReplyKeyboardRemove(true)
 
-    notLoggedInReply* = newReplyKeyboardMarkup @[
-      @[loginT],
+    commonFirstPageKeyboard = @[
+      @[knowUsT],
+      @[knowConsultingPlansT, knowEducationalPlansT],
+      @[registerInVaiousPlansT, reportProblemsT]
     ]
+
+    notLoggedInReply* = newReplyKeyboardMarkup:
+        commonFirstPageKeyboard & @[ @[loginT]]
+
+    loggedInReply* = newReplyKeyboardMarkup:
+        commonFirstPageKeyboard
+
+    adminReply* = newReplyKeyboardMarkup:
+        commonFirstPageKeyboard & @[ @[adminPanelT]]
 
     cancelReply* = newReplyKeyboardMarkup @[
       @[cancelT]
@@ -207,10 +223,6 @@ let
     yesOrNoReply* = newReplyKeyboardMarkup @[
       @[yesT],
       @[noTx],
-    ]
-
-    endReply* = newReplyKeyboardMarkup @[
-      @[endT]
     ]
 
     answersReply* = newReplyKeyboardMarkup @[

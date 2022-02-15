@@ -14,6 +14,8 @@ type
     sAddQuiz, sAQName, sAQDesc, sAQTime, sAQGrade, sAQLesson, sAQchapter
     sAQQuestion, sAQQPic, sAQQDesc, sAQQWhy, sAQQAns
 
+    sAddPlan, spKind, spTitle, spVideo, spDesc, spLink
+
   SearchFor* = enum
     sfQuiz, sfmyRecords
 

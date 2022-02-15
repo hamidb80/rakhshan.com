@@ -37,7 +37,6 @@ proc dispatcherImpl*(up: Update, chatId: int64): Action {.fakeSafety.} =
           # without argument
           of 's': reStart
           of 'h': reHelp
-          of 'z': reReset
           # with arguemnt
           of 'q': reShow_quiz
           of 'a': reAnalyze

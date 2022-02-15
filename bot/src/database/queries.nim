@@ -40,6 +40,11 @@ template transaction*(db, body): untyped =
     body
     db.exec sql"COMMIT"
 
+proc initDatabase*(path: string) =
+    dbworks path:
+        for q in initQuery:
+            db.exec q.sql
+
 proc getSingleRow*(db;
     query: SqlQuery, args: varargs[string, `$`]
 ): Option[Row] =
@@ -68,17 +73,27 @@ func `~`*(dir: SearchDirection): SearchDirection =
     of saLess: saMore
     of saMore: saLess
 
-func `$`(so: SortOrder): string=
+func `$`(so: SortOrder): string =
     case so:
     of Ascending: "ASC"
     of Descending: "DESC"
 
-# member ----------------------------------------
+func wrapWith(s: string, c: char): string =
+    fmt"{c}{s}{c}"
 
-proc initDatabase*(path: string) =
-    dbworks path:
-        for q in initQuery:
-            db.exec q.sql
+func toNillableString(i: Option[int]): string =
+    if issome i: $i.get
+    else: ""
+
+func parseNillableInt(s: string): Option[int64] =
+    if s == "": none int64
+    else: some parseBiggestInt s
+
+template keepOrder(result, dir, order): untyped =
+    if (dir == saMore and order == Descending) or (dir == saLess and order == Ascending):
+        result.reverse
+
+# member ----------------------------------------
 
 proc getMember*(db; chatId: int64): Option[MemberModel] =
     let row = db.getSingleRow(sql"""
@@ -107,7 +122,7 @@ proc addMember*(db;
     """, chatId, site_name.limit(LongStrLimit), tg_name.limit(LongStrLimit),
         phone_number.limit(PhoneNumberLimit), isAdmin, joined_at)
 
-# quiz -------------------------------------------
+# tag --------------------------------------
 
 proc totag*(s: seq[string]): TagModel =
     TagModel(
@@ -148,6 +163,8 @@ proc upsertTag*(db;
             grade: grade,
             lesson: lesson,
             chapter: chapter)
+
+# quiz --------------------------------------
 
 proc addQuiz*(db;
     name: string, description: string, time: int64, tag_id: int64,
@@ -199,13 +216,6 @@ func toQuizInfo(row: Row): QuizInfo =
         grade: row[6].parseInt,
         lesson: row[7],
         chapter: row[8].parseInt)
-
-func wrapWith(s:string, c: char): string =
-    fmt"{c}{s}{c}"
-
-template keepOrder(result, dir, order): untyped =
-    if (dir == saMore and order == Descending) or (dir == saLess and order == Ascending):
-        result.reverse
 
 proc findQuizzes*(db;
     qq: QuizQuery, pinnedIndex: int64, limit: int,
@@ -273,7 +283,7 @@ proc deleteQuiz*(db; quizid: int64): bool =
         db.exec("DELETE FROM question WHERE quiz_id = ?".sql, quizid)
         db.exec("DELETE FROM quiz WHERE id = ?".sql, quizid)
 
-# quiz -------------------------------------------
+# record -------------------------------------------
 
 proc addRecord*(db;
     quizId: int64, member_chatId: int64, answers: string,
@@ -282,7 +292,8 @@ proc addRecord*(db;
     db.insertID(sql"""
         INSERT INTO record (quiz_id, member_chatid, answer_list, percent, created_at, questions_order) 
         VALUES (?, ?, ?, ?, ?, ?)
-    """, quizId, member_chatId, answers.limit(LongStrLimit), precent, created_at, questions_order)
+    """, quizId, member_chatId, answers.limit(LongStrLimit), precent,
+            created_at, questions_order)
 
 proc isRecordExistsFor*(db;
     memberId: int64, quizId: int64
@@ -290,7 +301,6 @@ proc isRecordExistsFor*(db;
     isSome db.getSingleRow(
         sql"SELECT 1 FROM record WHERE member_chatid = ? AND quiz_id = ?",
         memberid, quizid)
-
 
 proc getRecordFor*(db;
     memberId: int64, quizId: int64
@@ -362,3 +372,115 @@ proc getRank*(db;
             FROM record r
             WHERE r.quiz_id = ? AND r.percent - ? > 0.01
         """, quizid, myPercent).get[0].parseint + 1
+
+# post / plan / form -------------------------------
+
+proc addPost*(db;
+    title, videoPath, description: string,
+): int64 =
+    db.insertID(sql"""
+        INSERT INTO post (title, video_path, description) 
+        VALUES (?, ?, ?)
+    """, title.limit(LongStrLimit), videoPath, description)
+
+proc getPost*(db; title: string): Option[PostModel] =
+    let t = db.getSingleRow(sql"""
+        SELECT id, video_path, title, description
+        FROM post
+        WHERE title = ?
+    """, title)
+
+    if isSome t:
+        result = some PostModel(
+            id: parseInt t.get[0],
+            video_path: t.get[1],
+            title: t.get[2],
+            description: t.get[3])
+
+proc upsertPost*(db;
+    title: string,
+    video_path: string,
+    description: string,
+): int64 =
+    let t = db.getSingleRow(sql"""
+        SELECT id FROM form WHERE title = ?
+    """, title)
+
+    if issome t:
+        db.exec(sql"""
+            UPDATE post SET
+            title = ?,
+            video_path = ?,
+            description = ?
+            WHERE id = ?
+        """, title, video_path, description, t.get[0])
+
+        parseBiggestInt t.get[0]
+
+    else:
+        db.insertID(sql"""
+            INSERT INTO
+            post (title, video_path, description)
+            VALUES (?, ?, ?)
+        """, title, video_path, description)
+
+proc addPlan*(db;
+    kind, title, videoPath, description, link: string,
+): int64 =
+    db.insertID(sql"""
+        INSERT INTO plan (kind, title, video_path, description, link) 
+        VALUES (?, ?, ?, ?, ?)
+    """, kind.limit(ShortStrLimit), title.limit(LongStrLimit),
+        videoPath, description, link)
+
+proc getPlansTitle*(db): seq[string] =
+    db.getAllRows(sql"""
+        SELECT title FROM plan
+        ORDER BY id DESC
+    """).mapIt it[0]
+
+proc addForm*(db;
+    kind: string,
+    plan_id: Option[int],
+    chat_id: int,
+    createdAt: int,
+    full_name: string,
+    number: string,
+    major: string,
+    grade: int,
+): int64 =
+    db.insertID(sql"""
+        INSERT INTO form (
+            kind, plan_id, chat_id, created_at,
+            full_name, number, major, grade
+        ) 
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, kind.limit(ShortStrLimit), plan_id.toNillableString,
+        chatid, createdAt,
+        fullname, number.limit(PhoneNumberLimit), major, grade)
+
+proc getForms*(db;
+    pinnedIndex: int, limit: int,
+    dir: SearchDirection, order: SortOrder
+): seq[FormModel] =
+    result =
+        db.getAllRows(sql fmt"""
+            SELECT 
+                id, kind, plan_id, chat_id,
+                full_name, number, major, grade, created_at
+            FROM form
+            WHERE id {dop[dir]} {pinnedIndex}
+            ORDER BY id {ortsd[dir]}
+            LIMIT {limit}
+        """).mapIt FormModel(
+            id: parseInt it[0],
+            kind: it[1],
+            # plan_id: parseNillableInt it[2],
+            chat_id: parseInt it[3],
+            fullname: it[4],
+            number: it[5],
+            major: it[6],
+            grade: parseint it[7],
+            created_at: parseInt it[8])
+
+    result.keepOrder(dir, order)

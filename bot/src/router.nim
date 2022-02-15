@@ -8,27 +8,6 @@ import
   host_api, utils, database/[queries, models]
 
 newRouter router:
-  command(chatid: int64) as "start":
-    if isSome uctx.membership:
-      discard await chatid << fmt"{loggedInAsT} '{uctx.membership.get.site_name}'"
-    else:
-      discard await chatid << firstTimeStartMsgT
-
-    asyncCheck redirect(reHome, %*[chatid, ""])
-
-  route(chatid: int64, msgtext: string) as "home":
-    if isSome uctx.membership:
-      asyncCheck redirect(reEnterMenu, %*[chatid])
-
-    else:
-      case msgtext:
-      of loginT:
-        asyncCheck chatid << (enterPhoneNumberT, sendContactReply)
-        /-> sSendContact
-
-      else:
-        asyncCheck chatid << (selectOptionsT, notLoggedInReply)
-
   command(chatid: int64) as "help":
     asyncCheck chatid << [
       fmt"{bold helpT}: {'\n'}",
@@ -39,12 +18,45 @@ newRouter router:
       fmt"{bold commandsT}:",
       fmt"{underline startT} /start",
       fmt"{underline helpT}: /help",
-      fmt"{underline resetT}: /zzz",
     ].join "\n"
 
-  command(chatid: int64) as "reset":
-    uctx.reset
-    asyncCheck redirect(reEnterMenu, %*[chatid])
+  command(chatid: int64) as "start":
+    if isSome uctx.membership:
+      let
+        t = fmt"{loggedInAsT} '{uctx.membership.get.site_name}'"
+        km =
+          if uctx.membership.get.isAdmin == 1: adminReply
+          else: loggedInReply
+
+      asyncCheck chatid << (t, km)
+    
+    else:
+      asyncCheck chatid << (firstTimeStartMsgT, notLoggedInReply)
+
+    asyncCheck redirect(reHome, %*[chatid, ""])
+
+  route(chatid: int64, msgtext: string) as "home":
+    case msgtext:
+    of knowUsT:
+      discard
+    
+    of knowConsultingPlansT:
+      discard
+    
+    of knowEducationalPlansT:
+      discard
+    
+    of registerInVaiousPlansT:
+      discard
+
+    of reportProblemsT:
+      discard
+    
+    of loginT:
+      asyncCheck chatid << (enterPhoneNumberT, sendContactReply)
+      /-> sSendContact
+    else:
+      asyncCheck chatid << (selectOptionsT, notLoggedInReply)
 
   route(chatid: int64) as "verify_user":
     try:
@@ -652,4 +664,6 @@ newRouter router:
   command(chatid: int64) as "invalid_command":
     asyncCheck chatid << wrongCommandT
 
-  callbackQuery(_: int64) as "dont_care": discard
+  callbackQuery() as "dont_care": discard
+
+  # route(chatid: int64, input: string) as "middle_of_quiz":
