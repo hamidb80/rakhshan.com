@@ -11,7 +11,7 @@ type
     # find quiz
     sFindQuizMain, sFQname, sFQgrade, sFQlesson, sMyRecords, sScroll
 
-    sAdminDashboard
+    sAdminDashboard, sQuizMenu,
 
     # delete quiz
     sDeleteQuiz, sDQEnterId, sDQConfirm
@@ -26,14 +26,13 @@ type
     sfConfirmBefore, sfConfirm
 
     # post
-    sPost, spoVideo_path, spoTitle, spoDesc
+    sPost, spoVideo_path, spoKind, spoDesc
 
     # add plan
     sAddPlan, spKind, spTitle, spVideo, spDesc, spLink
 
     # delete plan
     sDeletePlan, sdpKind, sdqTitle
-
 
   SearchFor* = enum
     sfQuiz, sfmyRecords, sfForms
@@ -118,7 +117,7 @@ type
 
 const
   HomeStages* = {sMain, sSendContact} # primary
-  DeleteQuiz* = {sDeleteQuiz, sDQEnterId, sDQConfirm}
+  DeleteQuiz* = {sDeleteQuiz, sDQEnterId,sDQConfirm}
   AddQuizStages* = {sAddQuiz, sAQName, sAQDesc, sAQTime, sAQGrade, sAQLesson,
       sAQchapter}                     # admin
   AddQuestionStages* = {sAQQuestion, sAQQPic, sAQQDesc, sAQQWhy, sAQQAns}
@@ -133,7 +132,7 @@ const
   }
   AddPlanStages* = {sAddPlan, spKind, spTitle, spVideo, spDesc, spLink}
   DeletePlanStages* = {sDeletePlan, sdpKind, sdqTitle}
-  AddPostStages* = {sPost, spoVideo_path, spoTitle, spoDesc}
+  AddPostStages* = {sPost, spoVideo_path, spoKind, spoDesc}
 
 
 func findInEnum[Idx: range](wrapper: array[Idx, int], lookingFor: int): Option[Idx] =

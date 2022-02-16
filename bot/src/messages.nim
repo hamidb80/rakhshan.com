@@ -207,18 +207,22 @@ const
     yourFormHasSubmittedT* = "فرم شما ارسال شد"
     noFormsAvailableT* = "فرم پرکرده ای وجود ندارد"
 
+    sendOrForwardVideoT* = "ویدئوی مربوطه را ارسال یا فوروارد کنید"
+
     # plan
     addPlanT* = "افزودن طرح"
-    removePlanT* = "حذف کردن طرح"
-    selectPlanKindT* = "نوع طرح را اتنخاب کنید"
-    selectPlanTitleT* = "عنوان طرح را انتخاب کنید"
-    enterPlanTitleT* = "عنوان طرح را بنویسید"
-    enterPlanDescT* = "توضیحات طرح را بنویسید"
+    planAddedT* = "طرح ثبت شد"
+    removePlanT* = "حذف طرح"
     planDeletedT* = "طرح حذف شد"
+    selectPlanKindT* = "نوع طرح را اتنخاب کنید"
+    selectPlanTitleT* = "عنوان طرح را اتنخاب کنید"
+    sendPlanTitleT* = "عنوان طرح را انتخاب کنید"
+    enterPlanDescT* = "توضیحات طرح را بنویسید"
+    enterPlanLinkT* = "لینک طرح را وارد کنید"
+    registerationLinkT* = "لیتک ثبت نام"
 
     # post
     addPostT* = "افزودن مطلب"
-    sendOrForwardVideoT* = "ویدئو مربوطه را ارسال کنید (یا فوروارد کنید("
     enterPostTitleT* = "عنوان مطلب را بنویسید"
     enterPostDescT* = "توضیحات مطلب را بنویسید"
     postSubmittedT* = "مطلب ثبت شد"
@@ -467,6 +471,20 @@ proc fullFormString*(f: FormModel, planTitle: Option[string]): string =
         of fkReportProblem:
             header & userInfo & @[["متن", escapeMarkdownV2 f.content.get]]
 
+func `$`*(p: PlanModel): string =
+    [
+      fmt"{bold p.title}",
+      p.description,
+      fmt"{bold registerationLinkT}: {p.link}",
+    ].join "\n\n"
+
+func `$`*(pok: PostKinds): string =
+    case pok:
+    of pokIntroduction: "معرفی"
+
+func `$`*(p: PostModel): string =
+    p.description
+
 # keyboards -------------------------------
 
 let
@@ -493,6 +511,11 @@ let
       @[addQuizT, removeQuizT],
       @[submittedFormsT, addPostT],
       @[cancelT]
+    ]
+
+    postKindsReply* = newReplyKeyboardMarkupEveryRow @[
+      $pokIntroduction,
+      cancelT
     ]
 
     cancelReply* = newReplyKeyboardMarkup @[
@@ -532,16 +555,9 @@ let
       @[withoutPhotoT]
     ]
 
-    quizMenuMemberReplyRaw* = @[
-      @[findQuizT, myRecordsT]
+    quizMenuReply* = newReplyKeyboardMarkupEveryRow @[
+      findQuizT, myRecordsT, cancelT
     ]
-
-    quizMenuMemberReply* = newReplyKeyboardMarkup:
-        quizMenuMemberReplyRaw
-
-    quizMenuAdminReply* = newReplyKeyboardMarkup @[
-      @[addQuizT, removeQuizT]
-    ] & quizMenuMemberReplyRaw
 
     quizFilterReply* = newReplyKeyboardMarkup @[
       @[findQuizChangeGradeT, findQuizChangeLessonT, findQuizChangeNameT],

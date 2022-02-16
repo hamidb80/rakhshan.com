@@ -380,41 +380,38 @@ proc getRank*(db;
         """, quizid, myPercent).get[0].parseint + 1
 
 # post -------------------------------
-const mainPost* = "اصلی"
 
-proc addPost*(db; p: PostModel): int64 =
+proc addPost(db; p: PostModel): int64 =
     db.insertID(sql"""
-        INSERT INTO post (title, video_path, description) 
+        INSERT INTO post (kind, video_path, description) 
         VALUES (?, ?, ?)
-    """, p.title.limit(LongStrLimit), p.videoPath, p.description)
+    """, p.kind.ord, p.videoPath, p.description)
 
-proc getPost*(db; title: string): Option[PostModel] =
+proc getPost*(db; kind: PostKinds): Option[PostModel] =
     let t = db.getSingleRow(sql"""
-        SELECT id, video_path, title, description
+        SELECT id, kind, video_path, description
         FROM post
-        WHERE title = ?
-    """, title)
+        WHERE kind = ?
+    """, kind.ord)
 
     if isSome t:
         result = some PostModel(
             id: parseInt t.get[0],
-            video_path: t.get[1],
-            title: t.get[2],
+            kind: parseint t.get[1],
+            video_path: t.get[2],
             description: t.get[3])
 
 proc upsertPost*(db; p: PostModel): int64 =
     let t = db.getSingleRow(sql"""
-        SELECT id FROM post WHERE title = ?
-    """, p.title)
+        SELECT id FROM post WHERE kind = ?
+    """, p.kind.ord)
 
     if issome t:
         db.exec(sql"""
             UPDATE post SET
-            title = ?,
-            video_path = ?,
-            description = ?
+            video_path = ?, description = ?
             WHERE id = ?
-        """, p.title, p.video_path, p.description, t.get[0])
+        """, p.video_path, p.description, t.get[0])
 
         parseBiggestInt t.get[0]
 
@@ -433,7 +430,7 @@ proc isPlanExists*(db; title: string): bool =
     db.getValue(sql"""
         SELECT COUNT(id) 
         FROM plan
-        WHERE title = ?
+        WHERE is_deleted = 0 AND title = ?
     """, title) == "1"
 
 func toPlan(s: seq[string]): PlanModel =
@@ -444,7 +441,7 @@ proc getPlan*(db; title: string): Option[PlanModel] =
     let t = db.getSingleRow(sql"""
         SELECT id, kind, title, video_path, description, link
         FROM plan
-        WHERE title = ?
+        WHERE is_deleted = 0 AND title = ?
     """, title)
 
     if issome t:
@@ -454,7 +451,7 @@ proc getPlan*(db; id: int64): Option[PlanModel] =
     let t = db.getSingleRow(sql"""
         SELECT id, kind, title, video_path, description, link
         FROM plan
-        WHERE id = ?
+        WHERE AND id = ?
     """, id)
 
     if issome t:
@@ -463,12 +460,16 @@ proc getPlan*(db; id: int64): Option[PlanModel] =
 proc getPlansTitles*(db; kind: PlanKinds): seq[string] =
     db.getAllRows(sql"""
         SELECT title FROM plan
-        WHERE kind = ?
+        WHERE is_deleted = 0 AND kind = ?
         ORDER BY id DESC
     """, kind.ord).mapIt it[0]
 
 proc deletePlan*(db; kind: PlanKinds, title: string) =
-    db.exec(sql"DELETE FROM plan WHERE kind = ? AND title = ?", kind.ord, title)
+    db.exec(sql"""
+        UPDATE plan 
+        SET is_deleted = 1
+        WHERE kind = ? AND title = ?
+    """, kind.ord, title)
 
 # form -------------------------------
 proc addForm*(db; f: FormModel): int64 =

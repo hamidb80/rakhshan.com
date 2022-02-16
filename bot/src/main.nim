@@ -23,6 +23,8 @@ proc dispatcherImpl*(up: Update, chatId: int64): Action {.fakeSafety.} =
     result.handler = toFn reStart
 
   else:
+    echo (uctx.chatid, uctx.stage)
+
     if up.message.issome:
       let
         msg = up.message.get
@@ -53,7 +55,8 @@ proc dispatcherImpl*(up: Update, chatId: int64): Action {.fakeSafety.} =
           of FindQuizStages: reFind_quiz
           of sTakingQuiz: reMiddle_of_quiz
           of sScroll: reMiddle_of_scroll
-          
+          of sQuizMenu: reQuizmenu
+
           of sAdminDashboard: reAdmindashboard
           of DeleteQuiz: reDelete_quiz
           of AddQuizStages: reAdd_quiz

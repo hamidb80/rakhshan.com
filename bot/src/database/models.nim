@@ -53,7 +53,7 @@ Blueprint [queryHolder: initQuery, postfix: "Model"]:
 
     Table post:
         id: int {.primary.}
-        title: string[300]
+        kind: int
         video_path: string
         description: string
 
@@ -64,6 +64,7 @@ Blueprint [queryHolder: initQuery, postfix: "Model"]:
         video_path: string
         description: string
         link: string
+        is_deleted: int {.index, default: 0.}
 
     Table form:
         id: int {.primary.}
@@ -86,6 +87,9 @@ type
     FormKinds* = enum
         fkRegisterInPlans
         fkReportProblem
+
+    PostKinds* = enum
+        pokIntroduction
 
 
 func hasPhoto*(q: QuestionModel): bool =

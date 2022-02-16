@@ -102,12 +102,6 @@ let
       7.8, pt("2021/06/05T08:07")),
   ]
 
-  posts = [
-    (mainPost, "", "main post"),
-    ("post 2", "", "post 2 desc"),
-    ("post 3", "", "post 3 desc"),
-  ]
-
   plans = [
     (pkConsulting, "c1", "", "desc 1", "http://l1.com/"),
     (pkConsulting, "c2", "", "desc 2", "http://l2.com/"),
@@ -159,11 +153,6 @@ suite "INSERT":
   test "add record":
     for r in recordsRaw:
       discard db.addRecord(r[1].int64, r[2].int64, r[3], r[4], r[5], r[6])
-
-  test "add post":
-    for p in posts:
-      discard db.addPost(PostModel(
-        title: p[0], videoPath: p[1], description: p[2]))
 
   test "add plan":
     for p in plans:
@@ -246,12 +235,6 @@ suite "SELECT":
     let rnk2 = db.getrank(membersRaw[2].id, 1).get
     check rnk2 == 1
 
-  test "get post":
-    let p = db.getPost(mainPost)
-    check:
-      issome p
-      p.get.description == posts[0][2]
-
   test "get plan titles":
     let ts = db.getPlansTitles(pkConsulting)
     check ts == @["c2", "c1"]
@@ -302,12 +285,12 @@ suite "UPSERT":
     """.sql, tg.grade, tg.lesson, tg.chapter).parseint == 1
 
   test "new post":
-    discard db.upsertPost(PostModel(title: "arbitary text"))
-    check isSome db.getPost("arbitary text")
+    discard db.upsertPost(PostModel(kind: pokIntroduction.ord))
+    check isSome db.getPost(pokIntroduction)
 
   test "exsiting post":
-    discard db.upsertPost(PostModel(title: mainPost, description: "new desc"))
-    let p = db.getPost(mainPost)
+    discard db.upsertPost(PostModel(kind: pokIntroduction.ord, description: "new desc"))
+    let p = db.getPost(pokIntroduction)
     check:
       isSome p
       p.get.description == "new desc"

@@ -7,6 +7,9 @@ import
   messages, forms, settings,
   host_api, utils, database/[queries, models]
 
+# TODO send notification to admin when a new form submitted
+
+
 newRouter router:
   command(chatid: int64) as "help":
     asyncCheck chatid << [
@@ -40,11 +43,10 @@ newRouter router:
 
     case input:
     of knowUsT:
-      let p = ++db.getPost(mainPost)
+      let p = ++db.getPost(pokIntroduction)
 
       if isSome p:
-        asyncCheck bot.sendVideo(chatid,
-          p.get.videoPath, caption = p.get.description)
+        asyncCheck bot.sendVideo(chatid, p.get.videoPath, caption = $p.get)
       else:
         asyncCheck chatid << postNotFoundT
 
@@ -74,7 +76,7 @@ newRouter router:
 
     of quizT:
       if issome uctx.membership:
-        discard
+        asyncCheck redirect(reQuizmenu, %*[chatid, ""])
 
       else:
         asyncCheck chatid << youMustLoginToUseThisSection
@@ -98,8 +100,15 @@ newRouter router:
   route(chatid: int64, input: string) as "see_plans":
     if input == cancelT:
       asyncCheck redirect(reEnterhome, args)
+
     else:
-      asyncCheck chatid << input
+      let p = ++db.getPlan(input)
+      if isSome p:
+        asyncCheck bot.sendVideo(chatid, p.get.videopath,
+            caption = p.get.description)
+
+      else:
+        asyncCheck chatid << invalidInputT
 
   route(chatid: int64, input: string) as "fill_form":
     if input == cancelT:
@@ -283,21 +292,19 @@ newRouter router:
         /-> spKind
 
       of spKind:
-        template done: untyped =
+        template done(planKind): untyped =
           /-> spTitle
+          pl.kind = planKind.ord
+          asyncCheck chatid << (sendPlanTitleT, cancelReply)
 
         case input:
-        of $pkConsulting:
-          done()
-
-        of $pkEducational:
-          done()
-
-        else:
-          asyncCheck chatid << invalidInputT
+        of $pkConsulting: done pkConsulting
+        of $pkEducational: done pkEducational
+        else: asyncCheck chatid << invalidInputT
 
       of spTitle:
         pl.title = input
+        asyncCheck chatid << sendOrForwardVideoT
         /-> spVideo
 
       of spVideo:
@@ -305,19 +312,23 @@ newRouter router:
 
         if isSome fid:
           pl.video_path = fid.get
+          asyncCheck chatid << enterPlanDescT
           /-> spDesc
 
         else:
-          asyncCheck chatid << "..."
+          asyncCheck chatid << whatYouveJustSentIsNotAvideoT
 
       of spDesc:
         pl.description = input
+        asyncCheck chatid << enterPlanLinkT
         /-> spLink
 
       of spLink:
         pl.link = input
         discard ++db.addPlan pl
         forget uctx.plan
+        asyncCheck chatid << planAddedT
+        asyncCheck redirect(reAdmindashboard, %*[chatid, ""])
 
       else: impossible()
 
@@ -361,11 +372,19 @@ newRouter router:
     else:
       case uctx.stage:
       of sPost:
-        asyncCheck chatid << enterPostTitleT
+        asyncCheck chatid << (enterPostTitleT, postKindsReply)
+        uctx.post = some PostModel()
+        /-> spoKind
 
-      of spoTitle:
-        ps.title = input
-        asyncCheck chatid << sendOrForwardVideoT
+      of spoKind:
+        case input:
+        of $pokIntroduction:
+          ps.kind = pokIntroduction.ord
+          asyncCheck chatid << sendOrForwardVideoT
+          /-> spoVideo_path
+        
+        else:
+          asyncCheck chatid << invalidInputT
 
       of spoVideo_path:
         let fid = getVideoFileId(u.message)
@@ -392,7 +411,7 @@ newRouter router:
 
     if forms.len == 0:
       asyncCheck chatid << noFormsAvailableT
-      /-> sMainMenu
+      asyncCheck redirect(reAdmindashboard, %*[chatid, ""])
 
     else:
       uctx.queryPaging = some initQueryPageInfo(sfForms)
@@ -599,8 +618,30 @@ newRouter router:
     of qcmsNothing:
       asyncCheck chatid << nothingHasChangedT
 
+  route(chatid: int64, input: string) as "quiz_menu":
+    case input:
+    of cancelT:
+      asyncCheck redirect(reEnterhome, args)
+
+    of "":
+      asyncCheck chatid << (chooseOneT, quizMenuReply)
+      /-> sQuizMenu
+
+    of findQuizT:
+      /-> sFindQuizMain
+      uctx.quizQuery = some QuizQuery()
+      asyncCheck chatid << (findQuizDialogT, quizFilterReply)
+
+    of myRecordsT:
+      /-> sMyRecords
+      asyncCheck redirect(reMy_records, %*[chatid])
+
+    else:
+      asyncCheck chatid << invalidInputT
+
   route(chatid: int64, input: string) as "find_quiz":
-    template goBack: untyped = /-> sFindQuizMain
+    template goBack: untyped = 
+      /-> sFindQuizMain
 
     case input:
     of findQuizChangeNameT:
@@ -642,7 +683,7 @@ newRouter router:
     of cancelT:
       uctx.quizQuery.forget
       uctx.queryPaging.forget
-      asyncCheck redirect(reEnterhome, %*[chatid])
+      asyncCheck redirect(reQuizmenu, %*[chatid, ""])
 
     else:
       template alertChange(field: QuizCreateFields): untyped =
@@ -669,26 +710,12 @@ newRouter router:
 
       else: impossible()
 
-  route(chatid: int64, input: string) as "quiz_menu":
-    case input:
-    of findQuizT:
-      /-> sFindQuizMain
-      uctx.quizQuery = some QuizQuery()
-      asyncCheck chatid << (findQuizDialogT, quizFilterReply)
-
-    of myRecordsT:
-      /-> sMyRecords
-      asyncCheck redirect(reMy_records, %*[chatid])
-
-    else:
-      asyncCheck chatid << invalidInputT
-
   route(chatid: int64) as "my_records":
     let recs = ++ db.getMyRecords(chatid, int64.high, pageSize, saLess, Descending)
 
     if recs.len == 0:
       asyncCheck chatid << noRecordsAvailableT
-      /-> sMainMenu
+      /-> sQuizMenu
 
     else:
       uctx.queryPaging = some initQueryPageInfo(sfQuiz)
