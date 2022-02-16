@@ -52,12 +52,17 @@ proc dispatcherImpl*(up: Update, chatId: int64): Action {.fakeSafety.} =
           of sSendContact: reVerify_user
           of AddQuizStages: reAdd_quiz
           of AddQuestionStages: reAdd_question
-          of sEnterMainMenu: reEnter_menu
-          of sMainMenu: reMenu
+          of sEnterMainMenu: reEnterhome
+          of sMainMenu: reHome
           of FindQuizStages: reFind_quiz
           of DeleteQuiz: reDelete_quiz
           of sTakingQuiz: reMiddle_of_quiz
           of sScroll: reMiddle_of_scroll
+          of AddPlanStages: reAddplan
+          of DeletePlanStages: reDeleteplan
+          of FormStages: reFillform
+          of AddPostStages: reUpsertpost
+          of sspShowPlan: reSeeplans
           else: reInvalid_command
 
     elif up.editedMessage.issome:

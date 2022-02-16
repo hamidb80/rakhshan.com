@@ -69,9 +69,18 @@ func newReplyKeyboardMarkup*(keyboards: seq[seq[string]]
   newReplyKeyboardMarkup:
     keyboards.mapit it.mapIt initKeyBoardButton(it)
 
-func newReplyKeyboardMarkupEveryRow*(btns: seq[string]
+func newReplyKeyboardMarkupEveryRow*(
+  btns: seq[string], columns = 1
   ): ReplyKeyboardMarkup =
-  newReplyKeyboardMarkup btns.mapit @[it]
+  var acc: seq[seq[string]]
+
+  for i, txt in btns:
+    if i mod columns == 0:
+      acc.add @[txt]
+    else:
+      acc[^1].add txt
+
+  newReplyKeyboardMarkup acc
 
 template toRKeyboard*(s): untyped =
   newReplyKeyboardMarkupEveryRow s

@@ -85,6 +85,12 @@ func toNillableString[N: SomeInteger](i: Option[N]): string =
     if issome i: $i.get
     else: ""
 
+func toNillableString(s: string): Option[string] =
+    if s == "":
+        none string
+    else:
+        some s
+
 func parseNillableInt(s: string): Option[int64] =
     if s == "": none int64
     else: some parseBiggestInt s
@@ -453,27 +459,32 @@ proc addForm*(db; f: FormModel): int64 =
         f.fullname, f.phone_number.limit(PhoneNumberLimit), f.major, f.grade)
 
 proc getForms*(db;
-    pinnedIndex: int, limit: int,
+    pinnedIndex: int64, limit: int,
     dir: SearchDirection, order: SortOrder
-): seq[FormModel] =
+): seq[tuple[form: FormModel, planName: Option[string]]] =
     result =
         db.getAllRows(sql fmt"""
             SELECT 
-                id, kind, plan_id, chat_id,
-                full_name, phone_number, major, grade, created_at
-            FROM form
+                f.id, f.kind, f.plan_id, f.chat_id, f.created_at
+                f.full_name, f.phone_number, f.major, f.grade, 
+                p.title
+            FROM form f
             WHERE id {dop[dir]} {pinnedIndex}
+            JOIN plan p ON f.plan_id = p.id
             ORDER BY id {ortsd[dir]}
             LIMIT {limit}
-        """).mapIt FormModel(
-            id: parseInt it[0],
-            kind: parseInt it[1],
-            plan_id: parseNillableInt it[2],
-            chat_id: parseInt it[3],
-            fullname: it[4],
-            phone_number: it[5],
-            major: it[6],
-            grade: parseint it[7],
-            created_at: parseInt it[8])
+        """).mapIt (
+            form: FormModel(
+                id: parseInt it[0],
+                kind: parseInt it[1],
+                plan_id: parseNillableInt it[2],
+                chat_id: parseInt it[3],
+                created_at: parseInt it[4],
+                fullname: it[5],
+                phone_number: it[6],
+                major: it[7],
+                grade: parseint it[8]),
+
+            planName: toNillableString it[9])
 
     result.keepOrder(dir, order)

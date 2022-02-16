@@ -22,17 +22,23 @@ type
     # add plan
     sAddPlan, spKind, spTitle, spVideo, spDesc, spLink
 
+    # see plans
+    sspShowPlan
+
+    # delete plan
+    sDeletePlan, sdpKind, sdqTitle
+
     # post
     sPost, spoVideo_path, spoTitle, spoDesc
 
   SearchFor* = enum
-    sfQuiz, sfmyRecords
+    sfQuiz, sfmyRecords, sfForms
 
   QueryPageInfo*[T] = object
+    context*: T
     msgid*: Option[int]
     indexRange*: HSlice[int64, int64]
     page*: int
-    context*: T
 
   UserCtx* = ref object
     chatId*: int64
@@ -42,7 +48,7 @@ type
     membership*: Option[MemberModel]
     quizCreation*: Option[QuizCreate]
     record*: Option[QuizTaking]
-    quizQuery*: Options[QuizQuery]
+    quizQuery*: Option[QuizQuery]
     quizIdToDelete*: Option[int64]
     queryPaging*: Option[QueryPageInfo[SearchFor]]
     form: Option[FormModel]
@@ -116,6 +122,15 @@ const
   TakingQuizStages* = {sTakingQuiz}
   RecordStages* = {sFindMyRecords}
 
+  FormStages* = {
+    sfPlan, sfSelectPlanType, sfSelectPlan, sfReportProblem,
+    sfName, sfNumber, sfGrade, sfMajor, sfContent,
+    sfConfirmBefore, sfConfirm
+  }
+  AddPlanStages* = {sAddPlan, spKind, spTitle, spVideo, spDesc, spLink}
+  DeletePlanStages* = {sDeletePlan, sdpKind, sdqTitle}
+  AddPostStages* = {sPost, spoVideo_path, spoTitle, spoDesc}
+
 
 func findInEnum[Idx: range](wrapper: array[Idx, int], lookingFor: int): Option[Idx] =
   for i in Idx.low .. Idx.high:
@@ -147,16 +162,16 @@ func findEditedMessageIdContext*(
 
   elif (
     var
-    index = NotFound
-    field = none range[qfPhotoPath .. qfWhy]
+      index = NotFound
+      field = none range[qfPhotoPath .. qfWhy]
 
-  for i, q in qc.msgids.questions.pairs:
-    field = q.findInEnum(msgid)
-    if issome field:
-      index = i
-      break
+    for i, q in qc.msgids.questions.pairs:
+      field = q.findInEnum(msgid)
+      if issome field:
+        index = i
+        break
 
-  index != NotFound
+    index != NotFound
   ):
     (qcmsQuestions, index, field.get.ord.QuizCreateFields)
 

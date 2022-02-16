@@ -37,6 +37,14 @@ newRouter router:
     asyncCheck redirect(reHome, %*[chatid, ""])
 
   route(chatid: int64, msgtext: string) as "home":
+    template getPlans(planKind): untyped =
+      let
+        plans = @@ db.getPlansTitles planKind
+        kr = newReplyKeyboardMarkupEveryRow(plans & @[cancelT], 2)
+
+      asyncCheck chatid << (chooseOneT, kr)
+      /-> sspShowPlan
+
     case msgtext:
     of knowUsT:
       let p = @@ db.getPost(mainPost)
@@ -48,11 +56,10 @@ newRouter router:
         asyncCheck chatid << postNotFoundT
 
     of knowConsultingPlansT:
-      let plans = @@ db.getPlansTitles pkConsulting
-      # gen keyboard
+      getPlans pkConsulting
 
     of knowEducationalPlansT:
-      let plans = @@ db.getPlansTitles pkEducational
+      getPlans pkEducational
 
     of registerInVaiousPlansT:
       uctx.form = some FormModel(chatId: chatid,
@@ -81,94 +88,101 @@ newRouter router:
     asyncCheck chatid << (chooseOneT, keyboardReply)
     /-> sMainMenu
 
+  route(chatid: int64, input: string) as "see_plans":
+    if input == cancelT:
+      asyncCheck redirect(reEnterhome, args)
+    else:
+      asyncCheck chatid << input
+
   route(chatid: int64, input: string) as "fill_form":
-    case uctx.stage:
-    of sfPlan:
-      asyncCheck chatid << (chooseOneT, newReplyKeyboardMarkup @[
-        @[$pkConsulting],
-        @[$pkEducational]
-      ])
+    if input == cancelT:
+      discard
 
-    of sfSelectPlanType:
-      case input:
-      of $pkConsulting:
-        asyncCheck chatid << (chooseOneT, toRKeyboard @@db.getPlansTitles(pkConsulting))
+    else:
+      case uctx.stage:
+      of sfPlan:
+        asyncCheck chatid << (selectPlanKindT, selectPlanKindsReply)
 
-      of $pkEducational:
-        asyncCheck chatid << (chooseOneT, toRKeyboard @@db.getPlansTitles(pkEducational))
+      of sfSelectPlanType:
+        case input:
+        of $pkConsulting:
+          asyncCheck chatid << (chooseOneT, toRKeyboard @@db.getPlansTitles(pkConsulting))
 
-      else:
-        asyncCheck chatid << invalidInputT
+        of $pkEducational:
+          asyncCheck chatid << (chooseOneT, toRKeyboard @@db.getPlansTitles(pkEducational))
 
-    of sfSelectPlan:
-      if @@db.isPlanExists(input):
+        else:
+          asyncCheck chatid << invalidInputT
+
+      of sfSelectPlan:
+        if @@db.isPlanExists(input):
+          asyncCheck chatid << (enterFullNameT, noReply)
+          /-> sfName
+
+        else:
+          asyncCheck chatid << invalidInputT
+
+      of sfReportProblem:
         asyncCheck chatid << (enterFullNameT, noReply)
         /-> sfName
 
-      else:
-        asyncCheck chatid << invalidInputT
+      of sfName:
+        uf.fullname = input
+        /-> sfGrade
+        asyncCheck chatid << enterGradeT
 
-    of sfReportProblem:
-      asyncCheck chatid << (enterFullNameT, noReply)
-      /-> sfName
+      of sfGrade:
+        /-> sfMajor
+        # do some checks
+        asyncCheck chatid << enterMajorT
 
-    of sfName:
-      uf.fullname = input
-      /-> sfGrade
-      asyncCheck chatid << enterGradeT
+      of sfMajor:
+        /-> sfNumber
+        # do some checks
+        asyncCheck chatid << enterPhoneNumberT
 
-    of sfGrade:
-      /-> sfMajor
-      # do some checks
-      asyncCheck chatid << enterMajorT
+      of sfNumber:
+        if isPhoneNumber input:
+          uf.phoneNumber = input
 
-    of sfMajor:
-      /-> sfNumber
-      # do some checks
-      asyncCheck chatid << enterPhoneNumberT
+          case FormKinds(uf.kind):
+          of fkReportProblem:
+            /-> sfContent
+            asyncCheck chatid << enterProblemDescriptionT
 
-    of sfNumber:
-      if isPhoneNumber input:
-        uf.phoneNumber = input
+          of fkRegisterInPlans:
+            /-> sfConfirmBefore
+            asyncCheck redirect(reFillform, args)
 
-        case FormKinds(uf.kind):
-        of fkReportProblem:
-          /-> sfContent
-          asyncCheck chatid << enterProblemDescriptionT
+        else:
+          asyncCheck chatid << phoneNumberValidationNoteT
 
-        of fkRegisterInPlans:
-          /-> sfConfirmBefore
-          asyncCheck redirect(reFillform, args)
+      of sfContent:
+        uf.content = input
+        /-> sfConfirmBefore
+        asyncCheck redirect(reFillform, args)
 
-      else:
-        asyncCheck chatid << phoneNumberValidationNoteT
+      of sfConfirmBefore:
+        discard await chatid << $uf
+        asyncCheck chatid << (sendIfYouSureOtherwiseCancelAndRefillT, formEndReply)
 
-    of sfContent:
-      uf.content = input
-      /-> sfConfirmBefore
-      asyncCheck redirect(reFillform, args)
+      of sfConfirm:
+        case input:
 
-    of sfConfirmBefore:
-      discard await chatid << $uf
-      asyncCheck chatid << (sendIfYouSureOtherwiseCancelAndRefillT, formEndReply)
+        of submitT:
+          discard @@db.addForm(uf)
+          forget uctx.form
+          asyncCheck chatid << yourFormHasSubmittedT
+          asyncCheck redirect(reEnterhome, args)
 
-    of sfConfirm:
-      case input:
+        of cancelT:
+          forget uctx.form
+          asyncCheck redirect(reEnterhome, args)
 
-      of submitT:
-        discard @@db.addForm(uf)
-        forget uctx.form
-        asyncCheck chatid << yourFormHasSubmittedT
-        asyncCheck redirect(reEnterhome, args)
+        else:
+          asyncCheck chatid << invalidInputT
 
-      of cancelT:
-        forget uctx.form
-        asyncCheck redirect(reEnterhome, args)
-
-      else:
-        asyncCheck chatid << invalidInputT
-
-    else: impossible()
+      else: impossible()
 
   route(chatid: int64) as "verify_user":
     try:
@@ -195,97 +209,140 @@ newRouter router:
       asyncCheck chatid << wrongNumberT
 
   route(chatid: int64, input: string) as "add_plan":
-    case uctx.stage:
-    of sAddPlan:
-      uctx.plan = some PlanModel()
-      asyncCheck chatid << (selectPlanTypeT)
-      /-> spKind
-
-    of spKind:
-      template done: untyped =
-        /-> spTitle
-
-      case input:
-      of $pkConsulting:
-        done()
-
-      of $pkEducational:
-        done()
-
-      else:
-        asyncCheck chatid << invalidInputT
-
-    of spTitle:
-      pl.title = input
-      /-> spVideo
-
-    of spVideo:
-      let fid = getVideoFileId(u.message)
-
-      if isSome fid:
-        pl.video_path = fid.get
-        /-> spDesc
-
-      else:
-        asyncCheck chatid << "..."
-
-    of spDesc:
-      pl.description = input
-      /-> spLink
-
-    of spLink:
-      pl.link = input
-      discard @@db.addPlan pl
-      forget uctx.plan
-
-    else: impossible()
-
-  route(chatid: int64, input: string) as "delete_plan":
     if input == cancelT:
       forget uctx.plan
-    
+      asyncCheck redirect(reEnterhome, args)
+
+    else:
+      case uctx.stage:
+      of sAddPlan:
+        uctx.plan = some PlanModel()
+        asyncCheck chatid << (selectPlanKindT, selectPlanKindsReply)
+        /-> spKind
+
+      of spKind:
+        template done: untyped =
+          /-> spTitle
+
+        case input:
+        of $pkConsulting:
+          done()
+
+        of $pkEducational:
+          done()
+
+        else:
+          asyncCheck chatid << invalidInputT
+
+      of spTitle:
+        pl.title = input
+        /-> spVideo
+
+      of spVideo:
+        let fid = getVideoFileId(u.message)
+
+        if isSome fid:
+          pl.video_path = fid.get
+          /-> spDesc
+
+        else:
+          asyncCheck chatid << "..."
+
+      of spDesc:
+        pl.description = input
+        /-> spLink
+
+      of spLink:
+        pl.link = input
+        discard @@db.addPlan pl
+        forget uctx.plan
+
+      else: impossible()
+
+  route(chatid: int64, input: string) as "delete_plan":
+    template cancelJob: untyped =
+      forget uctx.plan
+      asyncCheck redirect(reEnterhome, args)
+
+    if input == cancelT:
+      cancelJob()
+
     else:
       case uctx.stage:
       of sDeletePlan:
-        uctx.plan = some Plan()
-        asyncCheck chatid << (selectPlanKindT, )
+        uctx.plan = some PlanModel()
+        asyncCheck chatid << (selectPlanKindT, selectPlanKindsReply)
 
       of sdpKind:
-        pl.kind = ...
-        asyncCheck chatid << (selectPlanTitleT, @@db.getPlansTitles(kind))
+        template job(planKind): untyped =
+          pl.kind = planKind.ord
+          asyncCheck chatid << (selectPlanTitleT,
+              newReplyKeyboardMarkupEveryRow @@db.getPlansTitles(planKind))
+
+        case input:
+        of $pkConsulting: job pkConsulting
+        of $pkEducational: job pkEducational
+        else: asyncCheck chatid << invalidInputT
 
       of sdqTitle:
-        discard @@db.deletePlan(pl.kind, input)
-        asyncCheck chatid << deletedT
-        asyncCheck redirect(reEnterhome, args)
+        @@db.deletePlan(PlanKinds(pl.kind), input)
+        asyncCheck chatid << planDeletedT
+        cancelJob()
 
-      else: 
-        impossible()
+      else: impossible()
 
   route(chatid: int64, input: string) as "upsert_post":
-    case uctx.stage:
-    of sPost:
-      asyncCheck chatid << enterPostTitleT
+    if input == cancelT:
+      forget uctx.post
+      asyncCheck redirect(reEnterhome, args)
 
-    of spoTitle:
-      ps.title = input
-      asyncCheck chatid << sendVideoT
+    else:
+      case uctx.stage:
+      of sPost:
+        asyncCheck chatid << enterPostTitleT
 
-    of spoVideo_path:
-      let fid = getVideoFileId(u.message)
+      of spoTitle:
+        ps.title = input
+        asyncCheck chatid << sendOrForwardVideoT
 
-      if isSome fid:
-        ps.video_path = fid.get
-        asyncCheck chatid << enterDescriptionT
-        /-> spoDesc
+      of spoVideo_path:
+        let fid = getVideoFileId(u.message)
 
-      else:
-        discard
+        if isSome fid:
+          ps.video_path = fid.get
+          asyncCheck chatid << enterPostDescT
+          /-> spoDesc
 
-    of spoDesc:
-      ps.description = input
+        else:
+          asyncCheck chatid << whatYouveJustSentIsNotAvideoT
 
-    else: impossible()
+      of spoDesc:
+        ps.description = input
+        discard @@db.upsertPost(ps)
+        asyncCheck chatid << postSubmittedT
+        forget uctx.post
+        asyncCheck redirect(reEnterhome, args)
+
+      else: impossible()
+
+  route(chatid: int64) as "forms":
+    let forms = @@db.getForms(int.high, pageSize, saLess, Descending)
+
+    if forms.len == 0:
+      asyncCheck chatid << noFormsAvailableT
+      /-> sMainMenu
+
+    else:
+      uctx.queryPaging = some initQueryPageInfo(sfForms)
+      asyncCheck chatid << (yourRecordsT, cancelReply)
+
+      qp.msgid = some (await chatid << (
+        forms.mapIt(fullFormString(it.form, it.planName)).join "\n\n",
+        genQueryPageInlineBtns(0)
+      )).messageid
+
+      qp.indexRange = forms[^1].form.id .. forms[0].form.id
+      /-> sScroll
 
   route(chatid: int64, input: string) as "quiz_menu":
     case input:
@@ -606,6 +663,21 @@ newRouter router:
 
             else:
               result = itsTheEndT
+
+          of sfForms:
+            let forms = @@ db.getForms(qp.indexRange[dir], pageSize, dir, Descending)
+
+            if forms.len != 0:
+              qp.indexRange = forms[^1].form.id .. forms[0].form.id
+              qp.page.inc btnDir.toInt
+
+              asyncCheck (chatid, msgid) <^ (
+                forms.mapit(fullFormString(it[0], it[1])).join "\n\n",
+                genQueryPageInlineBtns(qp.page))
+
+            else:
+              result = itsTheEndT
+
         else:
           result = itsTheStartT
 

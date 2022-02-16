@@ -1,4 +1,4 @@
-import std/[options, strutils, strformat, times]
+import std/[options, strutils, strformat, times, sequtils]
 import telebot, jalali_nim
 import controller, database/[queries, models], utils
 
@@ -202,12 +202,25 @@ const
     enterGradeT* = "پایه تحصیلی خود را وارد کنید"
     enterMajorT* = "رشته تحصیلی خود را وارد کنید"
     enterFullNameT* = "نام و نام خانوادگی خود را وارد کنید"
-    thisIsTheFormYouJustFilledT* =        "این فرمی است که همین الان پرکردید"
+    thisIsTheFormYouJustFilledT* = "این فرمی است که همین الان پرکردید"
     yourFormHasSubmittedT* = "فرم شما ارسال شد"
+    noFormsAvailableT* = "فرم پرکرده ای وجود ندارد"
 
     # plan
     selectPlanKindT* = "نوع طرح را اتنخاب کنید"
     selectPlanTitleT* = "عنوان طرح را انتخاب کنید"
+    enterPlanTitleT* = "عنوان طرح را بنویسید"
+    enterPlanDescT* = "توضیحات طرح را بنویسید"
+    planDeletedT* = "طرح حذف شد"
+
+    # post
+    sendOrForwardVideoT* = "ویدئو مربوطه را ارسال کنید (یا فوروارد کنید("
+    enterPostTitleT* = "عنوان مطلب را بنویسید"
+    enterPostDescT* = "توضیحات مطلب را بنویسید"
+    postSubmittedT* = "مطلب ثبت شد"
+
+    # rrror
+    whatYouveJustSentIsNotAvideoT* = "پیام ارسال شده، ویدئو نیست"
 
     loggedInAsT* = "وارد شده به عنوان"
     inputIsnotAIntegerT* = "ورودی عدد نیست"
@@ -220,95 +233,6 @@ const
     enterQuizNameToSearchT* = "نام آزمون مورد نظر را وارد کمید"
     enterQuizGradeToSearchT* = "پایه آزمون را برای جستجو وارد کنید"
     enterQuizLessonToSearchT* = "نام درس آزمون را برای جستحو وارد کنید"
-
-let
-    noReply* = newReplyKeyboardRemove(true)
-
-    commonFirstPageKeyboard = @[
-      @[knowUsT],
-      @[knowConsultingPlansT, knowEducationalPlansT],
-      @[registerInVaiousPlansT, reportProblemsT]
-    ]
-
-    notLoggedInReply* = newReplyKeyboardMarkup:
-        commonFirstPageKeyboard & @[ @[loginT]]
-
-    memberReply* = newReplyKeyboardMarkup:
-        commonFirstPageKeyboard
-
-    adminReply* = newReplyKeyboardMarkup:
-        commonFirstPageKeyboard & @[ @[adminPanelT]]
-
-    cancelReply* = newReplyKeyboardMarkup @[
-      @[cancelT]
-    ]
-
-    yesOrNoReply* = newReplyKeyboardMarkup @[
-      @[yesT],
-      @[noTx],
-    ]
-
-    answersReply* = newReplyKeyboardMarkup @[
-      @["1", "2", "3", "4"]
-    ]
-
-    doingQuizReply* = newReplyKeyboardMarkup @[
-      @[endT],
-      @[cancelT]
-    ]
-
-    addingMoreQuestionsReply* = newReplyKeyboardMarkup @[
-      @[endT],
-      @[withoutPhotoT]
-    ]
-
-    formEndReply* = newReplyKeyboardMarkupEveryRow @[
-      submitT, cancelT
-    ]
-
-    withoutPhotoReply* = newReplyKeyboardMarkup @[
-      @[withoutPhotoT]
-    ]
-
-    quizMenuMemberReplyRaw* = @[
-      @[findQuizT, myRecordsT]
-    ]
-
-    quizMenuMemberReply* = newReplyKeyboardMarkup:
-        quizMenuMemberReplyRaw
-
-    quizMenuAdminReply* = newReplyKeyboardMarkup @[
-      @[addQuizT, removeQuizT]
-    ] & quizMenuMemberReplyRaw
-
-    quizFilterReply* = newReplyKeyboardMarkup @[
-      @[findQuizChangeGradeT, findQuizChangeLessonT, findQuizChangeNameT],
-      @[showFiltersT],
-      @[showResultsT, cancelT]
-    ]
-
-    addQuestionMoreThanOne* = newReplyKeyboardMarkup @[
-      @[endT, cancelT],
-    ]
-
-    sendContactReply* = newReplyKeyboardMarkup @[@[
-      KeyboardButton(text: sendContactIntoT, requestContact: some true)
-    ]]
-
-    answerBtns* = [
-      ("1", "/p1"),
-      ("2", "/p2"),
-      ("3", "/p3"),
-      ("4", "/p4"),
-      (emptyT, "/p0"),
-    ].toInlineButtons
-
-    moveBtns* = @[
-      (pointLeftTJ, "/g-"),
-      (pointRightTJ, "/g+"),
-    ].toInlineButtons
-
-    answerKeyboard* = newInlineKeyboardMarkup(answerBtns, moveBtns)
 
 func genQueryPageInlineBtns*(pageIndex: int): InlineKeyboardMarkup =
     newInlineKeyboardMarkup @[
@@ -488,10 +412,135 @@ func `$`*(qq: QuizQuery): string =
       fmt"{bold lessonT}: {escapeMarkdownV2 qq.lesson.getStr(minesT)}",
     ].join "\n"
 
-func `$`*(f: FormModel): string =
-    discard
-
 func `$`*(pk: PlanKinds): string =
     case pk:
     of pkConsulting: "مشاوره ای"
     of pkEducational: "آموزشی درسی"
+
+func `$`*(fk: FormKinds): string =
+    case fk:
+    of fkRegisterInPlans: "ثبت نام"
+    of fkReportProblem: "گزارش مشکل"
+
+func formFieldsToString(s: seq[array[2, string]]): string =
+  s.mapIt(bold(it[0]) & ": " & it[1]).join "\n"
+
+proc fullFormString*(f: FormModel, planTitle: Option[string]): string =
+  let
+    header = @[
+      ["شماره فرم", $f.id],
+      ["نوع فرم", $f.kind]
+    ]
+ 
+    userInfo = @[
+      ["نام", $f.full_name],
+      ["شماره تماس", $f.phone_number],
+      ["پایه", $f.grade],
+      ["رشته", $f.major],
+      ["تاریخ", unixDatetimeFormat(f.createdAt)],
+    ]
+
+  formFieldsToString:
+    case  FormKinds f.kind:
+    of fkRegisterInPlans:
+      header & @[["عنوان طرح", planTitle.get ]] & userInfo
+
+    of fkReportProblem:
+      header & userInfo & @[["متن", f.content]]
+
+# keyboards -------------------------------
+
+let
+    noReply* = newReplyKeyboardRemove(true)
+
+    commonFirstPageKeyboard = @[
+      @[knowUsT],
+      @[knowConsultingPlansT, knowEducationalPlansT],
+      @[registerInVaiousPlansT, reportProblemsT]
+    ]
+
+    notLoggedInReply* = newReplyKeyboardMarkup:
+        commonFirstPageKeyboard & @[ @[loginT]]
+
+    memberReply* = newReplyKeyboardMarkup:
+        commonFirstPageKeyboard
+
+    adminReply* = newReplyKeyboardMarkup:
+        commonFirstPageKeyboard & @[ @[adminPanelT]]
+
+    cancelReply* = newReplyKeyboardMarkup @[
+      @[cancelT]
+    ]
+
+    yesOrNoReply* = newReplyKeyboardMarkup @[
+      @[yesT],
+      @[noTx],
+    ]
+
+    answersReply* = newReplyKeyboardMarkup @[
+      @["1", "2", "3", "4"]
+    ]
+
+    doingQuizReply* = newReplyKeyboardMarkup @[
+      @[endT],
+      @[cancelT]
+    ]
+
+    addingMoreQuestionsReply* = newReplyKeyboardMarkup @[
+      @[endT],
+      @[withoutPhotoT]
+    ]
+
+    formEndReply* = newReplyKeyboardMarkupEveryRow @[
+      submitT, cancelT
+    ]
+
+    selectPlanKindsReply* = newReplyKeyboardMarkupEveryRow @[
+        $pkConsulting,
+        $pkEducational,
+        cancelT,
+        ]
+
+    withoutPhotoReply* = newReplyKeyboardMarkup @[
+      @[withoutPhotoT]
+    ]
+
+    quizMenuMemberReplyRaw* = @[
+      @[findQuizT, myRecordsT]
+    ]
+
+    quizMenuMemberReply* = newReplyKeyboardMarkup:
+        quizMenuMemberReplyRaw
+
+    quizMenuAdminReply* = newReplyKeyboardMarkup @[
+      @[addQuizT, removeQuizT]
+    ] & quizMenuMemberReplyRaw
+
+    quizFilterReply* = newReplyKeyboardMarkup @[
+      @[findQuizChangeGradeT, findQuizChangeLessonT, findQuizChangeNameT],
+      @[showFiltersT],
+      @[showResultsT, cancelT]
+    ]
+
+    addQuestionMoreThanOne* = newReplyKeyboardMarkup @[
+      @[endT, cancelT],
+    ]
+
+    sendContactReply* = newReplyKeyboardMarkup @[@[
+      KeyboardButton(text: sendContactIntoT, requestContact: some true)
+    ]]
+
+    answerBtns* = [
+      ("1", "/p1"),
+      ("2", "/p2"),
+      ("3", "/p3"),
+      ("4", "/p4"),
+      (emptyT, "/p0"),
+    ].toInlineButtons
+
+    moveBtns* = @[
+      (pointLeftTJ, "/g-"),
+      (pointRightTJ, "/g+"),
+    ].toInlineButtons
+
+    answerKeyboard* = newInlineKeyboardMarkup(answerBtns, moveBtns)
