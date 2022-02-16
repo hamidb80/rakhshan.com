@@ -475,13 +475,13 @@ proc addForm*(db; f: FormModel): int64 =
     db.insertID(sql"""
         INSERT INTO form (
             kind, plan_id, chat_id, created_at,
-            full_name, phone_number, major, grade,
+            full_name, phone_number, grade, major, 
             content
         ) 
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, f.kind.ord, f.plan_id.toNillableString,
         f.chatid, f.createdAt, f.fullname,
-        f.phone_number.limit(PhoneNumberLimit), f.major, f.grade,
+        f.phone_number.limit(PhoneNumberLimit), f.grade, f.major.get(""),
         f.content.get(""))
 
 proc getForms*(db;
@@ -508,7 +508,7 @@ proc getForms*(db;
                 created_at: parseInt it[4],
                 fullname: it[5],
                 phone_number: it[6],
-                major: it[7],
+                major: toNillableString it[7],
                 grade: parseint it[8],
                 content: toNillableString(it[9])),
 

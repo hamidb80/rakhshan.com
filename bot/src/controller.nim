@@ -6,11 +6,17 @@ type
   Stages* = enum
     # basic
     sMain, sSendContact, sEnterMainMenu, sMainMenu
-    sFindQuizMain, sFQname, sFQgrade, sFQlesson, sMyRecords, sScroll
-    sTakingQuiz, sFindMyRecords
+    sspShowPlan, sTakingQuiz, sFindMyRecords
 
-    # admin stuff
+    # find quiz
+    sFindQuizMain, sFQname, sFQgrade, sFQlesson, sMyRecords, sScroll
+
+    sAdminDashboard
+
+    # delete quiz
     sDeleteQuiz, sDQEnterId, sDQConfirm
+
+    # add quiz
     sAddQuiz, sAQName, sAQDesc, sAQTime, sAQGrade, sAQLesson, sAQchapter
     sAQQuestion, sAQQPic, sAQQDesc, sAQQWhy, sAQQAns
 
@@ -19,17 +25,15 @@ type
     sfName, sfNumber, sfGrade, sfMajor, sfContent
     sfConfirmBefore, sfConfirm
 
+    # post
+    sPost, spoVideo_path, spoTitle, spoDesc
+
     # add plan
     sAddPlan, spKind, spTitle, spVideo, spDesc, spLink
-
-    # see plans
-    sspShowPlan
 
     # delete plan
     sDeletePlan, sdpKind, sdqTitle
 
-    # post
-    sPost, spoVideo_path, spoTitle, spoDesc
 
   SearchFor* = enum
     sfQuiz, sfmyRecords, sfForms

@@ -73,7 +73,7 @@ Blueprint [queryHolder: initQuery, postfix: "Model"]:
         full_name: string[300]
         phone_number: string[15]
         grade: int
-        major: string[60]
+        major: Option[string[60]]
         content: Option[string]
         created_at: int
 

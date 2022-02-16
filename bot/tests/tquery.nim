@@ -1,3 +1,4 @@
+
 import std/[db_sqlite, strutils, sequtils, unittest, options, os, times, json, algorithm]
 import database/[models, queries], controller
 
@@ -116,14 +117,14 @@ let
   ]
 
   forms = [
-    (fkRegisterInPlans, membersRaw[0][0], some 1'i64, "alizz", "0914", 11,
-        "math", none string, pt("2021/06/05T08:07")),
-    (fkRegisterInPlans, membersRaw[2][0], some 2'i64, "ajad", "0911", 10,
-        "ensani", none string, pt("2021/06/05T08:07")),
-    (fkReportProblem, membersRaw[1][0], none int64, "mahdid", "0915", 8, "",
-        some "some arbitary complain", pt("2021/06/05T08:07")),
-    (fkReportProblem, membersRaw[3][0], none int64, "qawsem", "0917", 12, "",
-        some "you're shit", pt("2022/01/05T08:00")),
+    (fkRegisterInPlans, membersRaw[0][0], some 1'i64, "alizz", "0914",
+      11, some "math", none string, pt("2021/06/05T08:07")),
+    (fkRegisterInPlans, membersRaw[2][0], some 2'i64, "ajad", "0911",
+      10, some "ensani", none string, pt("2021/06/05T08:07")),
+    (fkReportProblem, membersRaw[1][0], none int64, "mahdid", "0915",
+      8, none string, some "some arbitary complain", pt("2021/06/05T08:07")),
+    (fkReportProblem, membersRaw[3][0], none int64, "qawsem", "0917",
+      7, none string, some "you're shit", pt("2022/01/05T08:00")),
   ]
 
 
@@ -270,7 +271,8 @@ suite "SELECT":
       not db.isPlanExists("some arbitary title")
 
   test "get forms":
-    check db.getForms(0, 10, saMore, Ascending).mapIt(it.form.content) == forms.mapIt(it[7])
+    check db.getForms(0, 10, saMore, Ascending).mapIt(it.form.content) ==
+        forms.mapIt(it[7])
 
 suite "UPSERT":
   test "new tag":

@@ -49,7 +49,7 @@ const
     sendContactIntoT* = "ارسال اطلاعات حساب تلگرام"
     pleaseSendByYourCantactT* = "لطفا از طریق کیبرد ربات تلگرام، شماره خود را ارسال کنید"
 
-    addQuizT* = "اضافه کردن آزمون"
+    addQuizT* = "افزودن آزمون"
     removeQuizT* = "حذف آزمون"
     enterQuizNameT* = "نام آزمون را وارد کنید"
     enterQuizInfoT* = "توضیحات آزمون را وارد کنید"
@@ -188,7 +188,7 @@ const
 
     postNotFoundT* = "مطلب پیدا نشد"
     phoneNumberValidationNoteT* =
-        "شماره تلفن بای فقط با اعداد انگلیسی نوشته شده باشه"
+        "شماره تلفن باید فقط با اعداد انگلیسی نوشته شده باشه"
 
     knowUsT* = "آشنایی با ما"
     knowConsultingPlansT* = "آشنایی با طرح های مشاوره"
@@ -198,6 +198,7 @@ const
     adminPanelT* = "پنل ادمین"
 
     # form
+    submittedFormsT* = "فرم های ارسالی"
     enterProblemDescriptionT* = "توضیحات مشکل را بنویسید"
     enterGradeT* = "پایه تحصیلی خود را وارد کنید"
     enterMajorT* = "رشته تحصیلی خود را وارد کنید"
@@ -207,6 +208,8 @@ const
     noFormsAvailableT* = "فرم پرکرده ای وجود ندارد"
 
     # plan
+    addPlanT* = "افزودن طرح"
+    removePlanT* = "حذف کردن طرح"
     selectPlanKindT* = "نوع طرح را اتنخاب کنید"
     selectPlanTitleT* = "عنوان طرح را انتخاب کنید"
     enterPlanTitleT* = "عنوان طرح را بنویسید"
@@ -214,6 +217,7 @@ const
     planDeletedT* = "طرح حذف شد"
 
     # post
+    addPostT* = "افزودن مطلب"
     sendOrForwardVideoT* = "ویدئو مربوطه را ارسال کنید (یا فوروارد کنید("
     enterPostTitleT* = "عنوان مطلب را بنویسید"
     enterPostDescT* = "توضیحات مطلب را بنویسید"
@@ -229,10 +233,26 @@ const
     runtimeErrorT* = "مشکل در داخلی"
     someErrorT* = "مشکلی پیش آمده"
     rangeErrorT* = "ورودی داده شده در بازه مجاز نیست"
+    youMustLoginToUseThisSection* = "برای استفاده از این بخش، باید وارد شوید"
 
     enterQuizNameToSearchT* = "نام آزمون مورد نظر را وارد کمید"
     enterQuizGradeToSearchT* = "پایه آزمون را برای جستجو وارد کنید"
     enterQuizLessonToSearchT* = "نام درس آزمون را برای جستحو وارد کنید"
+
+    gradesSchoolT*: array[7..12, string] = [
+      "هفتم",
+      "هشتم",
+      "نهم",
+      "دهم",
+      "یازدهم",
+      "دوازدهم",
+    ]
+
+    majorsT* = [
+      "ریاضی فیزیک",
+      "تجربی",
+      "انسانی",
+    ]
 
 func genQueryPageInlineBtns*(pageIndex: int): InlineKeyboardMarkup =
     newInlineKeyboardMarkup @[
@@ -429,14 +449,13 @@ proc fullFormString*(f: FormModel, planTitle: Option[string]): string =
     let
         header = @[
           ["شماره فرم", $f.id],
-          ["نوع فرم", $f.kind]
+          ["نوع فرم", $(FormKinds f.kind)]
         ]
-
         userInfo = @[
           ["نام", escapeMarkdownV2 $f.full_name],
           ["شماره تماس", $f.phone_number],
           ["پایه", $f.grade],
-          ["رشته", $f.major],
+          ["رشته", f.major.get("")],
           ["تاریخ", unixDatetimeFormat(f.createdAt)],
         ]
 
@@ -456,7 +475,8 @@ let
     commonFirstPageKeyboard = @[
       @[knowUsT],
       @[knowConsultingPlansT, knowEducationalPlansT],
-      @[registerInVaiousPlansT, reportProblemsT]
+      @[registerInVaiousPlansT, reportProblemsT],
+      @[quizT],
     ]
 
     notLoggedInReply* = newReplyKeyboardMarkup:
@@ -467,6 +487,13 @@ let
 
     adminReply* = newReplyKeyboardMarkup:
         commonFirstPageKeyboard & @[ @[adminPanelT]]
+
+    adminDashboardReply* = newReplyKeyboardMarkup @[
+      @[addPlanT, removePlanT],
+      @[addQuizT, removeQuizT],
+      @[submittedFormsT, addPostT],
+      @[cancelT]
+    ]
 
     cancelReply* = newReplyKeyboardMarkup @[
       @[cancelT]
@@ -544,3 +571,12 @@ let
     ].toInlineButtons
 
     answerKeyboard* = newInlineKeyboardMarkup(answerBtns, moveBtns)
+
+    selectGrades* = newReplyKeyboardMarkup @[
+      gradesSchoolT[7..9],
+      gradesSchoolT[10..12],
+      @[cancelT]
+    ]
+
+    selectMajors* = newReplyKeyboardMarkupEveryRow:
+        majorsT.toseq & @[cancelT]

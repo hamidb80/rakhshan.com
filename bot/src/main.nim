@@ -47,19 +47,21 @@ proc dispatcherImpl*(up: Update, chatId: int64): Action {.fakeSafety.} =
         result.handler = tofn:
           case uctx.stage:
           of sMain: reHome
-          of sSendContact: reVerify_user
-          of AddQuizStages: reAdd_quiz
-          of AddQuestionStages: reAdd_question
           of sEnterMainMenu: reEnterhome
           of sMainMenu: reHome
+          of sSendContact: reVerify_user
           of FindQuizStages: reFind_quiz
-          of DeleteQuiz: reDelete_quiz
           of sTakingQuiz: reMiddle_of_quiz
           of sScroll: reMiddle_of_scroll
+          
+          of sAdminDashboard: reAdmindashboard
+          of DeleteQuiz: reDelete_quiz
+          of AddQuizStages: reAdd_quiz
+          of AddQuestionStages: reAdd_question
           of AddPlanStages: reAddplan
           of DeletePlanStages: reDeleteplan
-          of FormStages: reFillform
           of AddPostStages: reUpsertpost
+          of FormStages: reFillform
           of sspShowPlan: reSeeplans
           else: reInvalid_command
 
