@@ -69,9 +69,9 @@ template pl*: untyped {.dirty.} =
 template ps*: untyped {.dirty.} =
   uctx.post.get
 
-template `@@`*(dbOperations): untyped =
+template `++`*(code): untyped =
   dbWorksCapture dbfPath:
-    dbOperations
+    code
 
 template impossible*: untyped=
   raise newException(ValueError, "impossible")

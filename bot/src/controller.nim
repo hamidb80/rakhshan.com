@@ -144,6 +144,9 @@ proc reset*(u: UserCtx) =
   u.quizIdToDelete.forget
   u.queryPaging.forget
 
+func isAdmin*(u: UserCtx): bool =
+  issome(u.membership) and (u.membership.get.isAdmin == 1)
+
 func findEditedMessageIdContext*(
   qc: QuizCreate, msgid: int
 ): tuple[context: QCMsgIdSearch, index: int, field: QuizCreateFields] =
@@ -225,12 +228,14 @@ macro initRouter(varName: untyped, args: varargs[untyped]): untyped =
       alias = ("re" & entity[InfixRightSide].strVal.normalize.capitalizeAscii).ident
       procBody = entity[^1]
       customArgs = entity[1][1..^1]
-      commonArgs = args[0..^2] & @[
-          newColonExpr(ident "args", bindsym "JsonNode")]
+      customArgsLen = customArgs.len
+      argsId = ident "args"
+      commonArgs = args[0..^2] & @[newColonExpr(argsId, bindsym "JsonNode")]
       extractArgs = extractArgsFromJson(customArgs)
 
       definedProc = first quote do:
         (proc (): Future[string] {.async.} =
+          assert `argsId`.len >= `customArgsLen`
           `extractArgs`
           `procBody`)
 

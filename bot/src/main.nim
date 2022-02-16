@@ -3,7 +3,7 @@ import
 import telebot, packedArgs
 import
   controller, comfortable, settings, router,
-  messages, forms, states, utils, database/[queries]
+  states, utils, database/[queries], messages, forms
 
 
 let bot = newTeleBot tgToken
@@ -18,9 +18,7 @@ proc dispatcherImpl*(up: Update, chatId: int64): Action {.fakeSafety.} =
 
   let uctx = getOrCreateUser chatid
   if uctx.firstTime:
-    uctx.membership = dbworksCapture dbfPath:
-      getMember(db, up.getchatid)
-
+    uctx.membership = ++db.getMember(up.getchatid)
     uctx.firstTime = false
     result.handler = toFn reStart
 
@@ -116,7 +114,10 @@ proc resultWrapper(a: Action){.async.} =
   except DbError: asyncCheck a.chatid << databaseErrorT
   except FValueError: asyncCheck a.chatid << invalidInputT
   except FmRangeError: asyncCheck a.chatid << rangeErrorT
-  except: asyncCheck a.chatid << someErrorT
+  except:
+    echo getCurrentExceptionMsg()
+    asyncCheck a.chatid << someErrorT
+
 
 proc agentLoopImpl(ch: ptr Channel[Action], timeout: int) {.async, fakeSafety.} =
   while true:

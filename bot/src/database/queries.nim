@@ -436,21 +436,29 @@ proc isPlanExists*(db; title: string): bool =
         WHERE title = ?
     """, title) == "1"
 
+func toPlan(s: seq[string]): PlanModel =
+    PlanModel(id: parseBiggestInt s[0], kind: parseInt s[1], title: s[2],
+        video_path: s[3], description: s[4], link: s[5])
+
 proc getPlan*(db; title: string): Option[PlanModel] =
     let t = db.getSingleRow(sql"""
-        SELECT id, kind, video_path, description, link
+        SELECT id, kind, title, video_path, description, link
         FROM plan
         WHERE title = ?
     """, title)
 
     if issome t:
-        result = some PlanModel(
-            id: parseBiggestInt t.get[0],
-            kind: parseInt t.get[1],
-            title: title,
-            video_path: t.get[2],
-            description: t.get[3],
-            link: t.get[4])
+        result = some toPlan t.get
+
+proc getPlan*(db; id: int64): Option[PlanModel] =
+    let t = db.getSingleRow(sql"""
+        SELECT id, kind, title, video_path, description, link
+        FROM plan
+        WHERE id = ?
+    """, id)
+
+    if issome t:
+        result = some toPlan(t.get)
 
 proc getPlansTitles*(db; kind: PlanKinds): seq[string] =
     db.getAllRows(sql"""

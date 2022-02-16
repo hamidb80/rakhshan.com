@@ -174,7 +174,7 @@ const
         "-----------------------"
 
     sendIfYouSureOtherwiseCancelAndRefillT * = [
-      "اگر اطلاعات آن درست است، روی دکمه ثبت بزنید",
+      "اگر اطلاعات فرم درست وارد شده، روی دکمه ثبت بزنید",
       "در غیر این صورت گزینه انصراف را بزنید و فرم رو از اول پرکنید"
     ].join "\n\n"
 
@@ -193,7 +193,7 @@ const
     knowUsT* = "آشنایی با ما"
     knowConsultingPlansT* = "آشنایی با طرح های مشاوره"
     knowEducationalPlansT* = "آشنایی با طرح های آموزشی درسی"
-    registerInVaiousPlansT* = "ثبت نام در طراح های مختلف"
+    registerInVaiousPlansT* = "ثبت نام در طرح های مختلف"
     reportProblemsT* = "ثبت مشکلات"
     adminPanelT* = "پنل ادمین"
 
@@ -423,30 +423,30 @@ func `$`*(fk: FormKinds): string =
     of fkReportProblem: "گزارش مشکل"
 
 func formFieldsToString(s: seq[array[2, string]]): string =
-  s.mapIt(bold(it[0]) & ": " & it[1]).join "\n"
+    s.mapIt(bold(it[0]) & ": " & it[1]).join "\n"
 
 proc fullFormString*(f: FormModel, planTitle: Option[string]): string =
-  let
-    header = @[
-      ["شماره فرم", $f.id],
-      ["نوع فرم", $f.kind]
-    ]
- 
-    userInfo = @[
-      ["نام", $f.full_name],
-      ["شماره تماس", $f.phone_number],
-      ["پایه", $f.grade],
-      ["رشته", $f.major],
-      ["تاریخ", unixDatetimeFormat(f.createdAt)],
-    ]
+    let
+        header = @[
+          ["شماره فرم", $f.id],
+          ["نوع فرم", $f.kind]
+        ]
 
-  formFieldsToString:
-    case  FormKinds f.kind:
-    of fkRegisterInPlans:
-      header & @[["عنوان طرح", planTitle.get ]] & userInfo
+        userInfo = @[
+          ["نام", escapeMarkdownV2 $f.full_name],
+          ["شماره تماس", $f.phone_number],
+          ["پایه", $f.grade],
+          ["رشته", $f.major],
+          ["تاریخ", unixDatetimeFormat(f.createdAt)],
+        ]
 
-    of fkReportProblem:
-      header & userInfo & @[["متن", f.content.get]]
+    formFieldsToString:
+        case FormKinds f.kind:
+        of fkRegisterInPlans:
+            header & @[["عنوان طرح", escapeMarkdownV2 planTitle.get]] & userInfo
+
+        of fkReportProblem:
+            header & userInfo & @[["متن", escapeMarkdownV2 f.content.get]]
 
 # keyboards -------------------------------
 
