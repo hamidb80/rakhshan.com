@@ -53,8 +53,8 @@ Blueprint [queryHolder: initQuery, postfix: "Model"]:
 
     Table post:
         id: int {.primary.}
-        video_path: string
         title: string[300]
+        video_path: string
         description: string
 
     Table plan:
@@ -74,7 +74,7 @@ Blueprint [queryHolder: initQuery, postfix: "Model"]:
         phone_number: string[15]
         grade: int
         major: string[60]
-        content: string
+        content: Option[string]
         created_at: int
 
 

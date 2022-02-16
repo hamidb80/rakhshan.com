@@ -1,29 +1,31 @@
-import db_sqlite, strutils, sequtils, unittest, options, os, times, json, algorithm
-import database/[models, queries], telegram/controller
+import std/[db_sqlite, strutils, sequtils, unittest, options, os, times, json, algorithm]
+import database/[models, queries], controller
 
 # init
 const dbPath = "./play.db"
 
-func toQuestion(t: tuple[quizId: int, description, why: string,
-    answer: int]): QuestionModel =
+type
+  QuestionIR = tuple[quizId: int, description, why: string, answer: int]
+
+func toQuestion(q: QuestionIR): QuestionModel =
   QuestionModel(
-    quiz_id: t[0],
-    description: t[1],
-    why: t[2],
-    answer: t[3])
+    quiz_id: q[0],
+    description: q[1],
+    why: q[2],
+    answer: q[3])
 
 template id(rawRow): untyped = rawRow[0]
 
 proc pt(s: string): int64 =
-  parseTime(s, "yyyy/MM/dd'T'HH:mm:ss", local()).toUnix
+  parseTime(s, "yyyy/MM/dd'T'HH:mm", local()).toUnix
 
 let
   membersRaw = [
-    (118721, "ali site", "ali tg", "0912", 0, pt("2021/06/05T08:07:54")),
-    (81321257, "mahdi site", "mahdi tg", "0913", 1, pt("2021/01/05T14:27:43")),
-    (98312873, "hamid site", "hamid tg", "0914", 1, pt("2022/01/02T15:03:11")),
-    (53622231, "maher site", "maher tg", "0915", 0, pt("2020/07/22T23:43:28")),
-    (96820231, "Hadi sit", "Emami tg", "0917", 0, pt("2019/04/20T06:51:41")),
+    (118721, "ali site", "ali tg", "0912", 0, pt("2021/06/05T08:07")),
+    (81321257, "mahdi site", "mahdi tg", "0913", 1, pt("2021/01/05T14:27")),
+    (98312873, "hamid site", "hamid tg", "0914", 1, pt("2022/01/02T15:03")),
+    (53622231, "maher site", "maher tg", "0915", 0, pt("2020/07/22T23:43")),
+    (96820231, "Hadi sit", "Emami tg", "0917", 0, pt("2019/04/20T06:51")),
   ]
 
   tagsRaw = [
@@ -37,18 +39,18 @@ let
 
   quizzesRaw = [
     (1, "Qz1", "math q for g-11 ch-1", 100,
-      tagsRaw[0].id, pt("2021/06/05T08:07:54"), @[
+      tagsRaw[0].id, pt("2021/06/05T08:07"), @[
       (1, "q1 for Qz1", "1 :: q1 for Qz1", 1),
       (2, "q2 for Qz1", "3 :: q2 for Qz1", 3),
       (3, "q3 for Qz1", "2 :: q3 for Qz1", 2),
     ].map toQuestion),
     (2, "Qz2", "math q for g-11 ch-2", 50,
-      tagsRaw[1].id, pt("2021/06/05T08:07:54"), @[
+      tagsRaw[1].id, pt("2021/06/05T08:07"), @[
       (4, "q1 for Qz2", "4 :: q1 for Qz2", 4),
       (5, "q2 for Qz2", "4 :: q2 for Qz2", 4),
     ].map toQuestion),
     (3, "Qz3", "math q for g-11 ch-4", 20,
-      tagsRaw[2].id, pt("2021/06/05T08:07:54"), @[
+      tagsRaw[2].id, pt("2021/06/05T08:07"), @[
       (6, "q1 for Qz3", "3 :: q1 for Qz3", 3),
       (7, "q2 for Qz3", "2 :: q2 for Qz3", 2),
       (8, "q3 for Qz3", "1 :: q3 for Qz3", 1),
@@ -56,14 +58,14 @@ let
       (10, "q5 for Qz3", "1 :: q5 for Qz3", 1),
     ].map toQuestion),
     (4, "Qz4", "PHYZ q for g-11 ch-1", 80,
-      tagsRaw[3].id, pt("2021/06/05T08:07:54"), @[
+      tagsRaw[3].id, pt("2021/06/05T08:07"), @[
       (11, "q1 for Qz4", "3 :: q1 for Qz4", 3),
       (12, "q2 for Qz4", "2 :: q2 for Qz4", 2),
       (13, "q3 for Qz4", "1 :: q3 for Qz4", 1),
       (14, "q4 for Qz4", "4 :: q4 for Qz4", 4),
     ].map toQuestion),
     (5, "Qz5", "PHYZ q for g-11 ch-1", 30,
-      tagsRaw[4].id, pt("2021/06/05T08:07:54"), @[
+      tagsRaw[4].id, pt("2021/06/05T08:07"), @[
       (15, "q1 for Qz5", "1 :: q1 for Qz5", 1),
       (16, "q2 for Qz5", "1 :: q2 for Qz5", 1),
       (17, "q3 for Qz5", "2 :: q3 for Qz5", 2),
@@ -73,30 +75,55 @@ let
       (21, "q7 for Qz5", "4 :: q7 for Qz5", 4),
     ].map toQuestion),
     (6, "blah blah", "stupid quiz", 120,
-      tagsRaw[5].id, pt("2021/06/05T08:07:54"), @[
+      tagsRaw[5].id, pt("2021/06/05T08:07"), @[
       (22, "q1 for Qz6", "1 :: q1 for Qz", 1),
     ].map toQuestion),
   ]
 
   recordsRaw = [
     (1, 1, membersRaw[0].id, "012", $[1, 2, 3],
-      25.6, pt("2021/06/05T08:07:54")),
+      25.6, pt("2021/06/05T08:07")),
     (2, 1, membersRaw[1].id, "132", $[1, 2, 3],
-      48.5, pt("2021/06/05T08:07:54")),
+      48.5, pt("2021/06/05T08:07")),
     (3, 1, membersRaw[2].id, "132", $[1, 2, 3],
-      78.2, pt("2021/06/05T08:07:54")),
+      78.2, pt("2021/06/05T08:07")),
     (4, 1, membersRaw[3].id, "132", $[1, 2, 3],
-      12.3, pt("2021/06/05T08:07:54")),
+      12.3, pt("2021/06/05T08:07")),
     (5, 1, membersRaw[4].id, "132", $[1, 2, 3],
-      48.5, pt("2021/06/05T08:07:54")),
+      48.5, pt("2021/06/05T08:07")),
     (6, 2, membersRaw[1].id, "00", $[1, 2],
-      15.7, pt("2021/06/05T08:07:54")),
+      15.7, pt("2021/06/05T08:07")),
     (7, 3, membersRaw[1].id, "21334", $[1, 2, 3, 4, 5],
-      100.0, pt("2021/06/05T08:07:54")),
+      100.0, pt("2021/06/05T08:07")),
     (8, 4, membersRaw[2].id, "22", $[1, 2],
-      10.4, pt("2021/06/05T08:07:54")),
+      10.4, pt("2021/06/05T08:07")),
     (9, 3, membersRaw[3].id, "22021", $[1, 2, 3, 4, 5],
-      7.8, pt("2021/06/05T08:07:54")),
+      7.8, pt("2021/06/05T08:07")),
+  ]
+
+  posts = [
+    (mainPost, "", "main post"),
+    ("post 2", "", "post 2 desc"),
+    ("post 3", "", "post 3 desc"),
+  ]
+
+  plans = [
+    (pkConsulting, "c1", "", "desc 1", "http://l1.com/"),
+    (pkConsulting, "c2", "", "desc 2", "http://l2.com/"),
+    (pkEducational, "c3", "", "desc 1", "http://l3.com/"),
+    (pkEducational, "c4", "", "desc 1", "http://l4.com/"),
+    (pkEducational, "c5", "", "desc 1", "http://l5.com/"),
+  ]
+
+  forms = [
+    (fkRegisterInPlans, membersRaw[0][0], some 1'i64, "alizz", "0914", 11,
+        "math", none string, pt("2021/06/05T08:07")),
+    (fkRegisterInPlans, membersRaw[2][0], some 2'i64, "ajad", "0911", 10,
+        "ensani", none string, pt("2021/06/05T08:07")),
+    (fkReportProblem, membersRaw[1][0], none int64, "mahdid", "0915", 8, "",
+        some "some arbitary complain", pt("2021/06/05T08:07")),
+    (fkReportProblem, membersRaw[3][0], none int64, "qawsem", "0917", 12, "",
+        some "you're shit", pt("2022/01/05T08:00")),
   ]
 
 
@@ -105,7 +132,6 @@ if fileExists dbPath:
 
 let db = open(dbPath, "", "", "")
 
-# TODO add test to make sure suffeling works fine
 
 suite "INIT":
   initDatabase(dbPath)
@@ -132,6 +158,23 @@ suite "INSERT":
   test "add record":
     for r in recordsRaw:
       discard db.addRecord(r[1].int64, r[2].int64, r[3], r[4], r[5], r[6])
+
+  test "add post":
+    for p in posts:
+      discard db.addPost(PostModel(
+        title: p[0], videoPath: p[1], description: p[2]))
+
+  test "add plan":
+    for p in plans:
+      discard db.addPlan(PlanModel(kind: p[0].ord,
+        title: p[1], video_path: p[2], description: p[3], link: p[4]))
+
+  test "add form":
+    for f in forms:
+      discard db.addForm(FormModel(kind: f[0].ord,
+        chatid: f[1], planId: f[2], fullname: f[3],
+        phoneNumber: f[4], grade: f[5], major: f[6],
+        content: f[7], createdAt: f[8]))
 
 suite "SELECT":
   test "single member":
@@ -202,6 +245,33 @@ suite "SELECT":
     let rnk2 = db.getrank(membersRaw[2].id, 1).get
     check rnk2 == 1
 
+  test "get post":
+    let p = db.getPost(mainPost)
+    check:
+      issome p
+      p.get.description == posts[0][2]
+
+  test "get plan titles":
+    let ts = db.getPlansTitles(pkConsulting)
+    check ts == @["c2", "c1"]
+
+  test "get single plan":
+    let
+      originalPlan = plans[2]
+      p = db.getPlan(originalPlan[1])
+
+    check:
+      isSome p
+      p.get.link == originalPlan[4]
+
+  test "plan exists":
+    check:
+      db.isPlanExists(plans[0][1])
+      not db.isPlanExists("some arbitary title")
+
+  test "get forms":
+    check db.getForms(0, 10, saMore, Ascending).mapIt(it.form.content) == forms.mapIt(it[7])
+
 suite "UPSERT":
   test "new tag":
     let
@@ -229,6 +299,17 @@ suite "UPSERT":
       WHERE grade = ? AND lesson = ? AND chapter = ?
     """.sql, tg.grade, tg.lesson, tg.chapter).parseint == 1
 
+  test "new post":
+    discard db.upsertPost(PostModel(title: "arbitary text"))
+    check isSome db.getPost("arbitary text")
+
+  test "exsiting post":
+    discard db.upsertPost(PostModel(title: mainPost, description: "new desc"))
+    let p = db.getPost(mainPost)
+    check:
+      isSome p
+      p.get.description == "new desc"
+
 suite "DELETE":
   test "quiz":
     discard db.deleteQuiz(1)
@@ -238,3 +319,7 @@ suite "DELETE":
 
       db.getMyRecords(membersRaw[1].id, 0, 10, saMore, Descending)
         .mapIt(it.quiz.id) == @[3'i64, 2] # delete records
+
+  test "plan":
+    db.deletePlan(plans[0][0], plans[0][1])
+    check not db.isPlanExists(plans[0][1])

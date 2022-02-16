@@ -446,7 +446,7 @@ proc fullFormString*(f: FormModel, planTitle: Option[string]): string =
       header & @[["عنوان طرح", planTitle.get ]] & userInfo
 
     of fkReportProblem:
-      header & userInfo & @[["متن", f.content]]
+      header & userInfo & @[["متن", f.content.get]]
 
 # keyboards -------------------------------
 

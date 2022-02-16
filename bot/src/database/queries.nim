@@ -380,7 +380,7 @@ proc getRank*(db;
         """, quizid, myPercent).get[0].parseint + 1
 
 # post -------------------------------
-const mainPost* = "know-us"
+const mainPost* = "اصلی"
 
 proc addPost*(db; p: PostModel): int64 =
     db.insertID(sql"""
@@ -404,7 +404,7 @@ proc getPost*(db; title: string): Option[PostModel] =
 
 proc upsertPost*(db; p: PostModel): int64 =
     let t = db.getSingleRow(sql"""
-        SELECT id FROM form WHERE title = ?
+        SELECT id FROM post WHERE title = ?
     """, p.title)
 
     if issome t:
@@ -436,6 +436,22 @@ proc isPlanExists*(db; title: string): bool =
         WHERE title = ?
     """, title) == "1"
 
+proc getPlan*(db; title: string): Option[PlanModel] =
+    let t = db.getSingleRow(sql"""
+        SELECT id, kind, video_path, description, link
+        FROM plan
+        WHERE title = ?
+    """, title)
+
+    if issome t:
+        result = some PlanModel(
+            id: parseBiggestInt t.get[0],
+            kind: parseInt t.get[1],
+            title: title,
+            video_path: t.get[2],
+            description: t.get[3],
+            link: t.get[4])
+
 proc getPlansTitles*(db; kind: PlanKinds): seq[string] =
     db.getAllRows(sql"""
         SELECT title FROM plan
@@ -444,19 +460,21 @@ proc getPlansTitles*(db; kind: PlanKinds): seq[string] =
     """, kind.ord).mapIt it[0]
 
 proc deletePlan*(db; kind: PlanKinds, title: string) =
-    db.exec(sql"DELETE FROM plan WHERE kind = ? AND title = ?", kind, title)
+    db.exec(sql"DELETE FROM plan WHERE kind = ? AND title = ?", kind.ord, title)
 
 # form -------------------------------
 proc addForm*(db; f: FormModel): int64 =
     db.insertID(sql"""
         INSERT INTO form (
             kind, plan_id, chat_id, created_at,
-            full_name, phone_number, major, grade
+            full_name, phone_number, major, grade,
+            content
         ) 
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, f.kind.ord, f.plan_id.toNillableString,
-        f.chatid, f.createdAt,
-        f.fullname, f.phone_number.limit(PhoneNumberLimit), f.major, f.grade)
+        f.chatid, f.createdAt, f.fullname,
+        f.phone_number.limit(PhoneNumberLimit), f.major, f.grade,
+        f.content.get(""))
 
 proc getForms*(db;
     pinnedIndex: int64, limit: int,
@@ -465,13 +483,13 @@ proc getForms*(db;
     result =
         db.getAllRows(sql fmt"""
             SELECT 
-                f.id, f.kind, f.plan_id, f.chat_id, f.created_at
-                f.full_name, f.phone_number, f.major, f.grade, 
+                f.id, f.kind, f.plan_id, f.chat_id, f.created_at,
+                f.full_name, f.phone_number, f.major, f.grade, f.content,
                 p.title
             FROM form f
-            WHERE id {dop[dir]} {pinnedIndex}
-            JOIN plan p ON f.plan_id = p.id
-            ORDER BY id {ortsd[dir]}
+            LEFT JOIN plan p ON f.plan_id = p.id
+            WHERE f.id {dop[dir]} {pinnedIndex}
+            ORDER BY f.id {ortsd[dir]}
             LIMIT {limit}
         """).mapIt (
             form: FormModel(
@@ -483,8 +501,9 @@ proc getForms*(db;
                 fullname: it[5],
                 phone_number: it[6],
                 major: it[7],
-                grade: parseint it[8]),
+                grade: parseint it[8],
+                content: toNillableString(it[9])),
 
-            planName: toNillableString it[9])
+            planName: toNillableString it[10])
 
     result.keepOrder(dir, order)
