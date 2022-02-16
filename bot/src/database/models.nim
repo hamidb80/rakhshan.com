@@ -78,6 +78,11 @@ Blueprint [queryHolder: initQuery, postfix: "Model"]:
         content: Option[string]
         created_at: int
 
+    # TODO save empty photoPath here
+    Table settings:
+        id: int {.primary.}
+        field: string
+        value: string
 
 type
     PlanKinds* = enum
@@ -90,6 +95,9 @@ type
 
     PostKinds* = enum
         pokIntroduction
+
+    SettingsFieldKinds* = enum
+        sfkEmptyPhoto
 
 
 func hasPhoto*(q: QuestionModel): bool =

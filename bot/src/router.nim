@@ -10,8 +10,9 @@ import
 # TODO send notification to admin when a new form submitted
 # just notify without details ... to all of the admins
 
-# TODO add /backup
+# TODO add /backup (using sqlite backup) every 24 hours and send in PV
 # TODO improve help
+# TODO test form with arbitary message types like photo or audio
 
 newRouter router:
   command(chatid: int64) as "help":
