@@ -8,7 +8,10 @@ import
   host_api, utils, database/[queries, models]
 
 # TODO send notification to admin when a new form submitted
+# just notify without details ... to all of the admins
 
+# TODO add /backup
+# TODO improve help
 
 newRouter router:
   command(chatid: int64) as "help":
@@ -17,10 +20,6 @@ newRouter router:
       fmt"{bold gradesT} {italic positiveIntegerT} {areT}",
       fmt"{bold chaptersT} {italic positiveIntegerT} {areT}",
       fmt"{bold minQuizTimeT} {underline($minQuizTime & secondT)} {isT}",
-      "\n",
-      fmt"{bold commandsT}:",
-      fmt"{underline startT} /start",
-      fmt"{underline helpT}: /help",
     ].join "\n"
 
   command(chatid: int64) as "start":

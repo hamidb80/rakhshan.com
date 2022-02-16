@@ -14,7 +14,7 @@ Blueprint [queryHolder: initQuery, postfix: "Model"]:
         site_name: char[300]
         tg_name: char[300]
         phone_number: char[15]
-        is_admin: int # fake bool
+        is_admin: int {.index.}
         joined_at: int
 
     Table tag:
