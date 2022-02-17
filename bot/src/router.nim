@@ -1,18 +1,21 @@
 import
   std/[sequtils, tables, strutils, options, json, times, random, algorithm,
-  asyncdispatch, db_sqlite, strformat, sugar]
+  asyncdispatch, db_sqlite, strformat, sugar, os]
 import telebot
 import
   controller, comfortable,
   messages, forms, settings,
-  host_api, utils, database/[queries, models]
+  host_api, utils, database/[queries, models, native]
 
 # TODO send notification to admin when a new form submitted
 # just notify without details ... to all of the admins
 
-# TODO add /backup (using sqlite backup) every 24 hours and send in PV
+# TODO add backup every 24 hours and send in PV
 # TODO improve help
 # TODO test form with arbitary message types like photo or audio
+# TODO update telebot dep
+
+const backupFilePath = "backup.db"
 
 newRouter router:
   command(chatid: int64) as "help":
@@ -32,6 +35,17 @@ newRouter router:
 
     asyncCheck redirect(reEnterhome, args)
 
+  command(chatid: int64) as "backup":
+    if isAdmin uctx:
+      try:
+        backupDB dbfPath, backupFilePath
+        discard await bot.sendDocument(chatid, "file://" & backupFilePath)
+        removeFile backupFilePath
+      
+      except:
+        echo getCurrentExceptionMsg()
+        asyncCheck chatid << someErrorT
+        
   route(chatid: int64, input: string) as "home":
     template getPlans(planKind): untyped =
       let
@@ -235,7 +249,7 @@ newRouter router:
 
           uctx.membership = db.getMember(chatid)
 
-        asyncCheck chatid << (greeting(userinfo.displayName), noReply)
+        discard await chatid << greeting(userinfo.displayName)
         asyncCheck redirect(reEnterhome, args)
 
       else:

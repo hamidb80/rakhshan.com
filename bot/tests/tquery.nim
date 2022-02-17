@@ -1,6 +1,6 @@
 
 import std/[db_sqlite, strutils, sequtils, unittest, options, os, times, json, algorithm]
-import database/[models, queries], controller
+import database/[models, queries, native], controller
 
 # init
 const dbPath = "./play.db"
@@ -319,3 +319,11 @@ suite "DELETE":
   test "plan":
     db.deletePlan(plans[0][0], plans[0][1])
     check not db.isPlanExists(plans[0][1])
+
+suite "native":
+  test "backup":
+    backupDB(dbPath, "./backup.db")
+    let bdb = open("./backup.db", "", "", "")
+    echo bdb.getAllTables
+    bdb.close
+    removeFile "./backup.db"

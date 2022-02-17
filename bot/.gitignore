@@ -8,6 +8,6 @@ play.*
 azmoon
 
 .fandogh
-.*db
+*.db
 
 play.*

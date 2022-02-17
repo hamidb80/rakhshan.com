@@ -34,13 +34,14 @@ proc dispatcherImpl*(up: Update, chatId: int64): Action {.fakeSafety.} =
         result.args.add %text[2..^1]
         result.handler = tofn:
           case text[1]:
-          # without argument
-          of 's': reStart
-          of 'h': reHelp
           # with arguemnt
           of 'q': reShow_quiz
           of 'a': reAnalyze
           of 'r': reGet_rank
+
+          elif text.startsWith "/start": reStart
+          elif text.startsWith "/help": reHelp
+          elif text.startsWith "/backup": reBackup
           else: reInvalid_command
 
       else: # it's a text message
