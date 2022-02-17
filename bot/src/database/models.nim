@@ -94,7 +94,7 @@ type
         pokIntroduction
 
     SettingFieldKinds* = enum
-        sfkEmptyPhoto
+        sfkDefaultQuestionPhoto
 
 
 func hasPhoto*(q: QuestionModel): bool =

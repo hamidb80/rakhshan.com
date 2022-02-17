@@ -852,7 +852,7 @@ newRouter router:
 
           asyncCheck bot.pinChatMessage($chatid, myrecord.quizTimeMsgId)
 
-          myrecord.lastQuestionPhotoUrl = myrecord.questions[fqi].photo_path or defaultPhotoUrl
+          myrecord.lastQuestionPhotoUrl = myrecord.questions[fqi].photo_path or defaultQuestionPhotoUrl
           myrecord.questionPicMsgId = (await chatid <@
               myrecord.lastQuestionPhotoUrl).messageId
 
@@ -893,7 +893,7 @@ newRouter router:
           questionSerialize(q, newQuestionIndex), answerKeyboard)
 
         # if you set the same photo, telegram complains
-        let newPhotoUrl = q.photo_path or defaultPhotoUrl
+        let newPhotoUrl = q.photo_path or defaultQuestionPhotoUrl
         if newPhotoUrl != myrecord.lastQuestionPhotoUrl:
           myrecord.lastQuestionPhotoUrl = newPhotoUrl
           asyncCheck (chatid, myrecord.questionPicMsgId) <@^ newPhotoUrl

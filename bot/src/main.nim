@@ -3,7 +3,7 @@ import
 import telebot, packedArgs
 import
   controller, comfortable, settings, router,
-  states, utils, database/[queries], messages, forms
+  states, utils, database/[queries, models], messages, forms
 
 
 let bot = newTeleBot tgToken
@@ -138,18 +138,25 @@ proc agentLoop(ch: ptr Channel[Action], timeout: int) {.packedArgs.} =
   waitfor agentLoopImpl(ch, timeout)
 
 when isMainModule:
+  randomize()
+
   # init DB
   if not fileExists dbfPath:
     echo "not found DB, creating one ..."
     initDatabase dbfPath
 
-  # set default photo
-  let m = waitFor authorChatId <@ ("file://" & getCurrentDir() / "assets/no-photo.png")
-  defaultPhotoUrl = getBiggestPhotoFileId m
+  # get or set default photo
+  defaultQuestionPhotoUrl =
+    if (let p = ++db.getSetting($sfkDefaultQuestionPhoto); issome p):
+      p.get
+    else:
+      let t = getBiggestPhotoFileId:
+        waitFor authorChatId <@ ("file://" & getCurrentDir() / "assets/no-photo.png")
+
+      \+ db.putSetting($sfkDefaultQuestionPhoto, t)
+      t
 
   # register agents, workers, bot, ...
-  randomize()
-
   for i in 0 ..< agents:
     open agentsInput[i]
     discard runThread(agentLoopPacked,
