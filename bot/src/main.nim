@@ -23,7 +23,7 @@ proc dispatcherImpl*(up: Update, chatId: int64): Action {.fakeSafety.} =
     result.handler = toFn reStart
 
   else:
-    echo (uctx.chatid, uctx.stage)
+    # echo (uctx.chatid, uctx.stage)
 
     if up.message.issome:
       let
@@ -109,7 +109,7 @@ proc dispatcher*(bot: TeleBot, up: Update): Future[bool] {.async, fakeSafety.} =
 
 # app --------------------
 
-proc resultWrapper(a: Action){.async.} =
+proc resultWrapper(a: Action) {.async.} =
   try:
     let res = await a.handler(bot, a.update, getOrCreateUser(a.chatid), a.args)
 
@@ -120,9 +120,10 @@ proc resultWrapper(a: Action){.async.} =
   except FValueError: asyncCheck a.chatid << invalidInputT
   except FmRangeError: asyncCheck a.chatid << rangeErrorT
   except:
-    echo getCurrentExceptionMsg()
+    let err = getCurrentExceptionMsg()
+    echo err
+    asyncCheck authorChatId << escapeMarkdownV2 err
     asyncCheck a.chatid << someErrorT
-
 
 proc agentLoopImpl(ch: ptr Channel[Action], timeout: int) {.async, fakeSafety.} =
   while true:
@@ -166,9 +167,10 @@ when isMainModule:
     toStartBackgroudJobArgs(addr agentsInput, 50))
 
   bot.onUpdate dispatcher
+  discard waitFor authorChatId << "hey"
 
   # app loop
   while true:
     echo "running ..."
-    try: bot.poll(timeout = 100)
+    try: bot.poll()
     except: echo getCurrentExceptionMsg()

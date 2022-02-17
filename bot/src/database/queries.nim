@@ -100,7 +100,6 @@ template keepOrder(result, dir, order): untyped =
         result.reverse
 
 # member ----------------------------------------
-
 proc getMember*(db; chatId: int64): Option[MemberModel] =
     let row = db.getSingleRow(sql"""
         SELECT chat_id, site_name, tg_name, phone_number, is_admin, joined_at 
@@ -128,7 +127,6 @@ proc addMember*(db;
         phone_number.limit(PhoneNumberLimit), isAdmin, joined_at)
 
 # tag --------------------------------------
-
 proc totag*(s: seq[string]): TagModel =
     TagModel(
         id: s[0].parseint,
@@ -170,7 +168,6 @@ proc getOrInsertTag*(db;
             chapter: chapter)
 
 # quiz --------------------------------------
-
 proc addQuiz*(db;
     name: string, description: string, time: int64, tag_id: int64,
     created_at: int64, questions: openArray[QuestionModel],
@@ -289,7 +286,6 @@ proc deleteQuiz*(db; quizid: int64): bool =
         db.exec(sql"DELETE FROM quiz WHERE id = ?", quizid)
 
 # record -------------------------------------------
-
 proc addRecord*(db;
     quizId: int64, member_chatId: int64, answers: string,
     questions_order: string, precent: float, created_at: int64,

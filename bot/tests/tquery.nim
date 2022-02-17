@@ -257,6 +257,9 @@ suite "SELECT":
     check db.getForms(0, 10, saMore, Ascending).mapIt(it.form.content) ==
         forms.mapIt(it[7])
 
+  test "get not existing setting":
+    check isnone db.getSetting("some setting")
+
 suite "UPSERT":
   test "new tag":
     let
