@@ -52,8 +52,7 @@ Blueprint [queryHolder: initQuery, postfix: "Model"]:
         Index [quiz_id, percent] as "rank"
 
     Table post:
-        id: int {.primary.}
-        kind: int
+        kind: int {.primary.}
         video_path: string
         description: string
 
@@ -78,10 +77,8 @@ Blueprint [queryHolder: initQuery, postfix: "Model"]:
         content: Option[string]
         created_at: int
 
-    # TODO save empty photoPath here
-    Table settings:
-        id: int {.primary.}
-        field: string
+    Table setting:
+        field: string {.primary.}
         value: string
 
 type
@@ -96,7 +93,7 @@ type
     PostKinds* = enum
         pokIntroduction
 
-    SettingsFieldKinds* = enum
+    SettingFieldKinds* = enum
         sfkEmptyPhoto
 
 

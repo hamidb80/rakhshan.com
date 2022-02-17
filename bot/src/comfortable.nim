@@ -69,5 +69,9 @@ template `++`*(code): untyped =
   dbWorksCapture dbfPath:
     code
 
+template `\+`*(code): untyped =
+  dbWorks dbfPath:
+    code
+
 template impossible*: untyped=
   raise newException(ValueError, "impossible")

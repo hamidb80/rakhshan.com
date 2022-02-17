@@ -140,7 +140,7 @@ suite "INIT":
 suite "INSERT":
   test "add member":
     for m in membersRaw:
-      discard db.addMember(m[0], m[1], m[2], m[3], m[4], m[5])
+      db.addMember(m[0], m[1], m[2], m[3], m[4], m[5])
 
   test "add tag":
     for t in tagsRaw:
@@ -148,20 +148,20 @@ suite "INSERT":
 
   test "add quiz":
     for q in quizzesRaw:
-      discard db.addQuiz(q[1], q[2], q[3], q[4], q[5], q[6])
+      db.addQuiz(q[1], q[2], q[3], q[4], q[5], q[6])
 
   test "add record":
     for r in recordsRaw:
-      discard db.addRecord(r[1].int64, r[2].int64, r[3], r[4], r[5], r[6])
+      db.addRecord(r[1].int64, r[2].int64, r[3], r[4], r[5], r[6])
 
   test "add plan":
     for p in plans:
-      discard db.addPlan(PlanModel(kind: p[0].ord,
+      db.addPlan(PlanModel(kind: p[0].ord,
         title: p[1], video_path: p[2], description: p[3], link: p[4]))
 
   test "add form":
     for f in forms:
-      discard db.addForm(FormModel(kind: f[0].ord,
+      db.addForm(FormModel(kind: f[0].ord,
         chatid: f[1], planId: f[2], fullname: f[3],
         phoneNumber: f[4], grade: f[5], major: f[6],
         content: f[7], createdAt: f[8]))
@@ -261,7 +261,7 @@ suite "UPSERT":
   test "new tag":
     let
       traw = (10, "chemistery", 2)
-      tg = db.upsertTag(traw[0], traw[1], traw[2])
+      tg = db.getOrInsertTag(traw[0], traw[1], traw[2])
 
     check:
       tg.grade == traw[0]
@@ -271,7 +271,7 @@ suite "UPSERT":
   test "duplicated tag":
     let
       traw = tagsRaw[0]
-      tg = db.upsertTag(traw[1], traw[2], traw[3])
+      tg = db.getOrInsertTag(traw[1], traw[2], traw[3])
 
     check:
       tg.grade == traw[1]
@@ -285,15 +285,23 @@ suite "UPSERT":
     """.sql, tg.grade, tg.lesson, tg.chapter).parseint == 1
 
   test "new post":
-    discard db.upsertPost(PostModel(kind: pokIntroduction.ord))
+    db.upsertPost(PostModel(kind: pokIntroduction.ord, description: "test desc"))
     check isSome db.getPost(pokIntroduction)
 
   test "exsiting post":
-    discard db.upsertPost(PostModel(kind: pokIntroduction.ord, description: "new desc"))
+    db.upsertPost(PostModel(kind: pokIntroduction.ord, description: "new desc"))
     let p = db.getPost(pokIntroduction)
     check:
       isSome p
       p.get.description == "new desc"
+
+  test "new setting":
+    db.putSetting("app_name", "bot")
+    check db.getSetting("app_name") == some "bot"
+
+  test "existing setting":
+    db.putSetting("app_name", "test")
+    check db.getSetting("app_name") == some "test"
 
 suite "DELETE":
   test "quiz":

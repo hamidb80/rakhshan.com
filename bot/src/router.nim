@@ -210,7 +210,7 @@ newRouter router:
         case input:
 
         of submitT:
-          discard ++db.addForm(uf)
+          \+db.addForm(uf)
           forget uctx.form
           asyncCheck chatid << yourFormHasSubmittedT
           asyncCheck redirect(reEnterhome, args)
@@ -229,7 +229,7 @@ newRouter router:
           userInfo = await ct.phoneNumber.getUserInfo # number
 
         dbworks dbfpath:
-          discard db.addMember(chatid, userinfo.display_name,
+          db.addMember(chatid, userinfo.display_name,
             (ct.firstname & " " & ct.lastname.get("")),
             ct.phoneNumber, userInfo.is_admin.int, unixNow())
 
@@ -325,7 +325,7 @@ newRouter router:
 
       of spLink:
         pl.link = input
-        discard ++db.addPlan pl
+        \+db.addPlan pl
         forget uctx.plan
         asyncCheck chatid << planAddedT
         asyncCheck redirect(reAdmindashboard, %*[chatid, ""])
@@ -358,7 +358,7 @@ newRouter router:
         else: asyncCheck chatid << invalidInputT
 
       of sdqTitle:
-        dbworks dbfPath: db.deletePlan(PlanKinds(pl.kind), input)
+        \+db.deletePlan(PlanKinds(pl.kind), input)
         asyncCheck chatid << planDeletedT
         cancelJob()
 
@@ -399,7 +399,7 @@ newRouter router:
 
       of spoDesc:
         ps.description = input
-        discard ++db.upsertPost(ps)
+        \+db.upsertPost(ps)
         asyncCheck chatid << postSubmittedT
         forget uctx.post
         asyncCheck redirect(reEnterhome, args)
@@ -517,9 +517,9 @@ newRouter router:
 
     if input == endT and uctx.stage == sAQQPic:
       dbworks dbfpath:
-        let tg = db.upsertTag(
+        let tg = db.getOrInsertTag(
           qc.tag.grade, qc.tag.lesson, qc.tag.chapter)
-        discard db.addQuiz(
+        db.addQuiz(
           qc.quiz.name,
           qc.quiz.description,
           qc.quiz.time,
@@ -971,7 +971,7 @@ newRouter router:
         r.answerSheet, r.questionsOrder.mapIt(r.questions[it].answer.int))
 
       # save record
-      discard ++db.addRecord(r.quiz.id, chatid, r.answerSheet.join,
+      \+db.addRecord(r.quiz.id, chatid, r.answerSheet.join,
         ($r.questionsOrder).substr(1), percent, unixNow())
 
       # show complete result

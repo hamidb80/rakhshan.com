@@ -120,9 +120,8 @@ proc getMember*(db; chatId: int64): Option[MemberModel] =
 proc addMember*(db;
     chatId: int64, site_name: string, tg_name: string,
     phone_number: string, isAdmin: int, joined_at: int64
-): int64 =
-    # add site_name + tg_name
-    db.insertID(sql"""
+) =
+    db.exec(sql"""
         INSERT INTO member (chat_id, site_name, tg_name, phone_number, is_admin, joined_at) 
         VALUES (?, ?, ?, ?, ?, ?)
     """, chatId, site_name.limit(LongStrLimit), tg_name.limit(LongStrLimit),
@@ -156,7 +155,7 @@ grade: int64, lesson: string, chapter: int64
     if issome row:
         result = some totag row.get
 
-proc upsertTag*(db;
+proc getOrInsertTag*(db;
     grade: int64, lesson: string, chapter: int64
 ): TagModel =
     let tag = db.getTag(grade, lesson, chapter)
@@ -175,9 +174,9 @@ proc upsertTag*(db;
 proc addQuiz*(db;
     name: string, description: string, time: int64, tag_id: int64,
     created_at: int64, questions: openArray[QuestionModel],
-): int64 =
+) =
     transaction db:
-        result = db.insertID(sql"""
+        let qid = db.insertID(sql"""
             INSERT INTO quiz (name, description, time, tag_id, questions_count, created_at) 
             VALUES (?, ?, ?, ?, ?, ?)
         """, name.limit(LongStrLimit), description, time, tagid, questions.len, created_at)
@@ -185,7 +184,7 @@ proc addQuiz*(db;
         for q in questions:
             db.exec(
                 sql"INSERT INTO question (quiz_id, photo_path, description, why, answer) VALUES (?, ?, ?, ?, ?)",
-                result, q.photo_path, q.description, q.why, q.answer)
+                qid, q.photo_path, q.description, q.why, q.answer)
 
 func quizInfoQueryGen(whereClause: string, dir = saMore): string =
     fmt """
@@ -294,8 +293,8 @@ proc deleteQuiz*(db; quizid: int64): bool =
 proc addRecord*(db;
     quizId: int64, member_chatId: int64, answers: string,
     questions_order: string, precent: float, created_at: int64,
-): int64 =
-    db.insertID(sql"""
+) =
+    db.exec(sql"""
         INSERT INTO record (quiz_id, member_chatid, answer_list, percent, created_at, questions_order) 
         VALUES (?, ?, ?, ?, ?, ?)
     """, quizId, member_chatId, answers.limit(LongStrLimit), precent,
@@ -380,47 +379,31 @@ proc getRank*(db;
         """, quizid, myPercent).get[0].parseint + 1
 
 # post -------------------------------
-
-proc addPost(db; p: PostModel): int64 =
-    db.insertID(sql"""
-        INSERT INTO post (kind, video_path, description) 
-        VALUES (?, ?, ?)
-    """, p.kind.ord, p.videoPath, p.description)
-
 proc getPost*(db; kind: PostKinds): Option[PostModel] =
     let t = db.getSingleRow(sql"""
-        SELECT id, kind, video_path, description
+        SELECT kind, video_path, description
         FROM post
         WHERE kind = ?
     """, kind.ord)
 
     if isSome t:
         result = some PostModel(
-            id: parseInt t.get[0],
-            kind: parseint t.get[1],
-            video_path: t.get[2],
-            description: t.get[3])
+            kind: parseint t.get[0],
+            video_path: t.get[1],
+            description: t.get[2])
 
-proc upsertPost*(db; p: PostModel): int64 =
-    let t = db.getSingleRow(sql"""
-        SELECT id FROM post WHERE kind = ?
-    """, p.kind.ord)
-
-    if issome t:
-        db.exec(sql"""
-            UPDATE post SET
-            video_path = ?, description = ?
-            WHERE id = ?
-        """, p.video_path, p.description, t.get[0])
-
-        parseBiggestInt t.get[0]
-
-    else:
-        db.addPost(p)
+proc upsertPost*(db; p: PostModel) =
+    db.exec(sql"""
+        INSERT INTO post (kind, video_path, description)
+        VALUES (?, ?, ?)
+        ON CONFLICT(kind) DO UPDATE SET
+            video_path = excluded.video_path,
+            description = excluded.description
+    """, p.kind.ord, p.video_path, p.description)
 
 # plan -------------------------------
-proc addPlan*(db; p: PlanModel): int64 =
-    db.insertID(sql"""
+proc addPlan*(db; p: PlanModel) =
+    db.exec(sql"""
         INSERT INTO plan (kind, title, video_path, description, link) 
         VALUES (?, ?, ?, ?, ?)
     """, p.kind, p.title.limit(LongStrLimit),
@@ -472,8 +455,8 @@ proc deletePlan*(db; kind: PlanKinds, title: string) =
     """, kind.ord, title)
 
 # form -------------------------------
-proc addForm*(db; f: FormModel): int64 =
-    db.insertID(sql"""
+proc addForm*(db; f: FormModel) =
+    db.exec(sql"""
         INSERT INTO form (
             kind, plan_id, chat_id, created_at,
             full_name, phone_number, grade, major, 
@@ -516,3 +499,22 @@ proc getForms*(db;
             planName: toNillableString it[10])
 
     result.keepOrder(dir, order)
+
+# setting ---------------------------
+proc getSetting*(db; field: string): Option[string] =
+    let t = db.getSingleRow(sql"""
+        SELECT value 
+        FROM setting 
+        WHERE field = ?
+    """, field)
+
+    if isSome t:
+        result = some t.get[0]
+
+proc putSetting*(db; field, value: string) =
+    db.exec(sql"""
+        INSERT INTO setting (field, value)
+        VALUES(?, ?)
+        ON CONFLICT(field) DO UPDATE SET
+            value = excluded.value
+    """, field, value)
