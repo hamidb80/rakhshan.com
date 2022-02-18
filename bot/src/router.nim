@@ -7,13 +7,7 @@ import
   messages, forms, settings,
   host_api, utils, database/[queries, models, native]
 
-# TODO send notification to admin when a new form submitted
-# just notify without details ... to all of the admins
-
-# TODO add backup every 24 hours and send in PV
 # TODO improve help
-# TODO test form with arbitary message types like photo or audio
-# TODO update telebot dep
 
 const backupFilePath = "backup.db"
 
@@ -41,11 +35,11 @@ newRouter router:
         backupDB dbfPath, backupFilePath
         discard await bot.sendDocument(chatid, "file://" & backupFilePath)
         removeFile backupFilePath
-      
+
       except:
         echo getCurrentExceptionMsg()
         asyncCheck chatid << someErrorT
-        
+
   route(chatid: int64, input: string) as "home":
     template getPlans(planKind): untyped =
       let
@@ -216,18 +210,23 @@ newRouter router:
           else:
             none string
 
-        discard await chatid << fullFormString(uf, planTitle)
+        discard await chatid << fullFormString(uf, planTitle, false)
         asyncCheck chatid << (sendIfYouSureOtherwiseCancelAndRefillT, formEndReply)
         /-> sfConfirm
 
       of sfConfirm:
         case input:
-
         of submitT:
-          \+db.addForm(uf)
-          forget uctx.form
+          uf.createdAt = unixNow()
+          let formId = ++db.addForm(uf)
           asyncCheck chatid << yourFormHasSubmittedT
-          asyncCheck redirect(reEnterhome, args)
+
+          let msg = newFormNotification(formId, FormKinds uf.kind)
+          for chid in ++db.getAdminIds:
+            asyncCheck chid << msg
+
+          forget uctx.form
+          asyncCheck redirect(reEnterhome, %*[chatid])
 
         else:
           asyncCheck chatid << invalidInputT
@@ -396,7 +395,7 @@ newRouter router:
           ps.kind = pokIntroduction.ord
           asyncCheck chatid << sendOrForwardVideoT
           /-> spoVideo_path
-        
+
         else:
           asyncCheck chatid << invalidInputT
 
@@ -429,15 +428,22 @@ newRouter router:
 
     else:
       uctx.queryPaging = some initQueryPageInfo(sfForms)
-      asyncCheck chatid << (yourRecordsT, cancelReply)
+      asyncCheck chatid << (submittedFormsHistoryT, cancelReply)
 
       qp.msgid = some (await chatid << (
-        forms.mapIt(fullFormString(it.form, it.planName)).join "\n\n",
+        forms.mapIt(fullFormString(it.form, it.planName, true)).join "\n\n",
         genQueryPageInlineBtns(0)
       )).messageid
 
       qp.indexRange = forms[^1].form.id .. forms[0].form.id
       /-> sScroll
+
+  route(chatid: int64, fid: string) as "get_form_content":
+    let fc = ++db.getFormContent(fid.parseBiggestInt)
+    if isSome fc:
+      asyncCheck chatid <<< fc.get("-")
+    else:
+      asyncCheck chatid << formDoesNotExistsT
 
   route(chatid: int64, input: string) as "delete_quiz":
     if input == cancelT:
@@ -654,7 +660,7 @@ newRouter router:
       asyncCheck chatid << invalidInputT
 
   route(chatid: int64, input: string) as "find_quiz":
-    template goBack: untyped = 
+    template goBack: untyped =
       /-> sFindQuizMain
 
     case input:
@@ -794,7 +800,7 @@ newRouter router:
               qp.page.inc btnDir.toInt
 
               asyncCheck (chatid, msgid) <^ (
-                forms.mapit(fullFormString(it[0], it[1])).join "\n\n",
+                forms.mapit(fullFormString(it[0], it[1], true)).join "\n\n",
                 genQueryPageInlineBtns(qp.page))
 
             else:

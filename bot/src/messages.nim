@@ -150,6 +150,7 @@ const
 
     myRecordsT* = "سابقه آزمون ها"
     yourRecordsT* = "سابقه آزمون های شما"
+    submittedFormsHistoryT* = "سابقه فرم های ارسالی"
     itsTheEndT* = "آخرشه"
     itsTheStartT* = "اولشه"
 
@@ -209,6 +210,10 @@ const
 
     sendOrForwardVideoT* = "ویدئوی مربوطه را ارسال یا فوروارد کنید"
 
+    aNewFormWithIdT* = "یک فرم جدید با شناسه"
+    ofTypeT* = "از نوع"
+    submittedT* = "ثبت شد"
+
     # plan
     addPlanT* = "افزودن طرح"
     planAddedT* = "طرح ثبت شد"
@@ -243,6 +248,8 @@ const
     enterQuizGradeToSearchT* = "پایه آزمون را برای جستجو وارد کنید"
     enterQuizLessonToSearchT* = "نام درس آزمون را برای جستحو وارد کنید"
 
+    formDoesNotExistsT* = "چنین فرمی وجود ندارد"
+
     gradesSchoolT*: array[7..12, string] = [
       "هفتم",
       "هشتم",
@@ -257,37 +264,6 @@ const
       "تجربی",
       "انسانی",
     ]
-
-func genQueryPageInlineBtns*(pageIndex: int): InlineKeyboardMarkup =
-    newInlineKeyboardMarkup @[
-      toInlineButtons @[
-        (pointLeftTJ, "/m-"),
-        ($(pageIndex + 1), "/d"), # no op
-        (pointRightTJ, "/m+"),
-    ]]
-
-func genTakeQuizInlineBtn*(quizId: int64): InlineKeyboardMarkup =
-    result = InlineKeyboardMarkup(kind: kInlineKeyboardMarkup)
-    result.inlineKeyboard = @[@[
-      InlineKeyboardButton(
-        text: takeQuizT,
-        callbackData: some fmt"/t{quizid}"
-    )]]
-
-func genQuestionJumpBtns*(number: int): InlineKeyboardMarkup =
-    var btnRows = newSeqOfCap[seq[InlineKeyboardButton]](number div 4)
-
-    for offset in countup(1, number, 4):
-        var acc = newSeqOfCap[InlineKeyboardButton](4)
-        for n in offset .. min(offset + 3, number):
-            acc.add InlineKeyboardButton(
-              text: $n,
-              callbackData: some fmt"/j{(n-1)}")
-
-        btnRows.add acc
-
-    result = newInlineKeyboardMarkup()
-    result.inlineKeyboard = btnRows
 
 func toPersianNumbers*(str: string): string =
     for c in str:
@@ -446,31 +422,6 @@ func `$`*(fk: FormKinds): string =
     of fkRegisterInPlans: "ثبت نام"
     of fkReportProblem: "گزارش مشکل"
 
-func formFieldsToString(s: seq[array[2, string]]): string =
-    s.mapIt(bold(it[0]) & ": " & it[1]).join "\n"
-
-proc fullFormString*(f: FormModel, planTitle: Option[string]): string =
-    let
-        header = @[
-          ["شماره فرم", $f.id],
-          ["نوع فرم", $(FormKinds f.kind)]
-        ]
-        userInfo = @[
-          ["نام", escapeMarkdownV2 $f.full_name],
-          ["شماره تماس", $f.phone_number],
-          ["پایه", $f.grade],
-          ["رشته", f.major.get("")],
-          ["تاریخ", unixDatetimeFormat(f.createdAt)],
-        ]
-
-    formFieldsToString:
-        case FormKinds f.kind:
-        of fkRegisterInPlans:
-            header & @[["عنوان طرح", escapeMarkdownV2 planTitle.get]] & userInfo
-
-        of fkReportProblem:
-            header & userInfo & @[["متن", escapeMarkdownV2 f.content.get]]
-
 func `$`*(p: PlanModel): string =
     [
       fmt"{bold p.title}",
@@ -485,7 +436,80 @@ func `$`*(pok: PostKinds): string =
 func `$`*(p: PostModel): string =
     p.description
 
+func formFieldsToString(s: seq[array[2, string]]): string =
+    s.mapIt(bold(it[0]) & ": " & it[1]).join "\n"
+
+func strSlice(s: string, max: int): tuple[text: string, hasMore: bool] =
+    if s.len > max:
+        (s.substr(0, 99) & "...", true)
+    else:
+        (s, false)
+
+proc fullFormString*(f: FormModel, planTitle: Option[string],
+        isAdmin: bool): string =
+    var
+        header = @[ ["نوع فرم", $(FormKinds f.kind)]]
+        body = @[
+            ["نام", escapeMarkdownV2 $f.full_name],
+            ["شماره تماس", f.phone_number],
+            ["پایه", $f.grade],
+            ["رشته", f.major.get("")],
+            ["تاریخ", unixDatetimeFormat(f.createdAt)],
+        ]
+
+    if isAdmin:
+        header.add ["شماره فرم", $f.id]
+
+    case FormKinds f.kind:
+    of fkRegisterInPlans:
+        header.add @[
+          ["عنوان طرح", escapeMarkdownV2 planTitle.get "-"]]
+
+    of fkReportProblem:
+        let t = f.content.get("").strSlice(100)
+        body.add @[
+          ["متن", escapeMarkdownV2 t.text],
+        ]
+
+        if t.hasMore and isAdmin:
+            body.add ["ادامه متن", fmt"/f{f.id}"]
+
+    formFieldsToString header & body
+
+func newFormNotification*(formId: int64, formKind: FormKinds): string =
+    escapeMarkdownV2 fmt"{aNewFormWithIdT} '{formid}' {ofTypeT} '{formKind}' {submittedT}"
+
 # keyboards -------------------------------
+func genQueryPageInlineBtns*(pageIndex: int): InlineKeyboardMarkup =
+    newInlineKeyboardMarkup @[
+      toInlineButtons @[
+        (pointLeftTJ, "/m-"),
+        ($(pageIndex + 1), "/d"), # no op
+        (pointRightTJ, "/m+"),
+    ]]
+
+func genTakeQuizInlineBtn*(quizId: int64): InlineKeyboardMarkup =
+    result = InlineKeyboardMarkup(kind: kInlineKeyboardMarkup)
+    result.inlineKeyboard = @[@[
+      InlineKeyboardButton(
+        text: takeQuizT,
+        callbackData: some fmt"/t{quizid}"
+    )]]
+
+func genQuestionJumpBtns*(number: int): InlineKeyboardMarkup =
+    var btnRows = newSeqOfCap[seq[InlineKeyboardButton]](number div 4)
+
+    for offset in countup(1, number, 4):
+        var acc = newSeqOfCap[InlineKeyboardButton](4)
+        for n in offset .. min(offset + 3, number):
+            acc.add InlineKeyboardButton(
+              text: $n,
+              callbackData: some fmt"/j{(n-1)}")
+
+        btnRows.add acc
+
+    result = newInlineKeyboardMarkup()
+    result.inlineKeyboard = btnRows
 
 let
     noReply* = newReplyKeyboardRemove(true)

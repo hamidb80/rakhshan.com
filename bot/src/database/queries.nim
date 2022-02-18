@@ -100,6 +100,16 @@ template keepOrder(result, dir, order): untyped =
         result.reverse
 
 # member ----------------------------------------
+proc addMember*(db;
+    chatId: int64, site_name: string, tg_name: string,
+    phone_number: string, isAdmin: int, joined_at: int64
+) =
+    db.exec(sql"""
+        INSERT INTO member (chat_id, site_name, tg_name, phone_number, is_admin, joined_at) 
+        VALUES (?, ?, ?, ?, ?, ?)
+    """, chatId, site_name.limit(LongStrLimit), tg_name.limit(LongStrLimit),
+        phone_number.limit(PhoneNumberLimit), isAdmin, joined_at)
+
 proc getMember*(db; chatId: int64): Option[MemberModel] =
     let row = db.getSingleRow(sql"""
         SELECT chat_id, site_name, tg_name, phone_number, is_admin, joined_at 
@@ -116,15 +126,12 @@ proc getMember*(db; chatId: int64): Option[MemberModel] =
             isAdmin: row.get[4].parseInt,
             joinedAt: row.get[5].parseint)
 
-proc addMember*(db;
-    chatId: int64, site_name: string, tg_name: string,
-    phone_number: string, isAdmin: int, joined_at: int64
-) =
-    db.exec(sql"""
-        INSERT INTO member (chat_id, site_name, tg_name, phone_number, is_admin, joined_at) 
-        VALUES (?, ?, ?, ?, ?, ?)
-    """, chatId, site_name.limit(LongStrLimit), tg_name.limit(LongStrLimit),
-        phone_number.limit(PhoneNumberLimit), isAdmin, joined_at)
+proc getAdminIds*(db): seq[int64] =
+    db.getAllRows(sql """
+        SELECT chat_id
+        from member
+        WHERE is_admin = 1
+    """).mapIt parseBiggestInt it[0]
 
 # tag --------------------------------------
 proc totag*(s: seq[string]): TagModel =
@@ -451,8 +458,8 @@ proc deletePlan*(db; kind: PlanKinds, title: string) =
     """, kind.ord, title)
 
 # form -------------------------------
-proc addForm*(db; f: FormModel) =
-    db.exec(sql"""
+proc addForm*(db; f: FormModel): int64 =
+    db.insertID(sql"""
         INSERT INTO form (
             kind, plan_id, chat_id, created_at,
             full_name, phone_number, grade, major, 
@@ -495,6 +502,13 @@ proc getForms*(db;
             planName: toNillableString it[10])
 
     result.keepOrder(dir, order)
+
+proc getFormContent*(db; fid: int64): Option[string] =
+    toNillableString db.getValue(sql fmt"""
+        SELECT content
+        FROM form
+        WHERE id = ?
+    """, fid)
 
 # setting ---------------------------
 proc getSetting*(db; field: string): Option[string] =

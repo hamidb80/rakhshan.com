@@ -5,6 +5,7 @@ import
   controller, comfortable, settings, router,
   states, utils, database/[queries, models], messages, forms
 
+# TODO add backup every 24 hours and send in PV
 
 let bot = newTeleBot tgToken
 var agentsInput = newseq[Channel[Action]](agents)
@@ -38,6 +39,7 @@ proc dispatcherImpl*(up: Update, chatId: int64): Action {.fakeSafety.} =
           of 'q': reShow_quiz
           of 'a': reAnalyze
           of 'r': reGet_rank
+          of 'f': reGetFormContent
 
           elif text.startsWith "/start": reStart
           elif text.startsWith "/help": reHelp

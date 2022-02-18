@@ -1,13 +1,9 @@
+.fandogh
+
 temp/*
 !temp/.nomedia
-*.sql
 
 play.*
 *.exe
-
-azmoon
-
-.fandogh
 *.db
-
-play.*
+*.sql

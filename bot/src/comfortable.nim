@@ -16,6 +16,9 @@ template `<<`*(
 template `<<`*(chatid: int64, text: string): untyped {.dirty.} =
   bot.sendMessage(chatid, text, parsemode = "MarkdownV2")
 
+template `<<<`*(chatid: int64, text: string): untyped {.dirty.} =
+  bot.sendMessage(chatid, text)
+
 template `<@`*(chatid: int64, box: tuple[url,
     caption: string]): untyped {.dirty.} =
   bot.sendPhoto(chatid, box[0], box[1], parsemode = "MarkdownV2")

@@ -10,7 +10,7 @@ bin           = @["main"]
 # Dependencies
 
 requires "nim >= 1.6.2"
-requires "telebot == 2022.01.07"
+requires "telebot == 2022.02.02"
 requires "jalali_nim == 0.0.2"
 requires "packedargs"
 requires "macroplus == 0.1.20"
