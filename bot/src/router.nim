@@ -9,7 +9,10 @@ import
 
 # TODO improve help
 
-const backupFilePath = "backup.db"
+const 
+  backupFilePath = "backup.db"
+  captionLimitFull = 1024
+  captionLimitReverved = 900
 
 newRouter router:
   command(chatid: int64) as "help":
@@ -332,7 +335,7 @@ newRouter router:
           asyncCheck chatid << whatYouveJustSentIsNotAvideoT
 
       of spDesc:
-        pl.description = input
+        pl.description = input.substr(0, captionLimitReverved)
         asyncCheck chatid << enterPlanLinkT
         /-> spLink
 
@@ -411,7 +414,7 @@ newRouter router:
           asyncCheck chatid << whatYouveJustSentIsNotAvideoT
 
       of spoDesc:
-        ps.description = input
+        ps.description = input.substr(0, captionLimitFull)
         \+db.upsertPost(ps)
         asyncCheck chatid << postSubmittedT
         forget uctx.post
