@@ -1,9 +1,9 @@
-import std/[sqlite3, os]
+import std/[sqlite3, asyncdispatch]
 
 proc progress(a, b: cint) = discard
 
 proc backupDB*(source, dest: string,
-  delay: int = 100, xProgress: proc(a, b: cint) = progress) =
+  delay: int = 100, xProgress: proc(a, b: cint) = progress) {.async.} =
   ## code from: https://www.sqlite.org/backup.html
 
   var
@@ -25,7 +25,7 @@ proc backupDB*(source, dest: string,
     )
 
     if r in [SQLITE_OK, SQLITE_BUSY, SQLITE_LOCKED]:
-      sleep delay
+      sleepAsync delay
     else:
       break
 

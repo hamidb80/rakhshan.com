@@ -35,7 +35,7 @@ newRouter router:
   command(chatid: int64) as "backup":
     if isAdmin uctx:
       try:
-        backupDB dbfPath, backupFilePath
+        await backupDB(dbfPath, backupFilePath)
         discard await bot.sendDocument(chatid, "file://" & backupFilePath)
         removeFile backupFilePath
 
